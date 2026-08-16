@@ -104,7 +104,7 @@ Atom numbering is an indexing convenience. Renumbering the same atoms must not c
 
 Select a molecule and an atom. The highlighted atom on the structure must correspond exactly to the highlighted graph node. Inspect its neighbour list and verify that the heavy-atom degree equals the number of listed neighbours.
 """),
-        hidden_code("display(atom_explorer('properties'))"),
+        hidden_code("display(atom_explorer('graph'))"),
         markdown(r"""
 ## Mathematical object produced
 

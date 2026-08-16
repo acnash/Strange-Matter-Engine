@@ -410,6 +410,11 @@ def atom_explorer(mode="properties"):
             plt.show()
             props = atom_properties(mol).set_index("atom").loc[[idx]].T.reset_index()
             props.columns = ["property", "value"]
+            if mode == "graph":
+                props = props.loc[props["property"].isin(["heavy_atom_degree", "neighbours"])]
+                props["property"] = props["property"].replace(
+                    {"heavy_atom_degree": "degree dᵢ", "neighbours": "neighbour set N(i)"}
+                )
             display(props.style.hide(axis="index").set_properties(**{"background-color": NEON["panel"], "color": NEON["white"]}))
             if mode == "encoding":
                 names, vector = encode_atom(mol, idx)
