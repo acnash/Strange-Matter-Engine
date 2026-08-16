@@ -25,3 +25,7 @@ Nothing enters the final model merely because it is conventional or available in
 - how we will test whether it helps.
 
 These documents will grow alongside the implementation. They are teaching notes, design records, and a defence against accidental black-box modelling.
+
+## Visual laboratory
+
+The [interactive notebook course](../notebooks/README.md) turns these subjects into code-hidden visual experiments using the 12-molecule development set. Static, code-hidden exports are retained in the [rendered teaching laboratory](../docs/teaching_lab/README.md).
