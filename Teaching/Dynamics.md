@@ -74,7 +74,21 @@ A positive value seen only briefly will be reported as **finite-time local diver
 
 ## Dynamical fingerprint
 
-Candidate trajectory summaries include convergence time, step-to-step distance, variation across atoms and time, oscillation amplitude, periodicity, autocorrelation, entropy, spectral features, transient length, and perturbation response. Each quantity will be learned mathematically before adoption.
+A **dynamical fingerprint** is a vector of numerical summaries extracted from the complete CA trajectory. It converts aspects of how a molecule evolves into quantities that can be analysed and supplied to the `pIC50` readout. Candidate components include:
+
+- **Convergence time:** the number of generations required for the global state to become and remain sufficiently close to a fixed state. We must define the distance measure, closeness threshold, and required duration; otherwise numerical systems may approach a fixed point indefinitely without being declared converged.
+- **Step-to-step distance:** the size of the change from `X⁽ᵗ⁾` to `X⁽ᵗ⁺¹⁾`, measured with a stated norm. Its sequence through time shows whether evolution is slowing, maintaining activity, or changing irregularly.
+- **Variation across atoms:** the extent to which atom states differ from one another within the same generation. This can reveal whether the graph is becoming homogeneous or maintaining spatially differentiated behaviour.
+- **Variation through time:** the extent to which a state or summary changes across generations. It distinguishes nearly static trajectories from temporally active ones.
+- **Oscillation amplitude:** the magnitude of repeated movement around a central or average state. A larger amplitude means a wider excursion, but does not by itself prove that the motion is periodic.
+- **Periodicity:** whether a state pattern repeats after a consistent number of generations. The smallest repeat interval is the period or cycle length; approximate periodicity requires an explicit tolerance.
+- **Autocorrelation:** the similarity between a time series and a delayed copy of itself. Peaks at particular delays can reveal repeated structure and estimate an oscillation period even when repetition is imperfect.
+- **Entropy:** a measure of uncertainty or diversity in a defined distribution of states or changes. Its meaning depends on how continuous state values are converted into probabilities or bins, so “entropy” is incomplete without naming the distribution and formula used.
+- **Spectral features:** quantities obtained by decomposing temporal behaviour into frequencies, commonly with a Fourier transform. Dominant frequencies and their strengths can expose oscillations that are difficult to recognise directly in the raw trajectory.
+- **Transient length:** the duration of the initial, non-stationary behaviour before the system settles into a fixed point, cycle, or other persistent regime. Unlike convergence time, this concept can also apply when the eventual regime is not a fixed state.
+- **Perturbation response:** the change in behaviour caused by a small, controlled alteration to an initial state or feature. It can measure robustness, divergence, changes of attractor, or sensitivity near a basin boundary.
+
+These definitions are provisional. Before adopting any component, we will learn its mathematics, specify exactly how it is calculated for variable-sized molecular graphs, test its numerical reliability, and determine whether it adds information beyond the other fingerprint components.
 
 ## Topics to develop
 
