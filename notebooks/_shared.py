@@ -310,7 +310,7 @@ def plot_encoding(mol, selected_atom=0, ax=None):
     ax.set_yticks(range(mol.GetNumAtoms()), [f"Atom {i}" for i in range(mol.GetNumAtoms())])
     ax.get_yticklabels()[selected_atom].set_color(NEON["lime"])
     ax.get_yticklabels()[selected_atom].set_weight("bold")
-    ax.set_title("Initial chemical-state matrix $C$", color=NEON["cyan"], weight="bold", pad=12)
+    ax.set_title("Initial chemical-state matrix C", color=NEON["cyan"], weight="bold", pad=12)
     ax.set_xlabel("Feature channel")
     ax.set_ylabel("Cell / atom")
     ax.figure.colorbar(image, ax=ax, pad=0.01, label="encoded value")
@@ -406,7 +406,7 @@ def atom_explorer(mode="properties"):
             idx = min(atom_selector.value, mol.GetNumAtoms() - 1)
             fig, axes = plt.subplots(1, 2, figsize=(14, 5.5))
             plot_molecule(mol, selected_atom=idx, title=f"Selected cell: atom {idx}", ax=axes[0])
-            plot_graph(mol, selected_atom=idx, title=f"Neighbourhood $N({idx})$", ax=axes[1])
+            plot_graph(mol, selected_atom=idx, title=f"Neighbourhood N({idx})", ax=axes[1])
             plt.show()
             props = atom_properties(mol).set_index("atom").loc[[idx]].T.reset_index()
             props.columns = ["property", "value"]
