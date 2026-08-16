@@ -61,7 +61,6 @@ where $V$ is the set of atoms and $E$ is the set of chemical bonds. Its size is 
 
 The CYP identity and experimental $\mathrm{pIC}_{50}$ are **molecule-level labels**. They are retained beside the graph but are not intrinsic properties of an individual atom.
 """),
-        hidden_code("static_overview()"),
         markdown(r"""
 ## Interactive laboratory
 
@@ -100,7 +99,6 @@ $$d_i=|N(i)|.$$
 
 Atom numbering is an indexing convenience. Renumbering the same atoms must not change the underlying molecule or its eventual prediction.
 """),
-        hidden_code("static_overview('DEV_CYP1A2_001')"),
         markdown(r"""
 ## Interactive atom–node mapping
 
@@ -143,7 +141,6 @@ Several distinctions are essential:
 - **Ring membership** and **aromatic-ring membership** are different questions.
 - Donor and acceptor behaviour depends on chemical context, not merely on the element symbol.
 """),
-        hidden_code("static_overview('DEV_CYP2C9_002')"),
         markdown(r"""
 ## Interactive chemical inspection
 
@@ -190,7 +187,6 @@ $$X^{(0)}\in\mathbb R^{n\times(d_c+d_f)}.$$
 
 Rows are atoms; columns are state channels. Molecules can have different $n$, but the channel definition must be identical.
 """),
-        hidden_code("row, mol = get_molecule('DEV_CYP1A2_001'); fig, ax = plt.subplots(figsize=(14,5)); plot_encoding(mol, 0, ax=ax); plt.tight_layout(); plt.show()"),
         markdown(r"""
 ## Interactive encoding laboratory
 
@@ -229,7 +225,6 @@ $$m_i^{(t)}=\sum_{j\in N(i)}m_{ij}^{(t)}.$$
 
 The sum does not depend on the arbitrary order in which neighbours are listed.
 """),
-        hidden_code("static_overview('DEV_CYP1A2_002')"),
         markdown(r"""
 ## Interactive bond inspection
 
@@ -276,7 +271,6 @@ $$X^{(t+1)}=\left[(1-\alpha)I+\alpha D^{-1}A\right]X^{(t)}.$$
 
 This rule diffuses differences through the graph and commonly approaches a consensus-like fixed regime. It is useful because convergence can be seen and measured without claiming that this rule is suitable for inhibition prediction.
 """),
-        hidden_code("row, mol = get_molecule('DEV_CYP2C9_002'); states=diffuse(mol); fig, ax=plt.subplots(figsize=(12,5)); ax.imshow(states.T,aspect='auto',cmap=LinearSegmentedColormap.from_list('state',[NEON['black'],NEON['violet'],NEON['cyan'],NEON['lime']])); ax.set(xlabel='Generation t',ylabel='Atom / cell i',title='A complete molecular trajectory'); plt.show()"),
         markdown(r"""
 ## Interactive dynamical laboratory
 

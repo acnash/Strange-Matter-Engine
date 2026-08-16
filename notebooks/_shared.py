@@ -65,7 +65,7 @@ def neon_css():
         """
         <style>
         :root { --cyber-cyan:#27E1FF; --cyber-pink:#FF3CAC; --cyber-yellow:#F9F871; }
-        .jp-Cell-inputWrapper, div.input { display:none !important; }
+        .jp-CodeCell .jp-Cell-inputWrapper, div.code_cell div.input { display:none !important; }
         .jp-RenderedHTMLCommon h1, .text_cell_render h1 { color:#087F99 !important; letter-spacing:0.02em; border-bottom:1px solid #B9C5D6; padding-bottom:0.3em; }
         .jp-RenderedHTMLCommon h2, .text_cell_render h2 { color:#C21875 !important; }
         .jp-RenderedHTMLCommon h3, .text_cell_render h3 { color:#6950C5 !important; }
