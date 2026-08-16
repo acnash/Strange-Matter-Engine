@@ -1,5 +1,9 @@
 """Hidden scientific instrumentation for the Strange Matter Engine teaching notebooks."""
 
+import base64
+import io
+import json
+import uuid
 from pathlib import Path
 
 import ipywidgets as widgets
@@ -61,18 +65,13 @@ def neon_css():
         """
         <style>
         :root { --cyber-cyan:#27E1FF; --cyber-pink:#FF3CAC; --cyber-yellow:#F9F871; }
-        body, .jp-Notebook, .notebook-container { background:#070914 !important; }
         .jp-Cell-inputWrapper, div.input { display:none !important; }
-        .jp-RenderedHTMLCommon, .text_cell_render { color:#DCE6F2 !important; }
-        .jp-RenderedHTMLCommon h1, .text_cell_render h1 { color:#27E1FF !important; letter-spacing:0.02em; border-bottom:1px solid #27304D; padding-bottom:0.3em; }
-        .jp-RenderedHTMLCommon h2, .text_cell_render h2 { color:#FF3CAC !important; }
-        .jp-RenderedHTMLCommon h3, .text_cell_render h3 { color:#F9F871 !important; }
+        .jp-RenderedHTMLCommon h1, .text_cell_render h1 { color:#087F99 !important; letter-spacing:0.02em; border-bottom:1px solid #B9C5D6; padding-bottom:0.3em; }
+        .jp-RenderedHTMLCommon h2, .text_cell_render h2 { color:#C21875 !important; }
+        .jp-RenderedHTMLCommon h3, .text_cell_render h3 { color:#6950C5 !important; }
         .jp-RenderedHTMLCommon code, .text_cell_render code { color:#FF9F43 !important; background:#11152A !important; }
-        .jp-RenderedHTMLCommon blockquote, .text_cell_render blockquote { border-left:3px solid #27E1FF; color:#DCE6F2; background:#11152A; padding:0.5rem 1rem; }
-        .widget-label, .widget-readout, .jupyter-widgets label { color:#DCE6F2 !important; }
+        .jp-RenderedHTMLCommon blockquote, .text_cell_render blockquote { border-left:3px solid #27E1FF; background:#EEF3F9; padding:0.5rem 1rem; }
         .sme-card { background:#11152A; border:1px solid #27304D; border-left:3px solid #27E1FF; border-radius:4px; padding:14px; margin:10px 0; }
-        table { color:#DCE6F2 !important; }
-        th { color:#27E1FF !important; }
         </style>
         """
     )
@@ -324,22 +323,68 @@ def _selector(description="Molecule"):
 
 
 def gallery_explorer():
-    selector = _selector()
-    output = widgets.Output()
+    records = {}
+    for molecule_id in load_data()["molecule_id"]:
+        row, mol = get_molecule(molecule_id)
+        fig, axes = plt.subplots(1, 2, figsize=(14, 5.5))
+        plot_molecule(mol, title=f"{row['molecule_id']} | {row['cyp_target']}", ax=axes[0])
+        plot_graph(mol, ax=axes[1])
+        plt.tight_layout()
+        image_buffer = io.BytesIO()
+        fig.savefig(image_buffer, format="png", dpi=120, bbox_inches="tight")
+        plt.close(fig)
+        summary = molecule_summary(row, mol)
+        records[molecule_id] = {
+            "image": base64.b64encode(image_buffer.getvalue()).decode("ascii"),
+            "summary": summary.to_dict(orient="records"),
+        }
 
-    def refresh(*_):
-        with output:
-            clear_output(wait=True)
-            row, mol = get_molecule(selector.value)
-            fig, axes = plt.subplots(1, 2, figsize=(14, 5.5))
-            plot_molecule(mol, title=f"{row['molecule_id']} | {row['cyp_target']}", ax=axes[0])
-            plot_graph(mol, ax=axes[1])
-            plt.show()
-            display(molecule_summary(row, mol).style.hide(axis="index").set_properties(**{"background-color": NEON["panel"], "color": NEON["white"]}))
-
-    selector.observe(refresh, names="value")
-    refresh()
-    return widgets.VBox([selector, output])
+    control_id = f"sme-gallery-{uuid.uuid4().hex}"
+    options = "".join(f'<option value="{key}">{key}</option>' for key in records)
+    payload = json.dumps(records).replace("</", "<\\/")
+    return HTML(
+        f"""
+        <div id="{control_id}" class="sme-gallery">
+          <label for="{control_id}-selector">Molecule</label>
+          <select id="{control_id}-selector">{options}</select>
+          <img alt="Selected molecule and graph" />
+          <table><thead><tr><th>Quantity</th><th>Value</th></tr></thead><tbody></tbody></table>
+        </div>
+        <style>
+          #{control_id} {{ color:#182235; font-family:system-ui,sans-serif; }}
+          #{control_id} label {{ font-weight:700; margin-right:0.7rem; }}
+          #{control_id} select {{ min-width:230px; padding:0.35rem 0.5rem; border:1px solid #087F99; border-radius:4px; background:white; color:#182235; }}
+          #{control_id} img {{ display:block; width:100%; max-width:1400px; margin:0.8rem 0; background:#070914; }}
+          #{control_id} table {{ border-collapse:collapse; width:min(680px,100%); color:#182235; background:white; }}
+          #{control_id} th {{ background:#E8F3F7; color:#087F99; text-align:left; }}
+          #{control_id} th, #{control_id} td {{ border:1px solid #C8D3E0; padding:0.42rem 0.65rem; }}
+        </style>
+        <script>
+        (() => {{
+          const root = document.getElementById({json.dumps(control_id)});
+          const records = {payload};
+          const selector = root.querySelector('select');
+          const image = root.querySelector('img');
+          const body = root.querySelector('tbody');
+          function render() {{
+            const record = records[selector.value];
+            image.src = 'data:image/png;base64,' + record.image;
+            body.replaceChildren(...record.summary.map(item => {{
+              const row = document.createElement('tr');
+              const quantity = document.createElement('td');
+              const value = document.createElement('td');
+              quantity.textContent = item.quantity;
+              value.textContent = item.value;
+              row.append(quantity, value);
+              return row;
+            }}));
+          }}
+          selector.addEventListener('change', render);
+          render();
+        }})();
+        </script>
+        """
+    )
 
 
 def atom_explorer(mode="properties"):
