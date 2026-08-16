@@ -34,6 +34,34 @@ Perturbation analysis starts two trajectories from almost identical initial cond
 
 A **strange attractor** is a bounded attracting set with genuinely chaotic dynamics. A defensible claim would require evidence such as sustained sensitivity to initial conditions, appropriate Lyapunov analysis, recurrence structure, and meaningful dimensional or fractal properties. Until then, intricate behaviour will be called **complex dynamics**.
 
+### Lyapunov analysis
+
+Lyapunov analysis measures how rapidly two initially nearby states separate or converge as a dynamical rule repeatedly acts on them. Begin with a reference state `X⁽⁰⁾` and a slightly perturbed state whose initial separation is `δ₀`. After `t` generations, let the separation be `δₜ`. Over an interval in which the separation behaves approximately exponentially:
+
+```text
+δₜ ≈ δ₀ e^(λt)
+```
+
+The corresponding finite-time estimate is:
+
+```text
+λₜ ≈ (1/t) ln(δₜ / δ₀)
+```
+
+Here, `λ` is a **Lyapunov exponent**, `ln` is the natural logarithm, and distance must be defined in the full global CA state space—not merely in a two-dimensional visual projection.
+
+The largest Lyapunov exponent describes the most rapidly separating direction:
+
+- `λ < 0`: nearby trajectories tend to converge, as expected around a stable sink;
+- `λ = 0`: perturbations are approximately preserved, as can occur along a neutral direction or ideal periodic motion; and
+- `λ > 0`: nearby trajectories separate exponentially, providing evidence of sensitive dependence on initial conditions.
+
+In a bounded deterministic system, a robust positive largest exponent is important evidence for chaos. It is not sufficient by itself to establish a strange attractor: we must also show that trajectories remain bounded, are attracted to a persistent set, and are not displaying only a finite transient or numerical artefact.
+
+For long trajectories, the separation between two freely evolving states may become too large to measure the local divergence rate: bounded states eventually saturate at the size of the attractor. A standard calculation therefore evolves a very small perturbation for a short interval, measures its growth, rescales it to the original small magnitude, and repeats. The logarithmic growth factors are then averaged. For our differentiable CA, the same local stretching can also be studied through the Jacobian of the transition rule, but that method will be derived before use.
+
+Our analysis must specify the perturbation size, distance norm, rescaling interval, discarded transient, trajectory length, numerical precision, and results across multiple initial conditions. A positive value seen only briefly will be reported as **finite-time local divergence**, not immediately as chaos.
+
 ## Dynamical fingerprint
 
 Candidate trajectory summaries include convergence time, step-to-step distance, variation across atoms and time, oscillation amplitude, periodicity, autocorrelation, entropy, spectral features, transient length, and perturbation response. Each quantity will be learned mathematically before adoption.
