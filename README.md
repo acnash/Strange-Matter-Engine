@@ -10,6 +10,8 @@ The project is both a predictive experiment and a study of molecular dynamical b
 
 The work is designed for a personal workstation, with an emphasis on compact models, scientific interpretability, honest benchmarking, and visualisations grounded in quantities genuinely produced or analysed by the model.
 
+The evolving [Teaching curriculum](Teaching/README.md) records the scientific and mathematical background behind every component so that implementation and understanding advance together.
+
 ## Goal
 
 The primary goal is to build, understand, validate, and submit a complete end-to-end model that maps:
