@@ -16,21 +16,39 @@ The first practical chemistry lesson will parse small examples by hand and ident
 
 ## Candidate atom properties
 
-Properties raised so far include:
+Each atom can be described by a small set of chemically meaningful properties:
 
-- element and atomic number;
-- formal charge;
-- aromaticity;
-- hybridisation;
-- number of bonded heavy atoms and attached hydrogens;
-- hydrogen-bond donor and acceptor status;
-- ring membership;
-- atomic mass;
-- electronegativity;
-- van der Waals radius; and
-- polarizability.
+- **Element:** the chemical identity of the atom, such as carbon, nitrogen, oxygen, or sulfur.
+- **Atomic number:** the number of protons in the nucleus; it uniquely identifies the element.
+- **Formal charge:** the integer charge assigned by electron-bookkeeping rules, such as `+1`, `0`, or `−1`. It is a representation of charge localisation, not a measured partial charge.
+- **Aromaticity:** whether the atom participates in an aromatic electron system—a cyclic, approximately planar, conjugated system with exceptional electronic stabilisation.
+- **Hybridisation:** a local bonding description such as `sp`, `sp²`, or `sp³`, related to orbital arrangement and molecular geometry.
+- **Atom degree:** the number of atoms directly bonded to the atom. Heavy-atom degree excludes bonded hydrogen atoms.
+- **Attached hydrogen count:** the number of hydrogen atoms bonded to the atom, whether written explicitly or implied by the molecular representation.
+- **Hydrogen-bond donor status:** whether the atom can donate a hydrogen in a hydrogen bond, commonly an `O–H` or `N–H` group.
+- **Hydrogen-bond acceptor status:** whether the atom has an available electron pair capable of accepting a hydrogen bond. Formal charge, resonance, and chemical environment affect this property.
+- **Ring membership:** whether the atom belongs to at least one closed path of bonded atoms.
+- **Aromatic-ring membership:** whether the atom belongs specifically to a ring classified as aromatic.
+- **Atomic mass:** the mass associated with the element or isotope, usually expressed in unified atomic mass units.
+- **Electronegativity:** an element's tendency to attract shared bonding electrons towards itself.
+- **Van der Waals radius:** an approximate measure of the atom's non-bonded spatial extent.
+- **Polarizability:** how readily the atom's electron cloud is distorted by a nearby charge or electric field.
 
-**Molecular weight** is a whole-molecule property obtained from its atoms. **Polarizability** describes how readily an atom's or molecule's electron distribution is distorted by an electric field. Each property must have a chemical justification and appropriate scale before it is used numerically.
+**Molecular weight** is a whole-molecule property obtained by summing the atomic masses in its molecular formula. It is distinct from atomic mass, although it is derived from it.
+
+Some properties are categorical, some are numerical, and some depend on chemical context. Each must have a chemical justification and an appropriate encoding or scale before it is supplied to the model.
+
+## Aromaticity and conjugation
+
+**Conjugation** occurs when a continuous sequence of neighbouring atoms has overlapping orbitals—usually `p` orbitals—through which electrons can be delocalised. A conjugated system may be an open chain or a ring. For example, the alternating double bonds in `1,3-butadiene` form a conjugated chain, but the molecule is not aromatic.
+
+**Aromaticity** is a special case of cyclic conjugation. In the introductory Hückel model, an aromatic system must be cyclic, approximately planar, continuously conjugated, and contain `4n + 2` delocalised π electrons, where `n` is a non-negative integer. Benzene satisfies these conditions with six π electrons.
+
+The central distinction is:
+
+> Every aromatic system is conjugated, but not every conjugated system is aromatic.
+
+A molecule can also contain a conjugated bond outside an aromatic ring. We therefore retain aromaticity and conjugation as separate candidate features: aromaticity describes membership in a special stabilised cyclic electron system, whereas conjugation describes the local possibility of electron delocalisation across connected atoms and bonds.
 
 ## Candidate bond properties
 
