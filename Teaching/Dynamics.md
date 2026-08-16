@@ -60,7 +60,17 @@ In a bounded deterministic system, a robust positive largest exponent is importa
 
 For long trajectories, the separation between two freely evolving states may become too large to measure the local divergence rate: bounded states eventually saturate at the size of the attractor. A standard calculation therefore evolves a very small perturbation for a short interval, measures its growth, rescales it to the original small magnitude, and repeats. The logarithmic growth factors are then averaged. For our differentiable CA, the same local stretching can also be studied through the Jacobian of the transition rule, but that method will be derived before use.
 
-Our analysis must specify the perturbation size, distance norm, rescaling interval, discarded transient, trajectory length, numerical precision, and results across multiple initial conditions. A positive value seen only briefly will be reported as **finite-time local divergence**, not immediately as chaos.
+For the result to be reproducible and interpretable, our analysis must report:
+
+- **Perturbation size:** the initial magnitude `δ₀` of the small displacement applied to the reference state. It must be small enough to measure local behaviour, but large enough to remain distinguishable from numerical rounding error.
+- **Distance norm:** the mathematical rule used to convert the difference between two complete CA states into one separation value. Examples include the Euclidean (`L²`) norm and maximum (`L∞`) norm. Different norms can produce different finite-scale measurements, so the choice must be stated.
+- **Rescaling interval:** the number of CA generations allowed between measuring perturbation growth and reducing the perturbed displacement back to magnitude `δ₀`. Intervals that are too long can allow separation to saturate; intervals that are too short can make the estimate sensitive to local fluctuations and numerical noise.
+- **Discarded transient:** the initial generations excluded before Lyapunov growth factors are accumulated. This prevents the approach towards the long-term regime from being mistaken for behaviour on the attractor itself.
+- **Trajectory length:** the number of post-transient generations over which growth factors are collected and averaged. Longer observations help reveal whether an estimated positive exponent persists rather than appearing briefly.
+- **Numerical precision:** the floating-point representation used in the calculation, such as 32-bit or 64-bit values. Rounding error can create, conceal, or distort very small separations, so stability should be checked at sufficient precision.
+- **Results across multiple initial conditions:** repeated estimates from different molecular states or controlled perturbations. Agreement across relevant starting points provides stronger evidence than a result obtained from one exceptional trajectory.
+
+A positive value seen only briefly will be reported as **finite-time local divergence**, not immediately as chaos.
 
 ## Dynamical fingerprint
 
