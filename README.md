@@ -12,7 +12,7 @@ The work is designed for a personal workstation, with an emphasis on compact mod
 
 The evolving [Teaching curriculum](Teaching/README.md) records the scientific and mathematical background behind every component so that implementation and understanding advance together.
 
-The [Visual Laboratory](notebooks/README.md) provides interactive, code-hidden Jupyter experiences with neon molecular structures, graph views, atom and bond inspectors, encoding heatmaps, and a transparent first graph cellular automaton.
+The [Visual Laboratory](notebooks/README.md) provides interactive, code-hidden Jupyter experiences with clean RDKit molecular depictions, a restrained cyberpunk visual system, graph views, atom and bond inspectors, encoding heatmaps, and a transparent first graph cellular automaton.
 
 ## Goal
 

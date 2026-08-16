@@ -9,34 +9,36 @@ import numpy as np
 import pandas as pd
 from IPython.display import HTML, clear_output, display
 from matplotlib.colors import LinearSegmentedColormap
+from PIL import Image
 from rdkit import Chem, RDConfig
 from rdkit.Chem import AllChem, ChemicalFeatures, Descriptors, Lipinski, rdMolDescriptors
+from rdkit.Chem.Draw import rdMolDraw2D
 
 
 ROOT = Path(__file__).resolve().parents[1]
 DATA_PATH = ROOT / "data" / "development" / "cyp_graph_smoke_test.csv"
 
 NEON = {
-    "cyan": "#00F5FF",
-    "magenta": "#FF2BD6",
-    "lime": "#B6FF00",
-    "orange": "#FF8A00",
-    "violet": "#8A5CFF",
-    "white": "#F4FBFF",
-    "grey": "#718096",
-    "black": "#05070D",
-    "panel": "#0B1020",
+    "cyan": "#27E1FF",
+    "magenta": "#FF3CAC",
+    "lime": "#F9F871",
+    "orange": "#FF9F43",
+    "violet": "#7A5CFA",
+    "white": "#DCE6F2",
+    "grey": "#65758B",
+    "black": "#070914",
+    "panel": "#11152A",
 }
 
 ELEMENT_COLOURS = {
-    "C": NEON["cyan"],
-    "N": NEON["violet"],
+    "C": NEON["white"],
+    "N": NEON["cyan"],
     "O": NEON["magenta"],
     "S": NEON["lime"],
-    "F": NEON["orange"],
-    "Cl": "#49FFB5",
-    "Br": "#FF4D6D",
-    "P": "#FFD166",
+    "F": "#43F6A7",
+    "Cl": "#43F6A7",
+    "Br": NEON["orange"],
+    "P": NEON["lime"],
 }
 
 plt.rcParams.update(
@@ -58,19 +60,19 @@ def neon_css():
     return HTML(
         """
         <style>
-        :root { --neon-cyan:#00F5FF; --neon-magenta:#FF2BD6; --neon-lime:#B6FF00; }
-        .jp-Notebook, .notebook-container { background:#05070D !important; }
+        :root { --cyber-cyan:#27E1FF; --cyber-pink:#FF3CAC; --cyber-yellow:#F9F871; }
+        body, .jp-Notebook, .notebook-container { background:#070914 !important; }
         .jp-Cell-inputWrapper, div.input { display:none !important; }
-        .jp-RenderedHTMLCommon, .text_cell_render { color:#EAFBFF !important; }
-        .jp-RenderedHTMLCommon h1, .text_cell_render h1 { color:#00F5FF !important; text-shadow:0 0 12px #00F5FF; }
-        .jp-RenderedHTMLCommon h2, .text_cell_render h2 { color:#FF2BD6 !important; }
-        .jp-RenderedHTMLCommon h3, .text_cell_render h3 { color:#B6FF00 !important; }
-        .jp-RenderedHTMLCommon code, .text_cell_render code { color:#FF8A00 !important; background:#0B1020 !important; }
-        .jp-RenderedHTMLCommon blockquote, .text_cell_render blockquote { border-left:4px solid #00F5FF; color:#EAFBFF; background:#0B1020; padding:0.5rem 1rem; }
-        .widget-label, .widget-readout, .jupyter-widgets label { color:#EAFBFF !important; }
-        .sme-card { background:#0B1020; border:1px solid #00F5FF; border-radius:10px; padding:14px; margin:10px 0; box-shadow:0 0 10px #00F5FF33; }
-        table { color:#EAFBFF !important; }
-        th { color:#00F5FF !important; }
+        .jp-RenderedHTMLCommon, .text_cell_render { color:#DCE6F2 !important; }
+        .jp-RenderedHTMLCommon h1, .text_cell_render h1 { color:#27E1FF !important; letter-spacing:0.02em; border-bottom:1px solid #27304D; padding-bottom:0.3em; }
+        .jp-RenderedHTMLCommon h2, .text_cell_render h2 { color:#FF3CAC !important; }
+        .jp-RenderedHTMLCommon h3, .text_cell_render h3 { color:#F9F871 !important; }
+        .jp-RenderedHTMLCommon code, .text_cell_render code { color:#FF9F43 !important; background:#11152A !important; }
+        .jp-RenderedHTMLCommon blockquote, .text_cell_render blockquote { border-left:3px solid #27E1FF; color:#DCE6F2; background:#11152A; padding:0.5rem 1rem; }
+        .widget-label, .widget-readout, .jupyter-widgets label { color:#DCE6F2 !important; }
+        .sme-card { background:#11152A; border:1px solid #27304D; border-left:3px solid #27E1FF; border-radius:4px; padding:14px; margin:10px 0; }
+        table { color:#DCE6F2 !important; }
+        th { color:#27E1FF !important; }
         </style>
         """
     )
@@ -165,26 +167,57 @@ def _coordinates(mol):
     return (coords - coords.mean(axis=0)) / span.max()
 
 
-def plot_molecule(mol, selected_atom=None, title=None, ax=None):
+def _rdkit_depiction(mol, selected_atom=None, selected_bond=None, width=1000, height=700):
+    import io
+
+    drawer = rdMolDraw2D.MolDraw2DCairo(width, height)
+    options = drawer.drawOptions()
+    options.addAtomIndices = True
+    options.backgroundColour = (7 / 255, 9 / 255, 20 / 255, 1.0)
+    options.atomNoteColour = (39 / 255, 225 / 255, 1.0, 1.0)
+    options.annotationFontScale = 0.85
+    options.bondLineWidth = 2.2
+    options.additionalAtomLabelPadding = 0.08
+    options.updateAtomPalette(
+        {
+            6: (220 / 255, 230 / 255, 242 / 255),
+            7: (39 / 255, 225 / 255, 1.0),
+            8: (1.0, 60 / 255, 172 / 255),
+            9: (67 / 255, 246 / 255, 167 / 255),
+            15: (249 / 255, 248 / 255, 113 / 255),
+            16: (249 / 255, 248 / 255, 113 / 255),
+            17: (67 / 255, 246 / 255, 167 / 255),
+            35: (1.0, 159 / 255, 67 / 255),
+        }
+    )
+    if selected_atom is not None:
+        drawer.DrawMolecule(
+            mol,
+            highlightAtoms=[selected_atom],
+            highlightAtomColors={selected_atom: (1.0, 60 / 255, 172 / 255)},
+            highlightAtomRadii={selected_atom: 0.38},
+        )
+    elif selected_bond is not None:
+        drawer.DrawMolecule(
+            mol,
+            [],
+            [selected_bond],
+            {},
+            {selected_bond: (39 / 255, 225 / 255, 1.0)},
+            {},
+        )
+    else:
+        drawer.DrawMolecule(mol)
+    drawer.FinishDrawing()
+    return Image.open(io.BytesIO(drawer.GetDrawingText()))
+
+
+def plot_molecule(mol, selected_atom=None, selected_bond=None, title=None, ax=None):
     if ax is None:
         _, ax = plt.subplots(figsize=(8, 6))
-    coords = _coordinates(mol)
-    for bond in mol.GetBonds():
-        i, j = bond.GetBeginAtomIdx(), bond.GetEndAtomIdx()
-        xy = coords[[i, j]]
-        colour = NEON["magenta"] if bond.GetIsAromatic() else NEON["grey"]
-        width = 3.0 if bond.GetBondTypeAsDouble() > 1 else 2.0
-        ax.plot(xy[:, 0], xy[:, 1], color=colour, lw=width, alpha=0.85, zorder=1)
-    for atom in mol.GetAtoms():
-        i = atom.GetIdx()
-        colour = ELEMENT_COLOURS.get(atom.GetSymbol(), NEON["white"])
-        edge = NEON["lime"] if i == selected_atom else NEON["black"]
-        size = 900 if i == selected_atom else 600
-        ax.scatter(*coords[i], s=size, c=colour, edgecolors=edge, linewidths=4, zorder=3)
-        ax.text(*coords[i], f"{atom.GetSymbol()}\n{i}", ha="center", va="center", color=NEON["black"], weight="bold", zorder=4)
+    ax.imshow(_rdkit_depiction(mol, selected_atom=selected_atom, selected_bond=selected_bond))
     ax.set_title(title or "Atom-numbered molecular structure", color=NEON["cyan"], pad=15, weight="bold")
     ax.set_axis_off()
-    ax.margins(0.18)
     return ax
 
 
@@ -204,12 +237,12 @@ def plot_graph(mol, selected_atom=None, title="Molecular graph $G=(V,E)$", ax=No
     coords = _coordinates(mol)
     pos = {i: coords[i] for i in range(mol.GetNumAtoms())}
     node_colours = [ELEMENT_COLOURS.get(graph.nodes[i]["element"], NEON["white"]) for i in graph.nodes]
-    edge_colours = [NEON["magenta"] if graph.edges[e]["aromatic"] else NEON["cyan"] for e in graph.edges]
+    edge_colours = [NEON["violet"] if graph.edges[e]["aromatic"] else NEON["cyan"] for e in graph.edges]
     widths = [1.5 + graph.edges[e]["order"] for e in graph.edges]
     nx.draw_networkx_edges(graph, pos, edge_color=edge_colours, width=widths, alpha=0.8, ax=ax)
     nx.draw_networkx_nodes(graph, pos, node_color=node_colours, node_size=650, edgecolors=NEON["black"], linewidths=2, ax=ax)
     if selected_atom is not None:
-        nx.draw_networkx_nodes(graph, pos, nodelist=[selected_atom], node_color=[node_colours[selected_atom]], node_size=900, edgecolors=NEON["lime"], linewidths=4, ax=ax)
+        nx.draw_networkx_nodes(graph, pos, nodelist=[selected_atom], node_color=[node_colours[selected_atom]], node_size=900, edgecolors=NEON["magenta"], linewidths=4, ax=ax)
     nx.draw_networkx_labels(graph, pos, labels={i: f"{graph.nodes[i]['element']}\n{i}" for i in graph.nodes}, font_color=NEON["black"], font_weight="bold", ax=ax)
     ax.set_title(title, color=NEON["magenta"], pad=15, weight="bold")
     ax.set_axis_off()
@@ -367,10 +400,7 @@ def bond_explorer():
             idx = min(bond_selector.value, mol.GetNumBonds() - 1)
             bond = mol.GetBondWithIdx(idx)
             fig, ax = plt.subplots(figsize=(8, 5.5))
-            plot_molecule(mol, title=f"Edge {idx}: atom {bond.GetBeginAtomIdx()} ↔ atom {bond.GetEndAtomIdx()}", ax=ax)
-            coords = _coordinates(mol)
-            xy = coords[[bond.GetBeginAtomIdx(), bond.GetEndAtomIdx()]]
-            ax.plot(xy[:, 0], xy[:, 1], color=NEON["lime"], lw=8, alpha=0.75, zorder=2)
+            plot_molecule(mol, selected_bond=idx, title=f"Edge {idx}: atom {bond.GetBeginAtomIdx()} ↔ atom {bond.GetEndAtomIdx()}", ax=ax)
             plt.show()
             table = bond_properties(mol).set_index("edge").loc[[idx]].T.reset_index().rename(columns={"index": "property", idx: "value"})
             display(table.style.hide(axis="index").set_properties(**{"background-color": NEON["panel"], "color": NEON["white"]}))

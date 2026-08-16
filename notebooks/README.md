@@ -25,16 +25,17 @@ In JupyterLab, choose **Run → Run All Cells** to activate the molecule selecto
 
 ## Read-only rendered lessons
 
-Code-hidden HTML snapshots are stored in [`docs/teaching_lab`](../docs/teaching_lab/). They preserve the explanations, equations, and representative neon graphics for reading without executing Jupyter. Interactive controls require the live notebooks because they recalculate scientific results in a Python kernel.
+Code-hidden HTML snapshots are stored in [`docs/teaching_lab`](../docs/teaching_lab/). They preserve the explanations, equations, and representative cyberpunk graphics for reading without executing Jupyter. Interactive controls require the live notebooks because they recalculate scientific results in a Python kernel.
 
 ## Visual language
 
-All scientific graphics use a consistent black-background neon system:
+All scientific graphics use a restrained cyberpunk system on a deep ink background. Molecular structures use RDKit's clean chemical rendering conventions:
 
-- cyan: carbon, primary structures, and principal headings;
-- magenta: oxygen, aromatic edges, and secondary quantities;
-- violet: nitrogen and intermediate state values;
-- lime: selected atoms, high state values, and checkpoints; and
-- orange or green: halogens and selected categorical accents.
+- off-white: carbon skeletons and conventional bond lines;
+- cyan: nitrogen, graph connectivity, and principal headings;
+- hot pink: oxygen, selected atoms, and secondary quantities;
+- muted violet: aromatic graph edges and intermediate state values;
+- acid yellow: sulfur, phosphorus, high state values, and checkpoints; and
+- green or orange: halogens and selected categorical accents.
 
 Colours encode information consistently; they are not decorative replacements for labels.

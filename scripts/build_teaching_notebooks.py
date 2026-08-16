@@ -65,7 +65,7 @@ The CYP identity and experimental $\mathrm{pIC}_{50}$ are **molecule-level label
         markdown(r"""
 ## Interactive laboratory
 
-Use the selector to compare size, ring structure, aromaticity, charge, flexibility, stereochemistry, CYP context, and measured inhibition. Atom colours are consistent throughout the course: carbon is cyan, nitrogen violet, oxygen magenta, sulfur lime, and halogens use contrasting neon colours.
+Use the selector to compare size, ring structure, aromaticity, charge, flexibility, stereochemistry, CYP context, and measured inhibition. The chemical structures use clean RDKit rendering: carbon skeletons are off-white, nitrogen cyan, oxygen hot pink, sulfur acid yellow, and halogens green or orange. Cyberpunk accent colours remain consistent throughout the course.
 """),
         hidden_code("display(gallery_explorer())"),
         markdown(r"""
