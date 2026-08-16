@@ -31,32 +31,39 @@ Leaderboard victory is welcome, but learning, scientific defensibility, completi
 ## Schematic
 
 ```text
-SMILES + CYP identity
-        │
-        ▼
-Molecular graph
-(atoms, bonds, chemical features)
-        │
-        ▼
-Initial atom states X⁽⁰⁾
-        │
-        ▼
-Shared local CA rule × T generations
-        │
-        ▼
+TRAINING DATA: SMILES + CYP identity + experimental pIC50
+                              │
+                              ▼
+Molecular graph → initial atom states X⁽⁰⁾
+                              │
+                              ▼
+Shared local CA rule, repeated for T generations
+                              │
+                              ▼
 Complete trajectory X⁽⁰⁾, X⁽¹⁾, …, X⁽ᵀ⁾
-        │
-        ▼
-Interpretable dynamical fingerprint
-        │
-        ▼
-Transparent learned readout
-        │
-        ▼
-Predicted pIC50 → validation, submission,
-dynamical analysis, and visualisation
+                              │
+                              ▼
+Interpretable dynamical fingerprint z
+                              │
+                              ▼
+Ridge-regression readout → predicted pIC50
+                              │
+                              ▼
+Prediction error against experimental pIC50
+                ┌─────────────┴─────────────┐
+                ▼                           ▼
+LEARNING 1: CA rule                 LEARNING 2: readout
+Backpropagation through             Ridge regression learns
+all T CA generations learns         coefficients linking each
+the shared transition              dynamical feature to pIC50
+parameters θ                        (coefficients β)
+                │                           │
+                └─────────────┬─────────────┘
+                              ▼
+               Validate → freeze parameters
+                              │
+                              ▼
+Unseen SMILES + CYP → same frozen pipeline → submitted pIC50
 ```
 
-During training, predictions will be compared with known experimental `pIC50` values so the CA transition rule and readout can learn. Once training and validation are complete, all learned parameters will be frozen and the identical pipeline will generate blind-set predictions.
-
-> **Learn it. Build it. Make it beautiful. Finish it.**
+The model therefore contains two learning processes. First, prediction error is backpropagated through the repeated CA evolution to optimise the shared transition parameters (`θ`). Second, ridge regression learns the regularised readout coefficients (`β`) that map the trajectory-derived fingerprint to `pIC50`. The precise training schedule—joint, alternating, or staged—will be treated as an experimental design choice and taught before implementation. Once training and validation are complete, all learned parameters will be frozen and the identical pipeline will generate blind-set predictions.
