@@ -10,6 +10,12 @@ These notebooks are the interactive teaching environment for the project. They p
 4. [Encoding the Initial Cell State](03_Encoding_Initial_Cell_State.ipynb) — study one-hot encoding, feature vectors, and the initial state matrix.
 5. [Bonds and Local Neighbourhoods](04_Bonds_and_Local_Neighbourhoods.ipynb) — inspect edge properties and the mathematics of local message aggregation.
 6. [First Transparent Graph Cellular Automaton](05_First_Transparent_Graph_CA.ipynb) — explore a non-learned diffusion rule, complete trajectories, molecular spacetime, and convergence.
+7. [Dynamical Fingerprints](06_Dynamical_Fingerprints.ipynb) — measure convergence, variation, oscillation, autocorrelation, spectral concentration, and transient length.
+8. [Perturbations and Stability](07_Perturbations_and_Stability.ipynb) — compare nearby trajectories and learn finite-time sensitivity and Lyapunov-analysis discipline.
+9. [A Parameterised Local Rule](08_Parameterised_Local_Rule.ipynb) — explore how shared self, neighbour, and bias parameters define a family of graph-CA dynamics.
+10. [Backpropagation Through Time](09_Backpropagation_Through_Time.ipynb) — follow prediction error backward through the repeated shared rule.
+11. [Ridge Regression Readout](10_Ridge_Regression_Readout.ipynb) — map dynamical fingerprints to `pIC50` and study regularisation.
+12. [Scientific Validation](11_Scientific_Validation.ipynb) — compare held-out dynamical and descriptor models using transparent split schemes and error metrics.
 
 ## Opening the laboratory locally
 

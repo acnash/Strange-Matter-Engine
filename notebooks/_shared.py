@@ -520,3 +520,371 @@ def static_overview(molecule_id="DEV_CYP1A2_001"):
     plot_graph(mol, title="The same molecule as $G=(V,E)$", ax=axes[1])
     plt.tight_layout()
     plt.show()
+
+
+def neighbour_mean_matrix(mol):
+    """Row-normalised adjacency used by the transparent teaching rules."""
+    n_atoms = mol.GetNumAtoms()
+    matrix = np.zeros((n_atoms, n_atoms), dtype=float)
+    for atom in mol.GetAtoms():
+        i = atom.GetIdx()
+        neighbours = [neighbour.GetIdx() for neighbour in atom.GetNeighbors()]
+        if neighbours:
+            matrix[i, neighbours] = 1.0 / len(neighbours)
+        else:
+            matrix[i, i] = 1.0
+    return matrix
+
+
+def diffuse_from_initial(mol, initial_state, alpha=0.35, steps=24):
+    transition = (1.0 - alpha) * np.eye(mol.GetNumAtoms()) + alpha * neighbour_mean_matrix(mol)
+    states = np.zeros((steps + 1, mol.GetNumAtoms()), dtype=float)
+    states[0] = np.asarray(initial_state, dtype=float)
+    for t in range(steps):
+        states[t + 1] = transition @ states[t]
+    return states
+
+
+def trajectory_summary(states, tolerance=1e-3, persistence=3):
+    step_distance = np.linalg.norm(np.diff(states, axis=0), axis=1)
+    convergence_time = np.nan
+    for start in range(max(0, len(step_distance) - persistence + 1)):
+        if np.all(step_distance[start : start + persistence] < tolerance):
+            convergence_time = start + 1
+            break
+    centred = states - states.mean(axis=0, keepdims=True)
+    lag_pairs = []
+    for atom_series in centred.T:
+        denominator = np.dot(atom_series, atom_series)
+        if denominator > 1e-12:
+            lag_pairs.append(np.dot(atom_series[:-1], atom_series[1:]) / denominator)
+    spectrum = np.abs(np.fft.rfft(centred, axis=0)) ** 2
+    nonzero_power = spectrum[1:].sum()
+    dominant_fraction = float(spectrum[1:].max() / nonzero_power) if nonzero_power > 1e-12 else 0.0
+    observed_convergence = float(convergence_time) if np.isfinite(convergence_time) else float(len(states))
+    return {
+        "final_step_distance": float(step_distance[-1]),
+        "convergence_time": observed_convergence,
+        "mean_atom_variance": float(np.var(states, axis=1).mean()),
+        "mean_temporal_variance": float(np.var(states, axis=0).mean()),
+        "oscillation_amplitude": float(np.ptp(states, axis=0).mean()),
+        "mean_lag1_autocorrelation": float(np.mean(lag_pairs)) if lag_pairs else 0.0,
+        "dominant_frequency_power_fraction": dominant_fraction,
+        "transient_length": float(convergence_time) if np.isfinite(convergence_time) else float(len(states) - 1),
+    }
+
+
+FINGERPRINT_NAMES = [
+    "final_step_distance",
+    "convergence_time",
+    "mean_atom_variance",
+    "mean_temporal_variance",
+    "oscillation_amplitude",
+    "mean_lag1_autocorrelation",
+    "dominant_frequency_power_fraction",
+    "transient_length",
+]
+
+
+def dynamical_fingerprint(mol, alpha=0.35, steps=24, tolerance=1e-3):
+    states = diffuse(mol, alpha=alpha, steps=steps)
+    summary = trajectory_summary(states, tolerance=tolerance)
+    return states, np.array([summary[name] for name in FINGERPRINT_NAMES]), summary
+
+
+def fingerprint_explorer():
+    selector = _selector()
+    alpha = widgets.FloatSlider(value=0.35, min=0.05, max=0.95, step=0.05, description="alpha 0.35", readout=False, continuous_update=False)
+    steps = widgets.IntSlider(value=24, min=8, max=60, step=4, description="T 24", readout=False, continuous_update=False)
+    tolerance = widgets.FloatLogSlider(value=1e-3, base=10, min=-5, max=-1, step=0.5, description="tolerance", continuous_update=False)
+    output = widgets.Output()
+
+    def refresh(*_):
+        alpha.description = f"alpha {alpha.value:.2f}"
+        steps.description = f"T {steps.value}"
+        with output:
+            clear_output(wait=True)
+            row, mol = get_molecule(selector.value)
+            states, fingerprint, summary = dynamical_fingerprint(mol, alpha.value, steps.value, tolerance.value)
+            distances = np.linalg.norm(np.diff(states, axis=0), axis=1)
+            fig, axes = plt.subplots(1, 2, figsize=(15, 5.5))
+            cmap = LinearSegmentedColormap.from_list("fingerprint", [NEON["black"], NEON["violet"], NEON["cyan"], NEON["lime"]])
+            image = axes[0].imshow(states.T, aspect="auto", cmap=cmap, interpolation="nearest")
+            axes[0].set(title="Complete molecular trajectory", xlabel="Generation t", ylabel="Atom i")
+            fig.colorbar(image, ax=axes[0], label="state")
+            axes[1].semilogy(range(1, len(distances) + 1), np.maximum(distances, 1e-12), color=NEON["magenta"], lw=3)
+            axes[1].axhline(tolerance.value, color=NEON["lime"], ls="--", label="tolerance")
+            axes[1].set(title="Convergence measurement", xlabel="Generation t", ylabel="step distance")
+            axes[1].legend()
+            plt.tight_layout()
+            plt.show()
+            table = pd.DataFrame({"fingerprint component": FINGERPRINT_NAMES, "value": fingerprint})
+            display(table.style.hide(axis="index").format({"value": "{:.6g}"}).set_properties(**{"background-color": NEON["panel"], "color": NEON["white"]}))
+
+    for control in (selector, alpha, steps, tolerance):
+        control.observe(refresh, names="value")
+    refresh()
+    return widgets.VBox([widgets.HBox([selector, alpha, steps, tolerance]), output])
+
+
+def perturbation_analysis(mol, atom_index=0, epsilon=1e-3, alpha=0.35, steps=32):
+    initial = np.array([ELECTRONEGATIVITY.get(atom.GetSymbol(), 2.5) for atom in mol.GetAtoms()], dtype=float)
+    perturbed = initial.copy()
+    perturbed[atom_index] += epsilon
+    reference_states = diffuse_from_initial(mol, initial, alpha=alpha, steps=steps)
+    perturbed_states = diffuse_from_initial(mol, perturbed, alpha=alpha, steps=steps)
+    separation = np.linalg.norm(perturbed_states - reference_states, axis=1)
+    times = np.arange(1, steps + 1)
+    finite_time_rate = np.log(np.maximum(separation[1:], 1e-15) / epsilon) / times
+    return reference_states, perturbed_states, separation, finite_time_rate
+
+
+def perturbation_explorer():
+    selector = _selector()
+    atom_index = widgets.IntSlider(value=0, min=0, max=9, step=1, description="atom 0", readout=False, continuous_update=False)
+    epsilon = widgets.FloatLogSlider(value=1e-3, base=10, min=-6, max=-1, step=0.5, description="epsilon", continuous_update=False)
+    alpha = widgets.FloatSlider(value=0.35, min=0.05, max=0.95, step=0.05, description="alpha 0.35", readout=False, continuous_update=False)
+    output = widgets.Output()
+
+    def refresh(*_):
+        row, mol = get_molecule(selector.value)
+        atom_index.max = mol.GetNumAtoms() - 1
+        atom_index.value = min(atom_index.value, atom_index.max)
+        atom_index.description = f"atom {atom_index.value}"
+        alpha.description = f"alpha {alpha.value:.2f}"
+        with output:
+            clear_output(wait=True)
+            reference, perturbed, separation, rates = perturbation_analysis(mol, atom_index.value, epsilon.value, alpha.value)
+            fig, axes = plt.subplots(1, 2, figsize=(15, 5.2))
+            axes[0].plot(reference[:, atom_index.value], color=NEON["cyan"], lw=3, label="reference")
+            axes[0].plot(perturbed[:, atom_index.value], color=NEON["magenta"], lw=2, ls="--", label="perturbed")
+            axes[0].set(title=f"Atom {atom_index.value}: two nearby trajectories", xlabel="Generation t", ylabel="state")
+            axes[0].legend()
+            axes[1].semilogy(np.maximum(separation, 1e-15), color=NEON["lime"], lw=3)
+            axes[1].set(title="Global trajectory separation", xlabel="Generation t", ylabel="distance delta(t)")
+            plt.tight_layout()
+            plt.show()
+            result = pd.DataFrame(
+                {
+                    "quantity": ["initial perturbation", "final separation", "largest finite-time rate", "mean finite-time rate"],
+                    "value": [epsilon.value, separation[-1], np.max(rates), np.mean(rates)],
+                }
+            )
+            display(result.style.hide(axis="index").format({"value": "{:.6g}"}).set_properties(**{"background-color": NEON["panel"], "color": NEON["white"]}))
+
+    for control in (selector, atom_index, epsilon, alpha):
+        control.observe(refresh, names="value")
+    refresh()
+    return widgets.VBox([widgets.HBox([selector, atom_index, epsilon, alpha]), output])
+
+
+def parameterised_trajectory(mol, theta_self=0.6, theta_neighbour=0.4, theta_bias=0.0, steps=24):
+    neighbour_matrix = neighbour_mean_matrix(mol)
+    states = np.zeros((steps + 1, mol.GetNumAtoms()), dtype=float)
+    electronegativity = np.array([ELECTRONEGATIVITY.get(atom.GetSymbol(), 2.5) for atom in mol.GetAtoms()])
+    states[0] = (electronegativity - electronegativity.mean()) / (electronegativity.std() + 1e-8)
+    for t in range(steps):
+        states[t + 1] = np.tanh(theta_self * states[t] + theta_neighbour * (neighbour_matrix @ states[t]) + theta_bias)
+    return states
+
+
+def parameterised_rule_explorer():
+    selector = _selector()
+    theta_self = widgets.FloatSlider(value=0.6, min=-1.5, max=1.5, step=0.1, description="self 0.6", readout=False, continuous_update=False)
+    theta_neighbour = widgets.FloatSlider(value=0.4, min=-1.5, max=1.5, step=0.1, description="neighbour 0.4", readout=False, continuous_update=False)
+    theta_bias = widgets.FloatSlider(value=0.0, min=-0.75, max=0.75, step=0.05, description="bias 0.0", readout=False, continuous_update=False)
+    output = widgets.Output()
+
+    def refresh(*_):
+        theta_self.description = f"self {theta_self.value:.1f}"
+        theta_neighbour.description = f"neighbour {theta_neighbour.value:.1f}"
+        theta_bias.description = f"bias {theta_bias.value:.2f}"
+        with output:
+            clear_output(wait=True)
+            row, mol = get_molecule(selector.value)
+            states = parameterised_trajectory(mol, theta_self.value, theta_neighbour.value, theta_bias.value)
+            distances = np.linalg.norm(np.diff(states, axis=0), axis=1)
+            fig, axes = plt.subplots(1, 2, figsize=(15, 5.3))
+            cmap = LinearSegmentedColormap.from_list("learned", [NEON["black"], NEON["violet"], NEON["cyan"], NEON["lime"]])
+            axes[0].imshow(states.T, aspect="auto", cmap=cmap, interpolation="nearest", vmin=-1, vmax=1)
+            axes[0].set(title="Parameterised shared-rule trajectory", xlabel="Generation t", ylabel="Atom i")
+            axes[1].plot(distances, color=NEON["magenta"], lw=3)
+            axes[1].set(title="Movement under the chosen parameters", xlabel="Generation t", ylabel="step distance")
+            plt.tight_layout()
+            plt.show()
+
+    for control in (selector, theta_self, theta_neighbour, theta_bias):
+        control.observe(refresh, names="value")
+    refresh()
+    return widgets.VBox([widgets.HBox([selector, theta_self, theta_neighbour, theta_bias]), output])
+
+
+def bptt_gradients(mol, target, theta_self=0.6, theta_neighbour=0.4, theta_bias=0.0, steps=16):
+    neighbour_matrix = neighbour_mean_matrix(mol)
+    states = parameterised_trajectory(mol, theta_self, theta_neighbour, theta_bias, steps)
+    prediction = float(states[-1].mean())
+    loss = 0.5 * (prediction - target) ** 2
+    adjoint = np.full(mol.GetNumAtoms(), (prediction - target) / mol.GetNumAtoms())
+    gradient = np.zeros(3, dtype=float)
+    adjoint_norms = [np.linalg.norm(adjoint)]
+    transition_linear = theta_self * np.eye(mol.GetNumAtoms()) + theta_neighbour * neighbour_matrix
+    for t in range(steps - 1, -1, -1):
+        local = 1.0 - states[t + 1] ** 2
+        preactivation_gradient = adjoint * local
+        gradient[0] += np.dot(preactivation_gradient, states[t])
+        gradient[1] += np.dot(preactivation_gradient, neighbour_matrix @ states[t])
+        gradient[2] += preactivation_gradient.sum()
+        adjoint = transition_linear.T @ preactivation_gradient
+        adjoint_norms.append(np.linalg.norm(adjoint))
+    return states, prediction, loss, gradient, np.array(adjoint_norms[::-1])
+
+
+def bptt_explorer():
+    selector = _selector()
+    theta_self = widgets.FloatSlider(value=0.6, min=-1.2, max=1.2, step=0.1, description="self 0.6", readout=False, continuous_update=False)
+    theta_neighbour = widgets.FloatSlider(value=0.4, min=-1.2, max=1.2, step=0.1, description="neighbour 0.4", readout=False, continuous_update=False)
+    steps = widgets.IntSlider(value=16, min=2, max=40, step=2, description="T 16", readout=False, continuous_update=False)
+    output = widgets.Output()
+
+    def refresh(*_):
+        with output:
+            clear_output(wait=True)
+            row, mol = get_molecule(selector.value)
+            all_targets = load_data()["experimental_pic50"]
+            target = float((row["experimental_pic50"] - all_targets.mean()) / all_targets.std(ddof=0))
+            states, prediction, loss, gradient, adjoint_norms = bptt_gradients(mol, target, theta_self.value, theta_neighbour.value, 0.0, steps.value)
+            fig, axes = plt.subplots(1, 2, figsize=(15, 5.2))
+            axes[0].plot(states.mean(axis=1), color=NEON["cyan"], lw=3, label="mean state")
+            axes[0].axhline(target, color=NEON["magenta"], ls="--", label="scaled target")
+            axes[0].set(title="Forward pass", xlabel="Generation t", ylabel="molecular mean")
+            axes[0].legend()
+            axes[1].semilogy(np.maximum(adjoint_norms, 1e-15), color=NEON["lime"], lw=3)
+            axes[1].set(title="Backward gradient signal", xlabel="Generation t", ylabel="adjoint norm")
+            plt.tight_layout()
+            plt.show()
+            table = pd.DataFrame({"quantity": ["prediction", "scaled target", "loss", "dL/d self", "dL/d neighbour", "dL/d bias"], "value": [prediction, target, loss, *gradient]})
+            display(table.style.hide(axis="index").format({"value": "{:.6g}"}).set_properties(**{"background-color": NEON["panel"], "color": NEON["white"]}))
+
+    for control in (selector, theta_self, theta_neighbour, steps):
+        control.observe(refresh, names="value")
+    refresh()
+    return widgets.VBox([widgets.HBox([selector, theta_self, theta_neighbour, steps]), output])
+
+
+def teaching_feature_table(alpha=0.35, steps=24, tolerance=1e-3):
+    rows = []
+    for _, record in load_data().iterrows():
+        mol = Chem.MolFromSmiles(record["canonical_smiles"])
+        AllChem.Compute2DCoords(mol)
+        _, fingerprint, _ = dynamical_fingerprint(mol, alpha, steps, tolerance)
+        rows.append([record["molecule_id"], record["cyp_target"], record["experimental_pic50"], *fingerprint])
+    return pd.DataFrame(rows, columns=["molecule_id", "cyp_target", "experimental_pic50", *FINGERPRINT_NAMES])
+
+
+def ridge_fit(x, y, penalty=1.0):
+    x = np.asarray(x, dtype=float)
+    y = np.asarray(y, dtype=float)
+    mean = x.mean(axis=0)
+    scale = x.std(axis=0)
+    scale[scale < 1e-12] = 1.0
+    standardised = (x - mean) / scale
+    y_mean = y.mean()
+    coefficients = np.linalg.solve(standardised.T @ standardised + penalty * np.eye(standardised.shape[1]), standardised.T @ (y - y_mean))
+    predictions = y_mean + standardised @ coefficients
+    return predictions, coefficients, y_mean, mean, scale
+
+
+def ridge_explorer():
+    penalty = widgets.FloatLogSlider(value=1.0, base=10, min=-3, max=3, step=0.25, description="lambda", continuous_update=False)
+    output = widgets.Output()
+
+    def refresh(*_):
+        with output:
+            clear_output(wait=True)
+            table = teaching_feature_table()
+            x = table[FINGERPRINT_NAMES].to_numpy()
+            y = table["experimental_pic50"].to_numpy()
+            prediction, coefficients, _, _, _ = ridge_fit(x, y, penalty.value)
+            residuals = y - prediction
+            fig, axes = plt.subplots(1, 2, figsize=(15, 5.2))
+            colours = [NEON["cyan"], NEON["magenta"], NEON["lime"], NEON["orange"]] * 3
+            axes[0].scatter(y, prediction, c=colours[: len(y)], s=90, edgecolor=NEON["white"])
+            limits = [min(y.min(), prediction.min()) - 0.2, max(y.max(), prediction.max()) + 0.2]
+            axes[0].plot(limits, limits, color=NEON["white"], ls="--")
+            axes[0].set(title="Teaching-set fit", xlabel="experimental pIC50", ylabel="predicted pIC50", xlim=limits, ylim=limits)
+            axes[1].barh(FINGERPRINT_NAMES, coefficients, color=NEON["violet"])
+            axes[1].set(title="Regularised coefficients", xlabel="coefficient beta")
+            plt.tight_layout()
+            plt.show()
+            metrics = pd.DataFrame({"quantity": ["lambda", "training RMSE", "coefficient L2 norm"], "value": [penalty.value, np.sqrt(np.mean(residuals ** 2)), np.linalg.norm(coefficients)]})
+            display(metrics.style.hide(axis="index").format({"value": "{:.6g}"}).set_properties(**{"background-color": NEON["panel"], "color": NEON["white"]}))
+
+    penalty.observe(refresh, names="value")
+    refresh()
+    return widgets.VBox([penalty, output])
+
+
+BASELINE_NAMES = ["molecular_weight", "logP", "TPSA", "rings", "rotatable_bonds"]
+
+
+def baseline_features(mol):
+    return np.array([Descriptors.MolWt(mol), Descriptors.MolLogP(mol), rdMolDescriptors.CalcTPSA(mol), rdMolDescriptors.CalcNumRings(mol), Lipinski.NumRotatableBonds(mol)], dtype=float)
+
+
+def validation_table(penalty=1.0, scheme="leave-one-CYP-out"):
+    data = teaching_feature_table()
+    dynamic_x = data[FINGERPRINT_NAMES].to_numpy()
+    baseline_x = []
+    for molecule_id in data["molecule_id"]:
+        _, mol = get_molecule(molecule_id)
+        baseline_x.append(baseline_features(mol))
+    baseline_x = np.vstack(baseline_x)
+    y = data["experimental_pic50"].to_numpy()
+    if scheme == "leave-one-molecule-out":
+        folds = [np.array([i]) for i in range(len(data))]
+    else:
+        folds = [np.where(data["cyp_target"].to_numpy() == target)[0] for target in data["cyp_target"].unique()]
+
+    def cross_validated_predictions(x):
+        predictions = np.zeros_like(y)
+        for test_indices in folds:
+            train_indices = np.setdiff1d(np.arange(len(y)), test_indices)
+            _, coefficients, intercept, mean, scale = ridge_fit(x[train_indices], y[train_indices], penalty)
+            predictions[test_indices] = intercept + ((x[test_indices] - mean) / scale) @ coefficients
+        return predictions
+
+    baseline_prediction = cross_validated_predictions(baseline_x)
+    dynamic_prediction = cross_validated_predictions(dynamic_x)
+    rows = []
+    for name, prediction in [("descriptor baseline", baseline_prediction), ("dynamical fingerprint", dynamic_prediction)]:
+        residual = y - prediction
+        rows.append({"model": name, "RMSE": np.sqrt(np.mean(residual ** 2)), "MAE": np.mean(np.abs(residual)), "predictions": prediction})
+    return data, rows
+
+
+def validation_explorer():
+    scheme = widgets.Dropdown(options=["leave-one-CYP-out", "leave-one-molecule-out"], value="leave-one-CYP-out", description="split")
+    penalty = widgets.FloatLogSlider(value=1.0, base=10, min=-3, max=3, step=0.25, description="lambda", continuous_update=False)
+    output = widgets.Output()
+
+    def refresh(*_):
+        with output:
+            clear_output(wait=True)
+            data, results = validation_table(penalty.value, scheme.value)
+            y = data["experimental_pic50"].to_numpy()
+            fig, axes = plt.subplots(1, 2, figsize=(15, 5.2))
+            for ax, result, colour in zip(axes, results, [NEON["cyan"], NEON["magenta"]]):
+                prediction = result["predictions"]
+                limits = [min(y.min(), prediction.min()) - 0.3, max(y.max(), prediction.max()) + 0.3]
+                ax.scatter(y, prediction, color=colour, s=90, edgecolor=NEON["white"])
+                ax.plot(limits, limits, color=NEON["white"], ls="--")
+                ax.set(title=result["model"], xlabel="experimental pIC50", ylabel="held-out prediction", xlim=limits, ylim=limits)
+            plt.tight_layout()
+            plt.show()
+            metrics = pd.DataFrame([{key: value for key, value in result.items() if key != "predictions"} for result in results])
+            display(metrics.style.hide(axis="index").format({"RMSE": "{:.4f}", "MAE": "{:.4f}"}).set_properties(**{"background-color": NEON["panel"], "color": NEON["white"]}))
+
+    for control in (scheme, penalty):
+        control.observe(refresh, names="value")
+    refresh()
+    return widgets.VBox([widgets.HBox([scheme, penalty]), output])

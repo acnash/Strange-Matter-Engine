@@ -290,4 +290,273 @@ The eventual model will replace this hand-designed averaging operation with a sm
     ],
 )
 
-print("Built 6 teaching notebooks in", NOTEBOOKS)
+
+build(
+    "06_Dynamical_Fingerprints.ipynb",
+    "Dynamical Fingerprints",
+    [
+        markdown(r"""
+# Dynamical Fingerprints
+
+## Aim
+
+Convert a complete molecular trajectory into a small vector of explicitly defined measurements. This vector is the **dynamical fingerprint** $z$.
+
+## From trajectory to measurement
+
+For the global state $X^{(t)}$, the step-to-step distance is
+
+$$d_t=\left\|X^{(t)}-X^{(t-1)}\right\|_2.$$
+
+Given tolerance $\varepsilon$ and persistence $p$, the convergence time is the first generation $\tau$ for which
+
+$$d_\tau,d_{\tau+1},\ldots,d_{\tau+p-1}<\varepsilon.$$
+
+This is an operational definition: changing the tolerance, persistence, or trajectory length can change the measured convergence time.
+
+If convergence is not observed within $T$ generations, the laboratory records convergence time as $T+1$ and transient length as $T$. This is a numerical sentinel meaning **not observed in the available window**, not a claim that convergence occurs at $T+1$.
+
+Variation across atoms at generation $t$ is
+
+$$\sigma_{\mathrm{atoms}}^2(t)=\frac{1}{n}\sum_i\left(x_i^{(t)}-\bar{x}^{(t)}\right)^2.$$
+
+Temporal variance, oscillation amplitude, lag-one autocorrelation, spectral concentration, and transient length describe different aspects of the same preserved trajectory. They are candidate measurements, not automatically useful predictors.
+"""),
+        markdown(r"""
+## Interactive measurement laboratory
+
+Change the molecule, coupling, trajectory length, and convergence tolerance. The table is the fingerprint vector $z$. Observe which components respond to the numerical definition and which reflect the molecular graph.
+"""),
+        hidden_code("display(fingerprint_explorer())"),
+        markdown(r"""
+## Scientific checkpoint
+
+A fingerprint compresses a trajectory and therefore discards information. Every adopted component must be reproducible, permutation-invariant at molecule level, numerically stable, and shown to add useful information under held-out validation.
+"""),
+    ],
+)
+
+
+build(
+    "07_Perturbations_and_Stability.ipynb",
+    "Perturbations and Stability",
+    [
+        markdown(r"""
+# Perturbations and Stability
+
+## Aim
+
+Measure how a small, controlled change to the initial molecular state affects the subsequent trajectory.
+
+## Nearby trajectories
+
+Let the reference initial state be $X^{(0)}$ and perturb one atom by a vector of size $\delta_0$:
+
+$$\widetilde X^{(0)}=X^{(0)}+\Delta X^{(0)},\qquad \|\Delta X^{(0)}\|_2=\delta_0.$$
+
+At generation $t$, their separation is
+
+$$\delta_t=\left\|\widetilde X^{(t)}-X^{(t)}\right\|_2.$$
+
+A finite-time divergence rate is
+
+$$\lambda_t=\frac{1}{t}\log\left(\frac{\delta_t}{\delta_0}\right).$$
+
+Positive $\lambda_t$ over a short interval means local finite-time separation. It is not, by itself, evidence of a chaotic attractor. A defensible Lyapunov analysis must state the perturbation size, norm, rescaling protocol, discarded transient, trajectory length, numerical precision, and results across multiple initial conditions.
+"""),
+        markdown(r"""
+## Interactive perturbation laboratory
+
+Choose the perturbed atom and perturbation magnitude. Compare the reference and perturbed trajectories, then inspect whether separation grows, contracts, or remains neutral under the transparent diffusion rule.
+"""),
+        hidden_code("display(perturbation_explorer())"),
+        markdown(r"""
+## Scientific checkpoint
+
+The present linear averaging rule is expected to contract many perturbations. Later, the same protocol will test whether a learned rule produces stable sinks, oscillatory regimes, long transients, or genuine sustained sensitivity.
+"""),
+    ],
+)
+
+
+build(
+    "08_Parameterised_Local_Rule.ipynb",
+    "A Parameterised Local Rule",
+    [
+        markdown(r"""
+# A Parameterised Local Rule
+
+## Aim
+
+Replace the fixed averaging coefficient with a small shared rule whose parameters can eventually be learned.
+
+## Shared message and update
+
+For this first parameterised scalar rule, atom $i$ receives the mean neighbour state
+
+$$m_i^{(t)}=\frac{1}{d_i}\sum_{j\in N(i)}x_j^{(t)}.$$
+
+Its next state is
+
+$$x_i^{(t+1)}=\tanh\!\left(\theta_{\mathrm{self}}x_i^{(t)}+\theta_{\mathrm{neighbour}}m_i^{(t)}+\theta_{\mathrm{bias}}\right).$$
+
+The three values $\theta=(\theta_{\mathrm{self}},\theta_{\mathrm{neighbour}},\theta_{\mathrm{bias}})$ are shared by every atom and every generation. This sharing is central to the cellular-automaton design. The hyperbolic tangent keeps the scalar state between $-1$ and $1$ and introduces nonlinearity.
+
+This is a teaching rule. The eventual multichannel rule will use atom state, neighbouring state, and bond attributes, but the same local-and-shared logic will remain.
+"""),
+        markdown(r"""
+## Interactive rule laboratory
+
+Change each parameter separately. Identify which settings preserve an atom's own state, amplify neighbour influence, force saturation, produce sign alternation, or approach a fixed regime.
+"""),
+        hidden_code("display(parameterised_rule_explorer())"),
+        markdown(r"""
+## Scientific checkpoint
+
+Parameters determine a family of possible dynamical systems. Learning is the process of selecting parameter values using an explicitly defined loss—not evidence that every learned dynamical regime is scientifically useful.
+"""),
+    ],
+)
+
+
+build(
+    "09_Backpropagation_Through_Time.ipynb",
+    "Backpropagation Through Time",
+    [
+        markdown(r"""
+# Backpropagation Through Time
+
+## Aim
+
+Understand Learning 1: how prediction error at the end of a trajectory changes the shared local-rule parameters used at every preceding generation.
+
+## Forward computation and loss
+
+Unrolling $T$ generations creates the composition
+
+$$X^{(T)}=F_\theta\!\left(F_\theta\!\left(\cdots F_\theta(X^{(0)})\right)\right).$$
+
+For the teaching example, the molecular prediction is the mean final state
+
+$$\hat y=\frac{1}{n}\sum_i x_i^{(T)},$$
+
+and the squared-error loss is
+
+$$\mathcal L=\frac{1}{2}(\hat y-y)^2.$$
+
+The target $y$ is a standardised version of experimental $\mathrm{pIC}_{50}$ so that it is numerically comparable with the bounded teaching state. Standardisation changes units, not the experimental ordering.
+
+## Reverse-mode chain rule
+
+The gradient receives a contribution from every use of the shared parameter:
+
+$$\frac{\partial\mathcal L}{\partial\theta}
+=\sum_{t=0}^{T-1}
+\frac{\partial\mathcal L}{\partial X^{(t+1)}}
+\frac{\partial X^{(t+1)}}{\partial\theta}.$$
+
+The backward signal may shrink, remain stable, or grow as it passes through many repeated Jacobians. These are the vanishing- and exploding-gradient phenomena.
+"""),
+        markdown(r"""
+## Interactive gradient laboratory
+
+Change the rule parameters and unrolling length. The left panel is the forward trajectory; the right panel shows the norm of the backward adjoint at every generation. The table gives exact analytical derivatives of the loss.
+"""),
+        hidden_code("display(bptt_explorer())"),
+        markdown(r"""
+## Scientific checkpoint
+
+Backpropagation computes a gradient; an optimiser uses that gradient to propose a parameter update. Learning rate, optimiser, regularisation, stopping rule, and data splitting remain separate experimental choices.
+"""),
+    ],
+)
+
+
+build(
+    "10_Ridge_Regression_Readout.ipynb",
+    "Ridge Regression Readout",
+    [
+        markdown(r"""
+# Ridge Regression Readout
+
+## Aim
+
+Understand Learning 2: map a dynamical fingerprint $z$ to a continuous inhibition measurement while controlling coefficient magnitude.
+
+## Linear readout
+
+For fingerprint $z\in\mathbb R^p$, the prediction is
+
+$$\widehat{\mathrm{pIC}}_{50}=\beta_0+z^\mathsf T\beta.$$
+
+Ridge regression chooses coefficients by minimising
+
+$$\sum_{k=1}^{N}\left(y_k-\beta_0-z_k^\mathsf T\beta\right)^2
++\lambda\|\beta\|_2^2.$$
+
+After centring the target and standardising each fingerprint component, the closed-form coefficient estimate is
+
+$$\hat\beta=(Z^\mathsf T Z+\lambda I)^{-1}Z^\mathsf T y.$$
+
+The penalty $\lambda\geq0$ trades training fit against coefficient size. The intercept is not penalised. Standardisation is learned from the training data only whenever held-out predictions are made.
+"""),
+        markdown(r"""
+## Interactive regularisation laboratory
+
+Change $\lambda$ across several orders of magnitude. Observe the training fit and coefficient norm. This panel deliberately shows a teaching-set fit; it does not estimate generalisation performance.
+"""),
+        hidden_code("display(ridge_explorer())"),
+        markdown(r"""
+## Scientific checkpoint
+
+Small training error can coexist with poor prediction of new molecules. Ridge regularisation constrains the readout, but only a held-out evaluation can measure generalisation.
+"""),
+    ],
+)
+
+
+build(
+    "11_Scientific_Validation.ipynb",
+    "Scientific Validation",
+    [
+        markdown(r"""
+# Scientific Validation
+
+## Aim
+
+Test whether trajectory-derived information predicts held-out inhibition better than a transparent molecular-descriptor baseline.
+
+## Held-out prediction
+
+For observations $y_k$ and predictions $\hat y_k$, the root-mean-square error is
+
+$$\operatorname{RMSE}=\sqrt{\frac{1}{N}\sum_{k=1}^{N}(y_k-\hat y_k)^2},$$
+
+and the mean absolute error is
+
+$$\operatorname{MAE}=\frac{1}{N}\sum_{k=1}^{N}|y_k-\hat y_k|.$$
+
+The descriptor baseline uses molecular weight, calculated logP, topological polar surface area, ring count, and rotatable-bond count. The dynamical model uses the fingerprint from notebook 06. Both use the same ridge readout and penalty so that the representation—not readout complexity—is being compared.
+
+## Two illustrative split schemes
+
+- **Leave one molecule out:** fit on 11 molecules and predict the twelfth, repeated 12 times.
+- **Leave one CYP out:** fit on three CYP groups and predict all three molecules in the unseen CYP group, repeated four times.
+
+All scaling parameters and ridge coefficients are fitted inside each training fold. The held-out labels never participate in fitting that fold.
+"""),
+        markdown(r"""
+## Interactive validation laboratory
+
+Compare split schemes and regularisation. The 12-molecule smoke-test set is intentionally tiny and deliberately selected, so these values teach the procedure rather than establish model performance.
+"""),
+        hidden_code("display(validation_explorer())"),
+        markdown(r"""
+## Decision standard for the future dataset
+
+The trajectory representation earns adoption only if it improves appropriately repeated, chemically defensible held-out evaluation; remains stable across seeds and reasonable hyperparameters; survives comparison with simple baselines; and provides interpretable dynamical measurements rather than accidental leakage.
+"""),
+    ],
+)
+
+print("Built 12 teaching notebooks in", NOTEBOOKS)
