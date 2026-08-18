@@ -2,7 +2,7 @@
 
 ## Introduction
 
-Strange Matter Engine is an experimental molecular machine-learning project for the OpenADMET CYP inhibition challenge. It will explore whether a compact, learned **graph cellular automaton (GCA)** can transform molecular structure into interpretable emergent dynamics that predict experimental CYP inhibition (`pIC50`).
+Strange Matter Engine is an experimental molecular machine-learning project for the OpenADMET CYP inhibition challenge. It will explore whether a compact, learned **graph cellular automaton (GCA)** can transform molecular structure into interpretable emergent dynamics that predict direct CYP inhibition (`pIC50`) and time-dependent inhibition (`is_TDI`).
 
 Each molecule will be represented as a graph: atoms are cells, chemical bonds define their neighbourhoods, and a small shared local rule evolves every atom's state through time. The model will preserve and analyse the complete trajectory of this evolution—from the chemically initialised state through every subsequent generation—rather than reducing the molecule to its final state.
 
@@ -18,7 +18,14 @@ The [Visual Laboratory](notebooks/README.md) provides interactive, code-hidden J
 
 The primary goal is to build, understand, validate, and submit a complete end-to-end model that maps:
 
-> **SMILES + CYP identity → predicted pIC50**
+> **SMILES + CYP identity → predicted direct-inhibition pIC50 + TDI probability**
+
+The direct-inhibition and time-dependent-inhibition (TDI) challenge tracks are independent. A shared GCA trajectory encoder will support two task-specific readouts:
+
+- a regression readout predicting `pIC50` for CYP1A2, CYP2C9, CYP2D6, and CYP3A4; and
+- a binary-classification readout predicting `is_TDI` for CYP2D6 and CYP3A4.
+
+The TDI readout will produce a probability during training and validation. A decision threshold selected using training data only will convert that probability into the Boolean value required by the challenge submission schema.
 
 Success means:
 
@@ -48,26 +55,30 @@ Complete trajectory X⁽⁰⁾, X⁽¹⁾, …, X⁽ᵀ⁾
                               │
                               ▼
 Interpretable dynamical fingerprint z
-                              │
-                              ▼
-Ridge-regression readout → predicted pIC50
-                              │
-                              ▼
-Prediction error against experimental pIC50
                 ┌─────────────┴─────────────┐
                 ▼                           ▼
-LEARNING 1: CA rule                 LEARNING 2: readout
-Backpropagation through             Ridge regression learns
-all T CA generations learns         coefficients linking each
-the shared transition              dynamical feature to pIC50
-parameters θ                        (coefficients β)
+Regression readout                  Binary-classification readout
+→ predicted pIC50                   → predicted TDI probability
                 │                           │
+                ▼                           ▼
+Regression loss against             Classification loss against
+experimental pIC50                  experimental is_TDI label
                 └─────────────┬─────────────┘
                               ▼
-               Validate → freeze parameters
+LEARNING 1: shared CA rule    LEARNING 2: task-specific readouts
+Backpropagation through       Ridge regression learns pIC50
+all T CA generations learns   coefficients βreg; a regularised
+the shared transition         logistic readout learns TDI
+parameters θ                  coefficients βTDI
                               │
                               ▼
-Unseen SMILES + CYP → same frozen pipeline → submitted pIC50
+               Validate → select TDI threshold → freeze parameters
+                              │
+                              ▼
+             Unseen SMILES + CYP → same frozen pipeline
+                ┌─────────────┴─────────────┐
+                ▼                           ▼
+       submitted finite pIC50        submitted Boolean is_TDI
 ```
 
-The model therefore contains two learning processes. First, prediction error is backpropagated through the repeated CA evolution to optimise the shared transition parameters (`θ`). Second, ridge regression learns the regularised readout coefficients (`β`) that map the trajectory-derived fingerprint to `pIC50`. The precise training schedule—joint, alternating, or staged—will be treated as an experimental design choice and taught before implementation. Once training and validation are complete, all learned parameters will be frozen and the identical pipeline will generate blind-set predictions.
+The model therefore contains a shared learning process and two task-specific readouts. Direct-inhibition error and TDI-classification error can be backpropagated through the repeated CA evolution to optimise the shared transition parameters (`θ`). Ridge regression learns regularised coefficients (`βreg`) mapping the trajectory-derived fingerprint to `pIC50`; a regularised logistic readout learns coefficients (`βTDI`) mapping the same fingerprint to a TDI probability. The classification threshold will be selected without using blinded test outcomes, with Matthews correlation coefficient as the primary validation objective to match the challenge metric. The precise training schedule—joint, alternating, or staged—will be treated as an experimental design choice and taught before implementation. Once training, validation, and threshold selection are complete, all parameters will be frozen and the identical pipeline will generate the two independent blind-set submission files.
