@@ -566,4 +566,55 @@ The trajectory representation earns adoption only if it improves appropriately r
     ],
 )
 
-print("Built 12 teaching notebooks in", NOTEBOOKS)
+
+build(
+    "12_Fundamentals_Examination.ipynb",
+    "Fundamentals Examination",
+    [
+        markdown(r"""
+# Strange Matter Engine Fundamentals Examination
+
+## Aim
+
+Consolidate the scientific foundations from the preceding notebooks and diagnose where further study will produce the greatest gain. The examination contains **75 multiple-choice questions**. Every question has exactly three options: one correct answer and two scientifically plausible distractors.
+
+The examination covers:
+
+- chemistry and molecular representation;
+- graph theory and atom-state encoding;
+- graph cellular automata and emergence;
+- trajectories, attractors and dynamical fingerprints;
+- perturbation sensitivity and Lyapunov-analysis discipline;
+- backpropagation through time;
+- ridge regression; and
+- validation and scientific inference.
+
+## Method
+
+Answer each question before revealing the explanation. The option order is shuffled, but the question order is fixed so that question numbers remain stable when we discuss them together. Your first submitted answer is recorded for the diagnostic; the explanation then teaches the underlying principle.
+
+The final table reports performance by scientific domain. A total score is useful, but expertise is better indicated by consistently strong reasoning across every domain. Record questions that felt uncertain even when the selected answer was correct: uncertainty identifies a valuable learning objective that raw scoring can miss.
+"""),
+        markdown(r"""
+## Interactive examination
+
+Work through the questions without consulting the previous notebooks on the first pass. Afterwards, use the final diagnostic to revisit the relevant lesson and explain the corrected principle in your own words.
+"""),
+        hidden_code("display(fundamentals_quiz())"),
+        markdown(r"""
+## Expert-learning cycle
+
+For every missed or uncertain question:
+
+1. state why the chosen distractor was tempting;
+2. identify the exact assumption that made it wrong;
+3. derive or explain the correct principle without looking;
+4. connect it to one molecular example or one equation; and
+5. retest the concept after a delay.
+
+This converts recognition into recall, and recall into transferable scientific reasoning.
+"""),
+    ],
+)
+
+print("Built 13 teaching notebooks in", NOTEBOOKS)

@@ -14,5 +14,6 @@ These files are code-hidden, read-only exports of the interactive notebooks:
 10. [Backpropagation Through Time](09_Backpropagation_Through_Time.html)
 11. [Ridge Regression Readout](10_Ridge_Regression_Readout.html)
 12. [Scientific Validation](11_Scientific_Validation.html)
+13. [Fundamentals Examination](12_Fundamentals_Examination.html)
 
 Open the corresponding files in [`notebooks`](../../notebooks/) with JupyterLab for live selectors and sliders.

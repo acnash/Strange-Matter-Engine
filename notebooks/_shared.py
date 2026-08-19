@@ -18,6 +18,8 @@ from rdkit import Chem, RDConfig
 from rdkit.Chem import AllChem, ChemicalFeatures, Descriptors, Lipinski, rdMolDescriptors
 from rdkit.Chem.Draw import rdMolDraw2D
 
+from _quiz_data import QUESTIONS
+
 
 ROOT = Path(__file__).resolve().parents[1]
 DATA_PATH = ROOT / "data" / "development" / "cyp_graph_smoke_test.csv"
@@ -902,3 +904,166 @@ def validation_explorer():
         control.observe(refresh, names="value")
     refresh()
     return widgets.VBox([widgets.HBox([scheme, penalty]), output])
+
+
+def fundamentals_quiz():
+    """Self-contained browser-side examination with immediate scientific feedback."""
+    quiz_id = f"sme-quiz-{uuid.uuid4().hex}"
+    payload = json.dumps(QUESTIONS, ensure_ascii=False).replace("</", "<\\/")
+    return HTML(
+        f"""
+        <div id="{quiz_id}" class="sme-quiz">
+          <div class="quiz-status">
+            <strong class="quiz-progress-text">Question 1 of 75</strong>
+            <span class="quiz-score">Score: 0 / 0</span>
+          </div>
+          <div class="quiz-progress" aria-hidden="true"><span></span></div>
+          <p class="quiz-domain"></p>
+          <h3 class="quiz-question"></h3>
+          <form class="quiz-options"></form>
+          <div class="quiz-feedback" hidden></div>
+          <div class="quiz-actions">
+            <button type="button" class="quiz-submit">Check answer</button>
+            <button type="button" class="quiz-next" hidden>Next question</button>
+          </div>
+          <div class="quiz-results" hidden></div>
+        </div>
+        <style>
+          #{quiz_id} {{ color:#182235; font-family:system-ui,sans-serif; max-width:980px; }}
+          #{quiz_id} .quiz-status {{ display:flex; justify-content:space-between; gap:1rem; flex-wrap:wrap; }}
+          #{quiz_id} .quiz-progress {{ height:8px; background:#D9E2EE; margin:0.7rem 0 1rem; overflow:hidden; }}
+          #{quiz_id} .quiz-progress span {{ display:block; height:100%; width:0; background:#087F99; transition:width 180ms ease; }}
+          #{quiz_id} .quiz-domain {{ color:#6950C5; font-weight:700; margin:0.4rem 0; }}
+          #{quiz_id} .quiz-question {{ color:#182235 !important; margin-top:0.4rem; }}
+          #{quiz_id} .quiz-options {{ display:grid; gap:0.65rem; margin:1rem 0; }}
+          #{quiz_id} .quiz-option {{ display:flex; align-items:flex-start; gap:0.65rem; padding:0.8rem; border:1px solid #B9C5D6; background:#F7F9FC; cursor:pointer; }}
+          #{quiz_id} .quiz-option:hover {{ border-color:#087F99; }}
+          #{quiz_id} .quiz-option.correct {{ border-color:#15805D; background:#E9F7F1; }}
+          #{quiz_id} .quiz-option.incorrect {{ border-color:#C2185B; background:#FCECF3; }}
+          #{quiz_id} .quiz-option input {{ margin-top:0.2rem; }}
+          #{quiz_id} .quiz-feedback {{ border-left:4px solid #087F99; background:#EEF3F9; padding:0.85rem 1rem; margin:1rem 0; }}
+          #{quiz_id} .quiz-actions {{ display:flex; gap:0.7rem; }}
+          #{quiz_id} button {{ border:0; padding:0.65rem 1rem; background:#087F99; color:white; font-weight:700; cursor:pointer; }}
+          #{quiz_id} button:disabled {{ opacity:0.5; cursor:not-allowed; }}
+          #{quiz_id} .quiz-next {{ background:#6950C5; }}
+          #{quiz_id} .quiz-results table {{ border-collapse:collapse; width:100%; margin-top:1rem; }}
+          #{quiz_id} .quiz-results th, #{quiz_id} .quiz-results td {{ border-bottom:1px solid #C8D3E0; padding:0.5rem; text-align:left; }}
+          #{quiz_id} .quiz-results th {{ color:#087F99; }}
+          #{quiz_id} .quiz-results .review {{ margin-top:1rem; }}
+        </style>
+        <script>
+        (() => {{
+          const root = document.getElementById({json.dumps(quiz_id)});
+          const source = {payload};
+          function shuffledOptions(question, questionIndex) {{
+            const order = [0, 1, 2];
+            let seed = (questionIndex + 1) * 2654435761;
+            for (let i = order.length - 1; i > 0; i--) {{
+              seed = (seed * 1664525 + 1013904223) >>> 0;
+              const j = seed % (i + 1);
+              [order[i], order[j]] = [order[j], order[i]];
+            }}
+            return order.map(original => ({{ text: question.options[original], correct: original === question.correct }}));
+          }}
+          const questions = source.map((question, index) => ({{...question, displayed: shuffledOptions(question, index)}}));
+          const progressText = root.querySelector('.quiz-progress-text');
+          const scoreText = root.querySelector('.quiz-score');
+          const progressBar = root.querySelector('.quiz-progress span');
+          const domain = root.querySelector('.quiz-domain');
+          const questionText = root.querySelector('.quiz-question');
+          const options = root.querySelector('.quiz-options');
+          const feedback = root.querySelector('.quiz-feedback');
+          const submit = root.querySelector('.quiz-submit');
+          const next = root.querySelector('.quiz-next');
+          const results = root.querySelector('.quiz-results');
+          let current = 0;
+          const answers = [];
+
+          function renderQuestion() {{
+            const item = questions[current];
+            progressText.textContent = `Question ${{current + 1}} of ${{questions.length}}`;
+            scoreText.textContent = `Score: ${{answers.filter(answer => answer.correct).length}} / ${{answers.length}}`;
+            progressBar.style.width = `${{(current / questions.length) * 100}}%`;
+            domain.textContent = item.domain;
+            questionText.textContent = item.question;
+            options.replaceChildren(...item.displayed.map((choice, index) => {{
+              const label = document.createElement('label');
+              label.className = 'quiz-option';
+              const input = document.createElement('input');
+              input.type = 'radio';
+              input.name = `${{root.id}}-answer`;
+              input.value = String(index);
+              const span = document.createElement('span');
+              span.textContent = choice.text;
+              label.append(input, span);
+              return label;
+            }}));
+            feedback.hidden = true;
+            feedback.textContent = '';
+            submit.hidden = false;
+            submit.disabled = true;
+            next.hidden = true;
+            options.addEventListener('change', () => {{ submit.disabled = false; }}, {{once:true}});
+          }}
+
+          submit.addEventListener('click', () => {{
+            const selected = options.querySelector('input:checked');
+            if (!selected) return;
+            const selectedIndex = Number(selected.value);
+            const item = questions[current];
+            const isCorrect = item.displayed[selectedIndex].correct;
+            answers.push({{question:current, correct:isCorrect, selected:item.displayed[selectedIndex].text}});
+            [...options.querySelectorAll('.quiz-option')].forEach((label, index) => {{
+              label.querySelector('input').disabled = true;
+              if (item.displayed[index].correct) label.classList.add('correct');
+              else if (index === selectedIndex) label.classList.add('incorrect');
+            }});
+            feedback.hidden = false;
+            feedback.innerHTML = `<strong>${{isCorrect ? 'Correct.' : 'Not quite.'}}</strong> ${{item.explanation}}`;
+            scoreText.textContent = `Score: ${{answers.filter(answer => answer.correct).length}} / ${{answers.length}}`;
+            submit.hidden = true;
+            next.hidden = false;
+            next.textContent = current === questions.length - 1 ? 'Show final diagnostic' : 'Next question';
+          }});
+
+          next.addEventListener('click', () => {{
+            if (current < questions.length - 1) {{
+              current += 1;
+              renderQuestion();
+            }} else {{
+              showResults();
+            }}
+          }});
+
+          function showResults() {{
+            root.querySelector('.quiz-status').hidden = true;
+            root.querySelector('.quiz-progress').hidden = true;
+            domain.hidden = true;
+            questionText.hidden = true;
+            options.hidden = true;
+            feedback.hidden = true;
+            root.querySelector('.quiz-actions').hidden = true;
+            const byDomain = {{}};
+            questions.forEach((item, index) => {{
+              if (!byDomain[item.domain]) byDomain[item.domain] = {{correct:0,total:0}};
+              byDomain[item.domain].total += 1;
+              if (answers[index]?.correct) byDomain[item.domain].correct += 1;
+            }});
+            const totalCorrect = answers.filter(answer => answer.correct).length;
+            const rows = Object.entries(byDomain).map(([name, value]) =>
+              `<tr><td>${{name}}</td><td>${{value.correct}} / ${{value.total}}</td><td>${{Math.round(100 * value.correct / value.total)}}%</td></tr>`
+            ).join('');
+            const missed = answers.filter(answer => !answer.correct).map(answer => `<li>Question ${{answer.question + 1}}: ${{questions[answer.question].question}}</li>`).join('');
+            results.hidden = false;
+            results.innerHTML = `
+              <h2>Final diagnostic: ${{totalCorrect}} / ${{questions.length}} (${{Math.round(100 * totalCorrect / questions.length)}}%)</h2>
+              <table><thead><tr><th>Domain</th><th>Correct</th><th>Percentage</th></tr></thead><tbody>${{rows}}</tbody></table>
+              <div class="review"><strong>Questions to revisit</strong>${{missed ? `<ol>${{missed}}</ol>` : '<p>None. Every answer was correct.</p>'}}</div>`;
+            progressBar.style.width = '100%';
+          }}
+
+          renderQuestion();
+        }})();
+        </script>
+        """
+    )
