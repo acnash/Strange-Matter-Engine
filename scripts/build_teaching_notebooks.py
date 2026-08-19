@@ -356,11 +356,11 @@ Measure how a small, controlled change to the initial molecular state affects th
 
 Let the reference initial state be $X^{(0)}$ and perturb one atom by a vector of size $\delta_0$:
 
-$$\widetilde X^{(0)}=X^{(0)}+\Delta X^{(0)},\qquad \|\Delta X^{(0)}\|_2=\delta_0.$$
+$$\widetilde X^{(0)}=X^{(0)}+\Delta X^{(0)},\qquad \|\Delta X^{(0)}\|_F=\delta_0.$$
 
 At generation $t$, their separation is
 
-$$\delta_t=\left\|\widetilde X^{(t)}-X^{(t)}\right\|_2.$$
+$$\delta_t=\left\|\widetilde X^{(t)}-X^{(t)}\right\|_F.$$
 
 A finite-time divergence rate is
 
@@ -372,6 +372,9 @@ Positive $\lambda_t$ over a short interval means local finite-time separation. I
 ## Interactive perturbation laboratory
 
 Choose the perturbed atom and perturbation magnitude. Compare the reference and perturbed trajectories, then inspect whether separation grows, contracts, or remains neutral under the transparent diffusion rule.
+
+- $\varepsilon$ (**epsilon**) is the size of the initial change applied to the selected atom. In the equations above, $\delta_0=\varepsilon$. For example, $\varepsilon=10^{-3}$ adds $0.001$ to that atom's initial dynamical state.
+- $\alpha$ (**alpha**) is the diffusion or neighbour-coupling strength used at every generation. The update is $x_i^{(t+1)}=(1-\alpha)x_i^{(t)}+\alpha\,\mathrm{mean}_{j\in N(i)}x_j^{(t)}$. A larger $\alpha$ gives the neighbours more influence; a smaller $\alpha$ retains more of atom $i$'s current state.
 """),
         hidden_code("_perturbation_widget = perturbation_explorer()\ndisplay(_perturbation_widget)"),
         markdown(r"""
