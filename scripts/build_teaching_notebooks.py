@@ -31,7 +31,11 @@ def build(filename, title, cells):
     notebook = nbf.v4.new_notebook()
     notebook.metadata.update(
         {
-            "kernelspec": {"display_name": "Python (KCC2)", "language": "python", "name": "python3"},
+            "kernelspec": {
+                "display_name": "Python [conda env:kcc2]",
+                "language": "python",
+                "name": "conda-env-kcc2-py",
+            },
             "language_info": {"name": "python", "version": "3.11"},
             "title": title,
         }
@@ -369,7 +373,7 @@ Positive $\lambda_t$ over a short interval means local finite-time separation. I
 
 Choose the perturbed atom and perturbation magnitude. Compare the reference and perturbed trajectories, then inspect whether separation grows, contracts, or remains neutral under the transparent diffusion rule.
 """),
-        hidden_code("display(perturbation_explorer())"),
+        hidden_code("_perturbation_widget = perturbation_explorer()\ndisplay(_perturbation_widget)"),
         markdown(r"""
 ## Scientific checkpoint
 
