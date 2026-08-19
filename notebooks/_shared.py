@@ -647,44 +647,32 @@ def perturbation_explorer():
     output = widgets.Output()
 
     def refresh(*_):
-        row, mol = get_molecule(selector.value)
-        atom_index.max = mol.GetNumAtoms() - 1
-        atom_index.value = min(atom_index.value, atom_index.max)
         atom_index.description = f"atom {atom_index.value}"
         alpha.description = f"alpha {alpha.value:.2f}"
-        reference, perturbed, separation, rates = perturbation_analysis(mol, atom_index.value, epsilon.value, alpha.value)
-        fig, axes = plt.subplots(1, 2, figsize=(15, 5.2))
-        axes[0].plot(reference[:, atom_index.value], color=NEON["cyan"], lw=3, label="reference")
-        axes[0].plot(perturbed[:, atom_index.value], color=NEON["magenta"], lw=2, ls="--", label="perturbed")
-        axes[0].set(title=f"Atom {atom_index.value}: two nearby trajectories", xlabel="Generation t", ylabel="state")
-        axes[0].legend()
-        axes[1].semilogy(np.maximum(separation, 1e-15), color=NEON["lime"], lw=3)
-        axes[1].set(title="Global trajectory separation", xlabel="Generation t", ylabel="distance delta(t)")
-        plt.tight_layout()
-        image_buffer = io.BytesIO()
-        fig.savefig(image_buffer, format="png", bbox_inches="tight", facecolor=fig.get_facecolor())
-        plt.close(fig)
-        result = pd.DataFrame(
-            {
-                "quantity": ["initial perturbation", "final separation", "largest finite-time rate", "mean finite-time rate"],
-                "value": [epsilon.value, separation[-1], np.max(rates), np.mean(rates)],
-            }
-        )
-        result_html = result.style.hide(axis="index").format({"value": "{:.6g}"}).set_properties(
-            **{"background-color": NEON["panel"], "color": NEON["white"]}
-        ).to_html()
-        output.outputs = (
-            {
-                "output_type": "display_data",
-                "data": {"image/png": base64.b64encode(image_buffer.getvalue()).decode("ascii")},
-                "metadata": {},
-            },
-            {
-                "output_type": "display_data",
-                "data": {"text/html": result_html, "text/plain": result.to_string(index=False)},
-                "metadata": {},
-            },
-        )
+        with output:
+            clear_output(wait=True)
+            row, mol = get_molecule(selector.value)
+            atom_index.max = mol.GetNumAtoms() - 1
+            atom_index.value = min(atom_index.value, atom_index.max)
+            reference, perturbed, separation, rates = perturbation_analysis(mol, atom_index.value, epsilon.value, alpha.value)
+            fig, axes = plt.subplots(1, 2, figsize=(15, 5.2))
+            axes[0].plot(reference[:, atom_index.value], color=NEON["cyan"], lw=3, label="reference")
+            axes[0].plot(perturbed[:, atom_index.value], color=NEON["magenta"], lw=2, ls="--", label="perturbed")
+            axes[0].set(title=f"Atom {atom_index.value}: two nearby trajectories", xlabel="Generation t", ylabel="state")
+            axes[0].legend()
+            axes[1].semilogy(np.maximum(separation, 1e-15), color=NEON["lime"], lw=3)
+            axes[1].set(title="Global trajectory separation", xlabel="Generation t", ylabel="distance delta(t)")
+            plt.tight_layout()
+            plt.show()
+            result = pd.DataFrame(
+                {
+                    "quantity": ["initial perturbation", "final separation", "largest finite-time rate", "mean finite-time rate"],
+                    "value": [epsilon.value, separation[-1], np.max(rates), np.mean(rates)],
+                }
+            )
+            display(result.style.hide(axis="index").format({"value": "{:.6g}"}).set_properties(
+                **{"background-color": NEON["panel"], "color": NEON["white"]}
+            ))
 
     for control in (selector, atom_index, epsilon, alpha):
         control.observe(refresh, names="value")
