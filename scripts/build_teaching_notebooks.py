@@ -369,7 +369,7 @@ Positive $\lambda_t$ over a short interval means local finite-time separation. I
 
 Choose the perturbed atom and perturbation magnitude. Compare the reference and perturbed trajectories, then inspect whether separation grows, contracts, or remains neutral under the transparent diffusion rule.
 """),
-        hidden_code("display(perturbation_explorer())"),
+        hidden_code("_perturbation_widget = perturbation_explorer()"),
         markdown(r"""
 ## Scientific checkpoint
 

@@ -674,8 +674,10 @@ def perturbation_explorer():
 
     for control in (selector, atom_index, epsilon, alpha):
         control.observe(refresh, names="value")
+    container = widgets.VBox([widgets.HBox([selector, atom_index, epsilon, alpha]), output])
+    display(container)
     refresh()
-    return widgets.VBox([widgets.HBox([selector, atom_index, epsilon, alpha]), output])
+    return container
 
 
 def parameterised_trajectory(mol, theta_self=0.6, theta_neighbour=0.4, theta_bias=0.0, steps=24):
