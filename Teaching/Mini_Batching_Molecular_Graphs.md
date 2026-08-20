@@ -245,6 +245,8 @@ The initial loss gives every observed molecule–CYP pair equal weight. Alternat
 
 Those choices change the scientific objective and will be decided explicitly. Batch construction does not settle them.
 
+The accepted unweighted objective and the role of reported assay uncertainty are explained in [Loss Functions and Assay Uncertainty](Loss_Functions_and_Assay_Uncertainty.md).
+
 ## 14. Validation boundaries
 
 Mini-batching occurs only within the current training fold:
@@ -294,4 +296,3 @@ The accepted design is:
 - [End-to-End Joint Training](End_to_End_Joint_Training.md) defines the batch forward and backward passes.
 - [Optimisation, Adam, and Learning Rates](Optimisation_and_Learning_Rates.md) explains how batch gradients become updates.
 - [Grouped Nested Cross-Validation](Grouped_Nested_Cross_Validation.md) defines which molecules are eligible for each batch.
-

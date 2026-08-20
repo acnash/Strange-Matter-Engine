@@ -18,9 +18,10 @@ The notes are divided into subjects as they might be taught at a university:
 12. [End-to-End Joint Training](End_to_End_Joint_Training.md) — how one pIC50 loss jointly teaches the CA and ridge-regularised readout.
 13. [Optimisation, Adam, and Learning Rates](Optimisation_and_Learning_Rates.md) — gradients, adaptive moments, separate parameter-group rates, and explicit regularisation.
 14. [Mini-Batching Molecular Graphs](Mini_Batching_Molecular_Graphs.md) — molecule-centred batches, four CYP contexts, variable graph sizes, and missing-label masks.
-15. [Validation and Statistics](Validation_and_Statistics.md) — generalisation, data splitting, baselines, and honest evaluation.
-16. [Grouped Nested Cross-Validation](Grouped_Nested_Cross_Validation.md) — molecular and scaffold grouping, nested model selection, leakage prevention, and production evaluation.
-17. [Scientific Visualisation](Scientific_Visualisation.md) — making the model's real dynamics visible and interpretable.
+15. [Loss Functions and Assay Uncertainty](Loss_Functions_and_Assay_Uncertainty.md) — unweighted MSE, pIC50 residuals, missing labels, reported uncertainty, and robust alternatives.
+16. [Validation and Statistics](Validation_and_Statistics.md) — generalisation, data splitting, baselines, and honest evaluation.
+17. [Grouped Nested Cross-Validation](Grouped_Nested_Cross_Validation.md) — molecular and scaffold grouping, nested model selection, leakage prevention, and production evaluation.
+18. [Scientific Visualisation](Scientific_Visualisation.md) — making the model's real dynamics visible and interpretable.
 
 ## Learning rule
 
