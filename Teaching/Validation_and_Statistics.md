@@ -14,6 +14,8 @@ A random split is useful as an early diagnostic, but structurally related molecu
 
 Performance will be examined both overall and separately for each CYP target. The official competition rules, released dataset structure, and scoring metric will govern the final evaluation protocol.
 
+The production protocol is developed mathematically in [Grouped Nested Cross-Validation](Grouped_Nested_Cross_Validation.md).
+
 ## Baselines
 
 Conventional baselines are comparison instruments:
