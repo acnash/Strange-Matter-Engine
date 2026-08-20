@@ -934,7 +934,7 @@ def fundamentals_quiz():
           #{quiz_id} .quiz-progress {{ height:8px; background:#D9E2EE; margin:0.7rem 0 1rem; overflow:hidden; }}
           #{quiz_id} .quiz-progress span {{ display:block; height:100%; width:0; background:#087F99; transition:width 180ms ease; }}
           #{quiz_id} .quiz-domain {{ color:#6950C5; font-weight:700; margin:0.4rem 0; }}
-          #{quiz_id} .quiz-question {{ color:#182235 !important; margin-top:0.4rem; }}
+          #{quiz_id} .quiz-question {{ color:#B7FF3C !important; margin-top:0.4rem; }}
           #{quiz_id} .quiz-options {{ display:grid; gap:0.65rem; margin:1rem 0; }}
           #{quiz_id} .quiz-option {{ display:flex; align-items:flex-start; gap:0.65rem; padding:0.8rem; border:1px solid #B9C5D6; background:#F7F9FC; cursor:pointer; }}
           #{quiz_id} .quiz-option:hover {{ border-color:#087F99; }}
