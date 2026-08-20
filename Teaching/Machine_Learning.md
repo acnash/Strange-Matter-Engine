@@ -9,6 +9,8 @@ Strange Matter Engine currently proposes two conceptually distinct learned syste
 
 The precise joint, alternating, or staged training schedule remains an experimental question.
 
+The full mathematical chapters are [Backpropagation](Backpropagation.md) and [Ridge Regression](Ridge_Regression.md).
+
 ## Prediction error and loss
 
 For labelled training molecules, the predicted `pIC50` is compared with the experimental value. A provisional loss is mean squared error: the average squared prediction error. Squaring prevents positive and negative errors from cancelling and penalises larger errors more strongly.

@@ -9,9 +9,11 @@ The notes are divided into subjects as they might be taught at a university:
 3. [Graph Theory](Graph_Theory.md) — molecules as graphs, neighbourhoods, and graph representations.
 4. [Emergence](Emergence.md) — cellular automata, local rules, and collective behaviour.
 5. [Dynamics](Dynamics.md) — trajectories, convergence, attractors, oscillations, and perturbations.
-6. [Machine Learning](Machine_Learning.md) — loss, backpropagation, ridge regression, and model training.
-7. [Validation and Statistics](Validation_and_Statistics.md) — generalisation, data splitting, baselines, and honest evaluation.
-8. [Scientific Visualisation](Scientific_Visualisation.md) — making the model's real dynamics visible and interpretable.
+6. [Machine Learning](Machine_Learning.md) — overview of loss, the two learned components, and model training.
+7. [Backpropagation](Backpropagation.md) — derivatives, the chain rule, backpropagation through the graph CA, and learning the shared rule `θ`.
+8. [Ridge Regression](Ridge_Regression.md) — regularised linear regression, dynamical fingerprints, and learning the pIC50 readout `β`.
+9. [Validation and Statistics](Validation_and_Statistics.md) — generalisation, data splitting, baselines, and honest evaluation.
+10. [Scientific Visualisation](Scientific_Visualisation.md) — making the model's real dynamics visible and interpretable.
 
 ## Learning rule
 
