@@ -413,6 +413,8 @@ Backpropagation then computes gradients for both $\theta$ and $\beta$. This is m
 
 The training schedule will be treated as an experimental design choice. We will compare it under identical, leakage-free splits rather than assuming that greater coupling is better.
 
+The accepted separate penalty strengths and their selection are explained in [Regularisation and Parameter Shrinkage](Regularisation_and_Parameter_Shrinkage.md).
+
 ## 12. What the coefficients can and cannot tell us
 
 After standardisation, coefficient magnitude helps show which fingerprint directions the fitted model relies upon. However:
@@ -463,4 +465,3 @@ The unseen molecule does not refit the CA, scaling constants, ridge coefficients
 - [Backpropagation](Backpropagation.md) explains how prediction error can teach $\theta$.
 - [Machine Learning](Machine_Learning.md) gives the overview of both learned components.
 - [Validation and Statistics](Validation_and_Statistics.md) governs honest model comparison.
-
