@@ -60,12 +60,12 @@ We therefore introduce a chemical grouping function
 g(m)=\text{scaffold assigned to molecule }m.
 ```
 
-The split must satisfy
+Let $q(m)$ denote the fold index assigned to molecule $m$. The split must satisfy
 
 ```math
 g(m_i)=g(m_j)
 \quad\Longrightarrow\quad
-\operatorname{fold}(m_i)=\operatorname{fold}(m_j).
+q(m_i)=q(m_j).
 ```
 
 Every molecule with the same grouping scaffold enters the same fold.
@@ -115,7 +115,7 @@ For fold $k$, the test portion is $\mathcal D_k$ and the fitting portion is
 Each observation is tested once. If $\widehat y_i^{(-k)}$ denotes the prediction for observation $i$ from a model that did not train on fold $k$, the pooled cross-validated RMSE is
 
 ```math
-\operatorname{RMSE}_{\rm CV}
+\mathrm{RMSE}_{\rm CV}
 =
 \sqrt{
 \frac{1}{N}
@@ -180,7 +180,7 @@ h_k^*
 \;
 \frac{1}{K_{\rm in}}
 \sum_{\ell=1}^{K_{\rm in}}
-\operatorname{RMSE}
+\mathrm{RMSE}
 \left(h;\mathcal D_{k,\ell}^{\rm inner}\right).
 ```
 
@@ -188,7 +188,7 @@ The outer score is then
 
 ```math
 s_k=
-\operatorname{RMSE}
+\mathrm{RMSE}
 \left(
 y_k^{\rm outer},
 \widehat y_k^{\rm outer}(h_k^*)
@@ -264,7 +264,7 @@ A strong overall score must not hide failure on one enzyme.
 For residual $r_i=\widehat y_i-y_i$, root mean squared error is
 
 ```math
-\operatorname{RMSE}
+\mathrm{RMSE}
 =
 \sqrt{\frac1N\sum_{i=1}^{N}r_i^2}.
 ```
@@ -272,7 +272,7 @@ For residual $r_i=\widehat y_i-y_i$, root mean squared error is
 Mean absolute error is
 
 ```math
-\operatorname{MAE}
+\mathrm{MAE}
 =
 \frac1N\sum_{i=1}^{N}|r_i|.
 ```
@@ -369,4 +369,3 @@ This process makes the validation boundary part of the scientific model rather t
 - [Chemistry](Chemistry.md) supplies the structural meaning behind chemical grouping.
 - [Backpropagation](Backpropagation.md) explains how graph-CA parameters are fitted inside each fold.
 - [Ridge Regression](Ridge_Regression.md) explains the readout and inner selection of $\lambda$.
-
