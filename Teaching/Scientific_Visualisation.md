@@ -4,6 +4,8 @@
 
 Visualisation is a scientific output of Strange Matter Engine. Images and animations should reveal mathematical quantities that the model genuinely produces or uses, making its temporal behaviour easier to inspect and explain.
 
+The accepted multi-state structure, PyMOL animation, lossless trajectory, display-scalar, and hydrogen-coda design are developed in [Visualising Graph-CA Propagation in PyMOL](Trajectory_Visualisation_and_PyMOL.md).
+
 ## Planned views
 
 - **Evolving molecular graph:** fixed molecular connectivity with node colour, size, or glow representing selected state channels.

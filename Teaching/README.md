@@ -21,9 +21,11 @@ The notes are divided into subjects as they might be taught at a university:
 15. [Mini-Batching Molecular Graphs](Mini_Batching_Molecular_Graphs.md) — molecule-centred batches, four CYP contexts, variable graph sizes, and missing-label masks.
 16. [Loss Functions and Assay Uncertainty](Loss_Functions_and_Assay_Uncertainty.md) — unweighted MSE, pIC50 residuals, missing labels, reported uncertainty, and robust alternatives.
 17. [Hyperparameter Search](Hyperparameter_Search.md) — reproducible random search, promotion, multi-seed confirmation, and selection rules.
-18. [Validation and Statistics](Validation_and_Statistics.md) — generalisation, data splitting, baselines, and honest evaluation.
-19. [Grouped Nested Cross-Validation](Grouped_Nested_Cross_Validation.md) — molecular and scaffold grouping, nested model selection, leakage prevention, and production evaluation.
-20. [Scientific Visualisation](Scientific_Visualisation.md) — making the model's real dynamics visible and interpretable.
+18. [Early Stopping and Refitting](Early_Stopping_and_Refitting.md) — checkpoint selection, patience, protected outer tests, and fixed-duration refitting.
+19. [Validation and Statistics](Validation_and_Statistics.md) — generalisation, data splitting, baselines, and honest evaluation.
+20. [Grouped Nested Cross-Validation](Grouped_Nested_Cross_Validation.md) — molecular and scaffold grouping, nested model selection, leakage prevention, and production evaluation.
+21. [Scientific Visualisation](Scientific_Visualisation.md) — making the model's real dynamics visible and interpretable.
+22. [Trajectory Visualisation and PyMOL](Trajectory_Visualisation_and_PyMOL.md) — multi-state molecular animation, display B values, 3D viewing conformers, and the hydrogen visual coda.
 
 ## Learning rule
 
