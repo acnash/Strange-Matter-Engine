@@ -153,6 +153,8 @@ Nested cross-validation separates selection from assessment:
 
 The outer test fold is invisible to every decision made in the corresponding outer iteration.
 
+The accepted search budget, random sampling, promotion, and multi-seed confirmation are defined in [Reproducible Hyperparameter Search](Hyperparameter_Search.md).
+
 ## 6. The nested procedure
 
 Let the outer grouped folds be
