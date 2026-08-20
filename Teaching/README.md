@@ -16,9 +16,10 @@ The notes are divided into subjects as they might be taught at a university:
 10. [Backpropagation](Backpropagation.md) — derivatives, the chain rule, backpropagation through the graph CA, and learning the shared rule `θ`.
 11. [Ridge Regression](Ridge_Regression.md) — regularised linear regression, dynamical fingerprints, and learning the pIC50 readout `β`.
 12. [End-to-End Joint Training](End_to_End_Joint_Training.md) — how one pIC50 loss jointly teaches the CA and ridge-regularised readout.
-13. [Validation and Statistics](Validation_and_Statistics.md) — generalisation, data splitting, baselines, and honest evaluation.
-14. [Grouped Nested Cross-Validation](Grouped_Nested_Cross_Validation.md) — molecular and scaffold grouping, nested model selection, leakage prevention, and production evaluation.
-15. [Scientific Visualisation](Scientific_Visualisation.md) — making the model's real dynamics visible and interpretable.
+13. [Optimisation, Adam, and Learning Rates](Optimisation_and_Learning_Rates.md) — gradients, adaptive moments, separate parameter-group rates, and explicit regularisation.
+14. [Validation and Statistics](Validation_and_Statistics.md) — generalisation, data splitting, baselines, and honest evaluation.
+15. [Grouped Nested Cross-Validation](Grouped_Nested_Cross_Validation.md) — molecular and scaffold grouping, nested model selection, leakage prevention, and production evaluation.
+16. [Scientific Visualisation](Scientific_Visualisation.md) — making the model's real dynamics visible and interpretable.
 
 ## Learning rule
 

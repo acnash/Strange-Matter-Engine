@@ -451,6 +451,8 @@ The two parameter families may require different learning rates:
 
 Using separate $\eta_\beta$ and $\eta_\theta$ allows the simple linear readout and recurrent CA to learn at different speeds. Whether one shared learning rate is sufficient is a model-selection decision.
 
+The accepted Adam optimiser and learning-rate search are derived in [Optimisation, Adam, and Learning Rates](Optimisation_and_Learning_Rates.md).
+
 ## 12. Why joint learning is attractive
 
 Joint learning lets the CA discover trajectories useful to the prediction task. If the readout relies strongly on oscillation or temporal variation, gradients can encourage CA parameters that make those quantities informative.
@@ -529,4 +531,3 @@ Our accepted prototype uses joint gradient optimisation of a ridge-regularised l
 - [Ridge Regression](Ridge_Regression.md) derives the ridge objective and its closed-form fixed-feature solution.
 - [Dynamics](Dynamics.md) defines the trajectory measurements.
 - [Grouped Nested Cross-Validation](Grouped_Nested_Cross_Validation.md) controls model selection and assessment.
-
