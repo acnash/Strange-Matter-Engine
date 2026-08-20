@@ -90,6 +90,8 @@ A **dynamical fingerprint** is a vector of numerical summaries extracted from th
 
 These definitions are provisional. Before adopting any component, we will learn its mathematics, specify exactly how it is calculated for variable-sized molecular graphs, test its numerical reliability, and determine whether it adds information beyond the other fingerprint components.
 
+The accepted 40-component training representation is defined in [The Differentiable Dynamical Fingerprint](Differentiable_Dynamical_Fingerprint.md). Richer non-differentiable measurements remain part of post-training dynamical analysis.
+
 ## Topics to develop
 
 - phase and state space;
