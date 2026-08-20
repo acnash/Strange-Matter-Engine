@@ -109,21 +109,39 @@ Let
 x=0.5,\quad a=0.8,\quad b=0.1,\quad y^*=0.9.
 ```
 
-The forward calculation is
+Here, $x$ is the input, $a$ is a trainable weight, $b$ is a trainable bias, and $y^*$ is the known target value. The calculation has three distinct stages:
+
+1. the **forward pass** uses the current parameter values to produce a prediction and measure its error;
+2. the **backward pass** calculates how sensitive that error is to each trainable parameter; and
+3. the **parameter update** uses those sensitivities to choose new parameter values.
+
+### The forward pass
+
+The forward pass follows information from input to loss. It answers: **with the parameters as they are now, what does the model predict, and how wrong is that prediction?** No parameter is changed during this pass.
+
+First, the input is transformed into the pre-activation $u$:
 
 ```math
 u=(0.8)(0.5)+0.1=0.5,
 ```
 
+The activation function then converts $u$ into the prediction $y$:
+
 ```math
 y=\tanh(0.5)\approx0.4621,
 ```
+
+Finally, the prediction is compared with the target $y^*=0.9$ to obtain the loss:
 
 ```math
 \mathcal L=\frac12(0.4621-0.9)^2\approx0.0959.
 ```
 
-The backward calculation is
+The intermediate values $u=0.5$ and $y\approx0.4621$ are retained because the backward pass needs them. In the graph CA, the same principle applies on a larger scale: the forward pass generates every atom state at every generation, constructs the dynamical fingerprint, predicts pIC50, and finally calculates the prediction loss.
+
+### The backward pass
+
+The backward pass starts at the loss and follows the chain of dependencies in reverse. It does not make another prediction. It calculates how a small change in each parameter would locally change the loss:
 
 ```math
 \frac{\partial\mathcal L}{\partial y}=0.4621-0.9=-0.4379,
@@ -138,14 +156,32 @@ The backward calculation is
 =(-0.4379)(0.7864)(0.5)\approx-0.1722.
 ```
 
-With learning rate $\eta=0.1$, gradient descent updates
+### Introducing the learning rate
+
+The gradient supplies a direction and a local sensitivity, but we still need to decide how far to move the parameter. The **learning rate**, written $\eta$ (Greek letter eta), is the positive step-size hyperparameter that controls this distance.
+
+Gradient descent uses
+
+```math
+a_{\text{new}}=a-\eta\frac{\partial\mathcal L}{\partial a}.
+```
+
+The minus sign moves against the gradient, towards lower loss. The learning rate scales that move:
+
+- a very small $\eta$ produces cautious but potentially slow learning;
+- an excessively large $\eta$ can overshoot a useful value and make optimisation oscillate or diverge; and
+- an appropriate $\eta$ makes meaningful progress while keeping updates stable.
+
+The learning rate is not learned by backpropagation. It is selected as an optimisation hyperparameter using training behaviour and validation, without consulting blind test outcomes.
+
+For this worked example, choose $\eta=0.1$. The update is
 
 ```math
 a_{\text{new}}=a-\eta\frac{\partial\mathcal L}{\partial a}
 =0.8-0.1(-0.1722)=0.8172.
 ```
 
-The negative gradient tells us that increasing $a$ locally reduces this example's loss.
+The gradient is negative, so subtracting it increases $a$. Locally, that increase raises the prediction towards the target and reduces the loss. One training step therefore consists of a forward pass, a backward pass, and a parameter update; the cycle is then repeated with the revised parameters.
 
 ## 4. Our local graph-CA rule
 
@@ -440,4 +476,3 @@ Backpropagation is the route by which experimental error can shape the automaton
 - [Dynamics](Dynamics.md) defines the trajectories being differentiated.
 - [Ridge Regression](Ridge_Regression.md) explains the pIC50 readout.
 - [Validation and Statistics](Validation_and_Statistics.md) explains how learning claims are tested.
-
