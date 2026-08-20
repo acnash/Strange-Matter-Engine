@@ -11,6 +11,8 @@ The precise joint, alternating, or staged training schedule remains an experimen
 
 The full mathematical chapters are [Backpropagation](Backpropagation.md) and [Ridge Regression](Ridge_Regression.md).
 
+The accepted prototype schedule is explained in [End-to-End Joint Training](End_to_End_Joint_Training.md).
+
 ## Prediction error and loss
 
 For labelled training molecules, the predicted `pIC50` is compared with the experimental value. A provisional loss is mean squared error: the average squared prediction error. Squaring prevents positive and negative errors from cancelling and penalises larger errors more strongly.
