@@ -20,6 +20,15 @@ For each of the 750 blinded challenge molecules:
 8. animate colour and glow over CA generations; and
 9. append a clearly labelled hydrogen **visual coda** that is not a model generation.
 
+Because CYP identity conditions the graph-CA update, the same molecular graph can follow a different trajectory for CYP1A2, CYP2C9, CYP2D6, and CYP3A4. We will therefore preserve **all four context-conditioned trajectories**, rather than treating one trajectory as representative of the molecule.
+
+For 750 molecules, this gives
+
+```math
+750\ \text{molecules}\times4\ \text{CYP contexts}
+=3000\ \text{molecule--CYP trajectory bundles}.
+```
+
 ## 1. The model remains two-dimensional
 
 The predictive model uses:
@@ -358,7 +367,18 @@ The scientific data remain separate from cinematic camera and glow settings.
 
 ## 17. File organisation
 
-For each molecule–CYP prediction, the output bundle should contain files equivalent to:
+Each molecule will have one directory, with a separate scientific bundle for each CYP context:
+
+```text
+MOLECULE_ID/
+  CYP1A2/
+  CYP2C9/
+  CYP2D6/
+  CYP3A4/
+  four_cyp_comparison.mp4
+```
+
+Each CYP directory should contain files equivalent to:
 
 ```text
 trajectory.npz
@@ -367,6 +387,8 @@ trajectory_multistate.pdb
 view_and_animate.pml
 preview.mp4
 ```
+
+The optional four-panel movie will place the four CYP-conditioned animations beside one another with a shared generation counter. It is a comparative view derived from the four underlying bundles, not an additional model trajectory.
 
 A manifest across all 750 molecules will record:
 
@@ -452,4 +474,3 @@ After this small pilot is verified, the workflow can scale to the 750 blinded mo
 - [Differentiable Dynamical Fingerprint](Differentiable_Dynamical_Fingerprint.md) distinguishes atom trajectories from molecular summaries.
 - [Dynamics](Dynamics.md) defines propagation, convergence, oscillation, and perturbation response.
 - [Molecular Standardisation](Molecular_Standardisation.md) preserves atom identity and provenance.
-
