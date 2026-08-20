@@ -248,6 +248,8 @@ For mini-batch $\mathcal B_s$, the joint loss is
 
 Its gradient estimates the complete training-set gradient. Smaller batches introduce more sampling variation; larger batches require more memory and produce fewer updates per epoch. Batch construction is a separate design decision.
 
+The accepted molecule-centred batch is developed in [Mini-Batching Molecular Graphs and CYP Contexts](Mini_Batching_Molecular_Graphs.md).
+
 ## 10. Explicit L2 regularisation
 
 The regularisation gradients are
@@ -359,4 +361,3 @@ The accepted design is:
 - [Ridge Regression](Ridge_Regression.md) explains the penalty on $\beta$.
 - [Dynamics](Dynamics.md) explains recurrent-state stability.
 - [Grouped Nested Cross-Validation](Grouped_Nested_Cross_Validation.md) governs learning-rate selection.
-
