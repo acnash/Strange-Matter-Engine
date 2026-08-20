@@ -5,17 +5,18 @@ This directory is the evolving course for Strange Matter Engine. Every equation,
 The notes are divided into subjects as they might be taught at a university:
 
 1. [Chemistry](Chemistry.md) — molecular structure, atomic and bond properties, and SMILES.
-2. [Pharmacology](Pharmacology.md) — CYP inhibition, concentration–response measurements, `IC50`, and `pIC50`.
-3. [Graph Theory](Graph_Theory.md) — molecules as graphs, neighbourhoods, and graph representations.
-4. [Emergence](Emergence.md) — cellular automata, local rules, and collective behaviour.
-5. [Dynamics](Dynamics.md) — trajectories, convergence, attractors, oscillations, and perturbations.
-6. [Hybrid Atom-State Channels](Hybrid_Atom_State_Channels.md) — fixed chemical and bond information alongside evolving dynamical channels.
-7. [Machine Learning](Machine_Learning.md) — overview of loss, the two learned components, and model training.
-8. [Backpropagation](Backpropagation.md) — derivatives, the chain rule, backpropagation through the graph CA, and learning the shared rule `θ`.
-9. [Ridge Regression](Ridge_Regression.md) — regularised linear regression, dynamical fingerprints, and learning the pIC50 readout `β`.
-10. [Validation and Statistics](Validation_and_Statistics.md) — generalisation, data splitting, baselines, and honest evaluation.
-11. [Grouped Nested Cross-Validation](Grouped_Nested_Cross_Validation.md) — molecular and scaffold grouping, nested model selection, leakage prevention, and production evaluation.
-12. [Scientific Visualisation](Scientific_Visualisation.md) — making the model's real dynamics visible and interpretable.
+2. [Molecular Standardisation](Molecular_Standardisation.md) — conservative parsing, fragment handling, charge, stereochemistry, canonical identity, and provenance.
+3. [Pharmacology](Pharmacology.md) — CYP inhibition, concentration–response measurements, `IC50`, and `pIC50`.
+4. [Graph Theory](Graph_Theory.md) — molecules as graphs, neighbourhoods, and graph representations.
+5. [Emergence](Emergence.md) — cellular automata, local rules, and collective behaviour.
+6. [Dynamics](Dynamics.md) — trajectories, convergence, attractors, oscillations, and perturbations.
+7. [Hybrid Atom-State Channels](Hybrid_Atom_State_Channels.md) — fixed chemical and bond information alongside evolving dynamical channels.
+8. [Machine Learning](Machine_Learning.md) — overview of loss, the two learned components, and model training.
+9. [Backpropagation](Backpropagation.md) — derivatives, the chain rule, backpropagation through the graph CA, and learning the shared rule `θ`.
+10. [Ridge Regression](Ridge_Regression.md) — regularised linear regression, dynamical fingerprints, and learning the pIC50 readout `β`.
+11. [Validation and Statistics](Validation_and_Statistics.md) — generalisation, data splitting, baselines, and honest evaluation.
+12. [Grouped Nested Cross-Validation](Grouped_Nested_Cross_Validation.md) — molecular and scaffold grouping, nested model selection, leakage prevention, and production evaluation.
+13. [Scientific Visualisation](Scientific_Visualisation.md) — making the model's real dynamics visible and interpretable.
 
 ## Learning rule
 
