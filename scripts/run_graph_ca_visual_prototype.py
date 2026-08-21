@@ -451,7 +451,7 @@ def render() -> None:
             "python", controller_source, "python end", "gca_state 1", "refresh",
             "# Select one object in the right-hand panel, click its name to enable it,",
             "# disable the previous object, then use gca_next, gca_previous,",
-            "# gca_state 1-18, or gca_play in the PyMOL command line."]
+            "# gca_state 1-18, gca_play, or gca_stop in the PyMOL command line."]
     (OUT / "load_20_trajectories.pml").write_text("\n".join(pml) + "\n")
     with (OUT / "trajectory_manifest.csv").open("w", newline="") as handle:
         writer = csv.DictWriter(handle, fieldnames=manifest[0].keys()); writer.writeheader(); writer.writerows(manifest)
@@ -506,7 +506,9 @@ This is one fixed-design scientific prototype, trained with seed {SEED}. It is a
 
 Open PyMOL, choose **File → Run Script**, and select `load_20_trajectories.pml` from this directory. All 20 objects appear in the right-hand object panel; the first is enabled. Enable one desired object and disable the previous one.
 
-The supplied controller does not use PyMOL's movie subsystem. Enter `gca_next`, `gca_previous`, `gca_state 18`, or `gca_play` in the PyMOL command line. `gca_play 0.25, 2` uses a 0.25-second delay and plays two cycles.
+The supplied controller does not use PyMOL's movie subsystem. Enter `gca_next`, `gca_previous`, `gca_state 18`, or `gca_play` in the PyMOL command line. `gca_play 0.25, 2` uses a 0.25-second delay and plays two cycles; `gca_stop` stops playback.
+
+Playback runs in the background so PyMOL can repaint between states. Only the currently enabled trajectory object is recoloured, which keeps display-memory use modest.
 
 States 1–17 are graph-CA generations 0–16. State 18 is the labelled visual coda: display-only hydrogens become lime using the final heavy-atom activity. The model never received 3D coordinates or hydrogen nodes.
 
