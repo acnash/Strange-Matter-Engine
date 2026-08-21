@@ -20,6 +20,8 @@ The supplied controller does not use PyMOL's movie subsystem. Enter `gca_next`, 
 
 Playback runs in the background so PyMOL can repaint between states. Only the currently enabled trajectory object is recoloured, which keeps display-memory use modest.
 
+Before recolouring, the controller explicitly installs the selected generation's activity values into the enabled object's B-factor field. This preserves the true 17-state gradient even in PyMOL versions that treat a multi-model PDB's B-factor as one shared atom property.
+
 States 1–17 are graph-CA generations 0–16. State 18 is the labelled visual coda: display-only hydrogens become lime using the final heavy-atom activity. The model never received 3D coordinates or hydrogen nodes.
 
 The PDB B-factor column stores scaled eight-channel atom-state magnitude. It is unrelated to the learned ridge coefficient beta. Lossless eight-channel values are in the matching NPZ files.

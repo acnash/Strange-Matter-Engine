@@ -422,6 +422,7 @@ def render() -> None:
     for old in list(traj_dir.glob("*.pdb")) + list(traj_dir.glob("*.npz")):
         old.unlink()
     manifest = []
+    display_values = {}
     colours = {"cyan": "0.00, 0.90, 1.00", "violet": "0.35, 0.15, 0.85",
                "magenta": "1.00, 0.05, 0.65", "lime": "0.65, 1.00, 0.10"}
     pml = ["reinitialize", "bg_color black", "set antialias, 2", "set ray_opaque_background, off",
@@ -434,6 +435,15 @@ def render() -> None:
         obj = f"traj_{number:02d}_{rec['cyp_target']}"
         pdb_path = traj_dir / f"{safe}.pdb"
         lo, hi = pdb_trajectory(mol, rec["trajectory"], pdb_path)
+        state_values, current_values = [], []
+        for line in pdb_path.read_text().splitlines():
+            if line.startswith("MODEL"):
+                current_values = []
+            elif line.startswith(("ATOM", "HETATM")):
+                current_values.append(float(line[60:66]))
+            elif line.startswith("ENDMDL"):
+                state_values.append(current_values)
+        display_values[obj] = state_values
         np.savez_compressed(traj_dir / f"{safe}.npz", trajectory=rec["trajectory"],
                             molecule_id=rec["molecule_id"], cyp_target=rec["cyp_target"],
                             predicted_pic50=rec["predicted_pic50"])
@@ -445,7 +455,10 @@ def render() -> None:
                 f"show sticks, {obj} and not elem H", f"show spheres, {obj} and not elem H",
                 f"disable {obj}"]
     controller = OUT / "gca_trajectory_controls.py"
-    controller_source = (ROOT / "scripts" / "pymol_gca_controller.py").read_text()
+    controller_source = (
+        "GCA_DISPLAY_VALUES = " + repr(display_values) + "\n" +
+        (ROOT / "scripts" / "pymol_gca_controller.py").read_text()
+    )
     controller.write_text(controller_source)
     pml += ["enable traj_01_CYP1A2", "orient traj_01_CYP1A2",
             "python", controller_source, "python end", "gca_state 1", "refresh",
@@ -509,6 +522,8 @@ Open PyMOL, choose **File → Run Script**, and select `load_20_trajectories.pml
 The supplied controller does not use PyMOL's movie subsystem. Enter `gca_next`, `gca_previous`, `gca_state 18`, or `gca_play` in the PyMOL command line. `gca_play 0.25, 2` uses a 0.25-second delay and plays two cycles; `gca_stop` stops playback.
 
 Playback runs in the background so PyMOL can repaint between states. Only the currently enabled trajectory object is recoloured, which keeps display-memory use modest.
+
+Before recolouring, the controller explicitly installs the selected generation's activity values into the enabled object's B-factor field. This preserves the true 17-state gradient even in PyMOL versions that treat a multi-model PDB's B-factor as one shared atom property.
 
 States 1–17 are graph-CA generations 0–16. State 18 is the labelled visual coda: display-only hydrogens become lime using the final heavy-atom activity. The model never received 3D coordinates or hydrogen nodes.
 

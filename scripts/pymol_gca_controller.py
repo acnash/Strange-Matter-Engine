@@ -1,7 +1,5 @@
 """License-independent PyMOL controls for graph-CA trajectory objects."""
 
-from __future__ import annotations
-
 import time
 import threading
 
@@ -12,6 +10,7 @@ _STATE_COUNT = 18
 _current_state = 1
 _play_thread = None
 _stop_playback = threading.Event()
+GCA_DISPLAY_VALUES = globals().get("GCA_DISPLAY_VALUES", {})
 
 
 def _trajectory_objects():
@@ -27,6 +26,9 @@ def gca_state(state=1):
     cmd.set("state", state)
     objects = _trajectory_objects()
     for obj in objects:
+        if obj in GCA_DISPLAY_VALUES:
+            values = iter(GCA_DISPLAY_VALUES[obj][state - 1])
+            cmd.alter(obj, "b=next(gca_values)", space={"gca_values": values})
         cmd.spectrum("b", "cyan_magenta", obj, minimum=0.0, maximum=100.0)
     if objects:
         hydrogen_selection = "(" + " or ".join(objects) + ") and elem H"
