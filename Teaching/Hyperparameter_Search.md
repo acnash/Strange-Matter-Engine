@@ -418,3 +418,13 @@ The accepted search design is:
 - [Regularisation and Parameter Shrinkage](Regularisation_and_Parameter_Shrinkage.md) defines the lambda candidates.
 - [Hybrid Atom-State Channels](Hybrid_Atom_State_Channels.md) defines dynamical width.
 - [Dynamics](Dynamics.md) explains generation count and stability.
+
+## Prototype-three multi-fidelity example
+
+The 200-generation prototype used a deliberately modest preliminary search rather than the full production search above. Six optimisation configurations were compared on identical, reproducibly sampled molecular subsets using 50-generation rollouts. The leading configuration was then promoted to a complete-data, 200-generation run.
+
+This is **multi-fidelity tuning**: inexpensive approximations screen candidates before costly high-fidelity evaluation. It is useful when a complete training run is extremely expensive, but it assumes that rankings at lower fidelity contain information about rankings at full fidelity.
+
+The screened hyperparameters were Graph-CA learning rate, readout learning rate, ridge strength, and gradient-clipping norm. The winning values were 0.002, 0.003, 0.001, and 1.0 respectively.
+
+The prototype is an engineering experiment, not the final nested-cross-validation estimate. Its grouped-validation result must not be used to repeatedly redesign the search and then be presented as untouched test performance. The production study will retain protected outer folds and perform model selection only inside each outer training partition.

@@ -33,6 +33,14 @@ RULE = os.environ.get("SME_CA_RULE", "gated_residual")
 GENERATIONS = int(os.environ.get("SME_GENERATIONS", "16"))
 RUN_NAME = os.environ.get("SME_RUN_NAME", "graph_ca_visual_prototype")
 OUT = ROOT / "results" / RUN_NAME
+CA_LR = float(os.environ.get("SME_CA_LR", "1e-3"))
+READOUT_LR = float(os.environ.get("SME_READOUT_LR", "3e-3"))
+RIDGE_STRENGTH = float(os.environ.get("SME_RIDGE", "1e-3"))
+CA_L2 = float(os.environ.get("SME_CA_L2", "1e-5"))
+GRAD_CLIP = float(os.environ.get("SME_GRAD_CLIP", "1.0"))
+PATIENCE_LIMIT = int(os.environ.get("SME_PATIENCE", "20"))
+MIN_DELTA = float(os.environ.get("SME_MIN_DELTA", "0.005"))
+TUNING_ONLY = os.environ.get("SME_TUNING_ONLY", "0") == "1"
 SEED = 1701
 CYPS = ("CYP1A2", "CYP2C9", "CYP2D6", "CYP3A4")
 LABEL_COLS = tuple(f"{c}_pIC50_direct_inhibition" for c in CYPS)
@@ -208,13 +216,16 @@ def train() -> None:
                 raise ValueError(f"Unknown CA rule: {RULE}")
             self.readout = nn.Linear(hidden * 5, 1)
 
-        def forward_one(self, rec, cyp: int, return_trajectory=False):
+        def forward_one(self, rec, cyp: int, return_trajectory=False,
+                        initial_perturbation=None):
             x = torch.as_tensor(rec["x"], device=device)
             src = torch.as_tensor(rec["src"], device=device)
             dst = torch.as_tensor(rec["dst"], device=device)
             edge = torch.as_tensor(rec["edge"], device=device)
             context = torch.zeros(4, device=device); context[cyp] = 1.0
             h = torch.tanh(self.init(x))
+            if initial_perturbation is not None:
+                h = h + initial_perturbation
             velocity = torch.zeros_like(h)
             states = [h]
             means = [h.mean(0)]
@@ -263,8 +274,8 @@ def train() -> None:
     readout_ids = {id(p) for p in readout_params}
     ca_params = [p for p in model.parameters() if id(p) not in readout_ids]
     optimizer = torch.optim.Adam([
-        {"params": ca_params, "lr": 1e-3},
-        {"params": readout_params, "lr": 3e-3},
+        {"params": ca_params, "lr": CA_LR},
+        {"params": readout_params, "lr": READOUT_LR},
     ], betas=(0.9, 0.999), eps=1e-8)
 
     def observed_pairs(indices):
@@ -274,8 +285,17 @@ def train() -> None:
                 if np.isfinite(y): pairs.append((i, c, float(y)))
         return pairs
 
-    fit_pairs = observed_pairs(data["train_idx"])
-    val_pairs = observed_pairs(data["val_idx"])
+    fit_indices = list(data["train_idx"])
+    validation_indices = list(data["val_idx"])
+    if TUNING_ONLY:
+        subset_rng = random.Random(SEED + 991)
+        subset_rng.shuffle(fit_indices); subset_rng.shuffle(validation_indices)
+        fit_limit = int(os.environ.get("SME_TUNING_FIT_MOLECULES", "600"))
+        validation_limit = int(os.environ.get("SME_TUNING_VAL_MOLECULES", "200"))
+        fit_indices = fit_indices[:fit_limit]
+        validation_indices = validation_indices[:validation_limit]
+    fit_pairs = observed_pairs(fit_indices)
+    val_pairs = observed_pairs(validation_indices)
 
     def evaluate(pairs):
         model.eval(); ys, ps = [], []
@@ -291,7 +311,7 @@ def train() -> None:
     max_epochs = int(os.environ.get("SME_MAX_EPOCHS", "200"))
     for epoch in range(1, max_epochs + 1):
         model.train()
-        molecule_order = list(data["train_idx"]); rng.shuffle(molecule_order)
+        molecule_order = list(fit_indices); rng.shuffle(molecule_order)
         total_sq, total_n, raw_norms, clipped_norms = 0.0, 0, [], []
         for start in range(0, len(molecule_order), 16):
             molecule_batch = molecule_order[start:start + 16]
@@ -305,14 +325,14 @@ def train() -> None:
             preds = torch.stack([model.forward_one(data["train"][i], c) for i, c, _ in batch])
             targets = torch.tensor([y for _, _, y in batch], dtype=torch.float32, device=device)
             mse = ((preds - targets) ** 2).mean()
-            ridge = 1e-3 * sum((p ** 2).sum() for p in readout_params)
-            ca_penalty = 1e-5 * sum((p ** 2).sum() for p in ca_params)
+            ridge = RIDGE_STRENGTH * sum((p ** 2).sum() for p in readout_params)
+            ca_penalty = CA_L2 * sum((p ** 2).sum() for p in ca_params)
             loss = mse + ridge + ca_penalty
             loss.backward()
             raw = float(torch.sqrt(sum((p.grad.detach() ** 2).sum() for p in model.parameters()
                                        if p.grad is not None)))
-            torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)
-            clipped = min(raw, 1.0)
+            torch.nn.utils.clip_grad_norm_(model.parameters(), GRAD_CLIP)
+            clipped = min(raw, GRAD_CLIP)
             optimizer.step()
             total_sq += float(((preds.detach() - targets) ** 2).sum())
             total_n += len(batch); raw_norms.append(raw); clipped_norms.append(clipped)
@@ -320,20 +340,23 @@ def train() -> None:
         val_rmse, _, _ = evaluate(val_pairs)
         row = {"epoch": epoch, "train_rmse": train_rmse, "validation_rmse": val_rmse,
                "mean_raw_gradient_norm": float(np.mean(raw_norms)),
-               "fraction_gradients_clipped": float(np.mean(np.asarray(raw_norms) > 1.0))}
+               "fraction_gradients_clipped": float(np.mean(np.asarray(raw_norms) > GRAD_CLIP))}
         history.append(row)
         print(json.dumps(row), flush=True)
-        if val_rmse < best - 0.005:
+        if val_rmse < best - MIN_DELTA:
             best, patience = val_rmse, 0
             best_state = {k: v.detach().cpu().clone() for k, v in model.state_dict().items()}
         else:
             patience += 1
-        if patience >= 20:
+        if patience >= PATIENCE_LIMIT:
             break
     model.load_state_dict(best_state)
     OUT.mkdir(parents=True, exist_ok=True)
     torch.save({"state_dict": best_state, "chem_dim": chem_dim, "seed": SEED,
-                "rule": RULE, "generations": GENERATIONS}, OUT / "model.pt")
+                "rule": RULE, "generations": GENERATIONS,
+                "hyperparameters": {"ca_lr": CA_LR, "readout_lr": READOUT_LR,
+                    "ridge": RIDGE_STRENGTH, "ca_l2": CA_L2,
+                    "gradient_clip": GRAD_CLIP}}, OUT / "model.pt")
     with (OUT / "training_history.csv").open("w", newline="") as handle:
         writer = csv.DictWriter(handle, fieldnames=history[0].keys()); writer.writeheader(); writer.writerows(history)
 
@@ -349,6 +372,18 @@ def train() -> None:
                               "residual": pred - y})
     with (OUT / "validation_predictions.csv").open("w", newline="") as handle:
         writer = csv.DictWriter(handle, fieldnames=pair_rows[0].keys()); writer.writeheader(); writer.writerows(pair_rows)
+
+    common_metrics = {"seed": SEED, "best_validation_rmse": best,
+        "restored_fit_rmse": train_rmse, "restored_validation_rmse": val_rmse,
+        "epochs_run": len(history), "fit_observations": len(fit_pairs),
+        "validation_observations": len(val_pairs), "rule": RULE,
+        "generations": GENERATIONS, "hyperparameters": {"ca_lr": CA_LR,
+        "readout_lr": READOUT_LR, "ridge": RIDGE_STRENGTH, "ca_l2": CA_L2,
+        "gradient_clip": GRAD_CLIP}}
+    if TUNING_ONLY:
+        (OUT / "metrics.json").write_text(json.dumps(common_metrics, indent=2) + "\n")
+        print(json.dumps(common_metrics, indent=2))
+        return
 
     def dynamical_scores(trajectory):
         mu = trajectory.mean(axis=1)
@@ -432,6 +467,30 @@ def train() -> None:
         record = all_trajectory_records[idx]
         record["selection_reason"] = reasons[idx]
         trajectory_records.append(record)
+
+    perturbation_rows = []
+    epsilon = 1e-5
+    with torch.no_grad():
+        for selection_index, record in enumerate(trajectory_records, start=1):
+            rec = data["test"][record["test_index"]]
+            shape = record["trajectory"][0].shape
+            generator = torch.Generator(device=device).manual_seed(SEED + selection_index)
+            direction = torch.randn(shape, generator=generator, device=device)
+            direction = epsilon * direction / torch.linalg.vector_norm(direction)
+            _, perturbed = model.forward_one(rec, record["cyp_index"],
+                                             return_trajectory=True,
+                                             initial_perturbation=direction)
+            reference = torch.as_tensor(record["trajectory"], device=device)
+            distances = torch.linalg.vector_norm(perturbed - reference,
+                                                  dim=(1, 2)).cpu().numpy()
+            times = np.arange(1, min(31, len(distances)))
+            log_growth = np.log(np.maximum(distances[times], 1e-12) / epsilon)
+            finite_time_lyapunov = float(np.polyfit(times, log_growth, 1)[0])
+            perturbation_rows.append({"molecule_id": record["molecule_id"],
+                "cyp_target": record["cyp_target"], "epsilon": epsilon,
+                "fit_generations": "1-30", "finite_time_lyapunov": finite_time_lyapunov,
+                "final_separation": float(distances[-1]),
+                "maximum_separation": float(distances.max())})
     selected_set = set(selected)
     for idx, row in enumerate(score_rows):
         row["selected_for_visualisation"] = idx in selected_set
@@ -442,10 +501,9 @@ def train() -> None:
         pickle.dump(trajectory_records, handle, protocol=pickle.HIGHEST_PROTOCOL)
     with (OUT / "trajectory_novelty_scores.csv").open("w", newline="") as handle:
         writer = csv.DictWriter(handle, fieldnames=score_rows[0].keys()); writer.writeheader(); writer.writerows(score_rows)
-    metrics = {"seed": SEED, "best_validation_rmse": best, "restored_fit_rmse": train_rmse,
-               "restored_validation_rmse": val_rmse, "epochs_run": len(history),
-               "fit_observations": len(fit_pairs), "validation_observations": len(val_pairs),
-               "rule": RULE, "generations": GENERATIONS,
+    with (OUT / "perturbation_analysis.csv").open("w", newline="") as handle:
+        writer = csv.DictWriter(handle, fieldnames=perturbation_rows[0].keys()); writer.writeheader(); writer.writerows(perturbation_rows)
+    metrics = {**common_metrics,
                "selected_trajectories": [{"molecule_id": r["molecule_id"],
                                            "cyp_target": r["cyp_target"],
                                            "selection_reason": r["selection_reason"]}
