@@ -444,7 +444,7 @@ def render() -> None:
         pml += [f'load "{pdb_path.as_posix()}", {obj}', f"hide everything, {obj}",
                 f"show sticks, {obj} and not elem H", f"show spheres, {obj} and not elem H",
                 f"disable {obj}"]
-    pml += ["enable traj_01_CYP1A2", "orient traj_01_CYP1A2", "mset 1 x18",
+    pml += ["enable traj_01_CYP1A2", "orient traj_01_CYP1A2", "mset 1 -18",
             "set movie_loop, 1"]
     objects = [m["object"] for m in manifest]
     for state in range(1, 19):
@@ -459,7 +459,8 @@ def render() -> None:
         pml.append(f"mdo {state}: " + "; ".join(cmds))
     pml += ["frame 1", "refresh",
             "# Select one object in the right-hand panel, click its name to enable it,",
-            "# disable the previous object, then press Play or step through states 1-18."]
+            "# disable the previous object, then use the MOVIE controls to play or step",
+            "# through frames 1-18. The ordinary object-state selector does not run mdo."]
     (OUT / "load_20_trajectories.pml").write_text("\n".join(pml) + "\n")
     with (OUT / "trajectory_manifest.csv").open("w", newline="") as handle:
         writer = csv.DictWriter(handle, fieldnames=manifest[0].keys()); writer.writeheader(); writer.writerows(manifest)
@@ -512,7 +513,9 @@ This is one fixed-design scientific prototype, trained with seed {SEED}. It is a
 
 ## PyMOL
 
-Open PyMOL, choose **File → Run Script**, and select `load_20_trajectories.pml` from this directory. All 20 objects appear in the right-hand object panel; the first is enabled. Enable one desired object and disable the previous one, then use Play or the state controls.
+Open PyMOL, choose **File → Run Script**, and select `load_20_trajectories.pml` from this directory. All 20 objects appear in the right-hand object panel; the first is enabled. Enable one desired object and disable the previous one, then use the **movie playback controls** at the bottom of PyMOL.
+
+Use the movie Play, Previous-frame, and Next-frame buttons. The ordinary object-state selector changes coordinates but does not execute the per-frame recolouring commands.
 
 States 1–17 are graph-CA generations 0–16. State 18 is the labelled visual coda: display-only hydrogens become lime using the final heavy-atom activity. The model never received 3D coordinates or hydrogen nodes.
 

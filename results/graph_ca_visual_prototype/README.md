@@ -14,7 +14,9 @@ This is one fixed-design scientific prototype, trained with seed 1701. It is an 
 
 ## PyMOL
 
-Open PyMOL, choose **File → Run Script**, and select `load_20_trajectories.pml` from this directory. All 20 objects appear in the right-hand object panel; the first is enabled. Enable one desired object and disable the previous one, then use Play or the state controls.
+Open PyMOL, choose **File → Run Script**, and select `load_20_trajectories.pml` from this directory. All 20 objects appear in the right-hand object panel; the first is enabled. Enable one desired object and disable the previous one, then use the **movie playback controls** at the bottom of PyMOL.
+
+Use the movie Play, Previous-frame, and Next-frame buttons. The ordinary object-state selector changes coordinates but does not execute the per-frame recolouring commands.
 
 States 1–17 are graph-CA generations 0–16. State 18 is the labelled visual coda: display-only hydrogens become lime using the final heavy-atom activity. The model never received 3D coordinates or hydrogen nodes.
 
