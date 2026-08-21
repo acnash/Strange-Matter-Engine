@@ -76,6 +76,8 @@ For
 \end{bmatrix}^{\mathsf T},
 ```
 
+Here $p$ is the number of fingerprint components, $j$ indexes one component, and $\beta_j$ is its readout coefficient.
+
 the squared L2 norm is
 
 ```math
@@ -258,6 +260,8 @@ z'_{ij}
 {s_{j,\rm train}+\epsilon}.
 ```
 
+Here $z_{ij}$ is fingerprint component $j$ for example $i$, $z'_{ij}$ is its standardised value, $\mu_{j,\rm train}$ and $s_{j,\rm train}$ are its training-fold mean and standard deviation, and $\epsilon$ is a small positive constant that prevents division by zero.
+
 After standardisation, a unit change represents approximately one training-fold standard deviation. The same penalty then acts more comparably across fingerprint components.
 
 ## 10. Parameters normally excluded
@@ -363,4 +367,3 @@ The accepted design is:
 - [Optimisation, Adam, and Learning Rates](Optimisation_and_Learning_Rates.md) explains how penalty gradients are applied.
 - [Differentiable Dynamical Fingerprint](Differentiable_Dynamical_Fingerprint.md) defines the 40 readout inputs.
 - [Grouped Nested Cross-Validation](Grouped_Nested_Cross_Validation.md) governs lambda selection.
-

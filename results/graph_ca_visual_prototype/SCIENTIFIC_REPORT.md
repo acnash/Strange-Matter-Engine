@@ -46,15 +46,17 @@ For $N$ observations, root mean squared error is
 }.
 ```
 
+Here $i$ indexes observations, $y_i$ is measured pIC50, $\widehat y_i$ is predicted pIC50, and $N$ is the number of observations included in the calculation.
+
 Squaring makes large mistakes influential. Taking the square root returns the result to pIC50 units. An RMSE of 0.869 means that the typical error scale, with larger errors emphasised, is about 0.87 logarithmic concentration units.
 
-Because pIC50 is base-10 logarithmic, a pIC50 error $Delta$ corresponds to an IC50 concentration ratio of approximately
+Because pIC50 is base-10 logarithmic, an absolute pIC50 error $|\Delta|$ corresponds to an IC50 concentration ratio of approximately
 
 ```math
 10^{\lvert\Delta\rvert}.
 ```
 
-For $Delta=0.869$, that ratio is approximately $7.4$. This conversion is useful for chemical intuition, although RMSE itself is an aggregate statistic and should not be interpreted as every prediction being wrong by exactly that factor.
+Here $\Delta=\widehat y-y$ is the signed pIC50 residual for one prediction. For $|\Delta|=0.869$, the ratio is approximately $7.4$. This conversion is useful for chemical intuition, although RMSE itself is an aggregate statistic and should not be interpreted as every prediction being wrong by exactly that factor.
 
 ## Error by CYP
 
@@ -181,4 +183,3 @@ The PDB B-factor is unrelated to the ridge readout coefficient customarily writt
 - maximum epochs: 200;
 - early-stopping patience: 20;
 - minimum validation improvement: 0.005 pIC50 RMSE.
-

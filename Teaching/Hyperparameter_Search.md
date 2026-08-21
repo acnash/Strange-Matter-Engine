@@ -101,6 +101,8 @@ If one inner evaluation uses $K_{\rm in}$ folds, the number of fitted models is
 1296K_{\rm in}.
 ```
 
+Here $K_{\rm in}$ is the number of grouped inner-validation folds. One separate model fit is required for every configuration–fold combination.
+
 With four inner folds,
 
 ```math
@@ -149,6 +151,8 @@ Using a pseudo-random generator with recorded seed $s_{\rm search}$, we select
 |\mathcal H_{48}|=48.
 ```
 
+Here $s_{\rm search}$ is the random-search seed, $\mathcal H$ is the complete candidate set, and $\mathcal H_{48}$ is the 48-configuration subset selected for first-stage evaluation. Vertical bars around a set denote its number of members.
+
 Sampling is performed without replacement, so a configuration is not accidentally evaluated twice during the first stage.
 
 Random search explores combinations across all dimensions and gives each sampled configuration the same evaluation protocol.
@@ -189,6 +193,8 @@ If candidate $h$ produces score $s_{h\ell}$ on inner fold $\ell$, its mean is
 \frac1{K_{\rm in}}
 \sum_{\ell=1}^{K_{\rm in}}s_{h\ell}.
 ```
+
+Here $h$ identifies one hyperparameter configuration, $\ell$ indexes inner folds, and $s_{h\ell}$ is that configuration's RMSE on inner fold $\ell$.
 
 Using identical folds creates a paired comparison: differences arise from the configuration and training randomness rather than different validation molecules.
 
@@ -259,6 +265,8 @@ We also measure dispersion:
 \left(s_{h\ell r}-\bar s_h\right)^2
 }.
 ```
+
+Here $r$ indexes the three training seeds and $\sigma_h$ is the sample standard deviation of configuration $h$'s fold-and-seed scores.
 
 A small apparent gain accompanied by severe seed instability is weak evidence.
 
@@ -410,4 +418,3 @@ The accepted search design is:
 - [Regularisation and Parameter Shrinkage](Regularisation_and_Parameter_Shrinkage.md) defines the lambda candidates.
 - [Hybrid Atom-State Channels](Hybrid_Atom_State_Channels.md) defines dynamical width.
 - [Dynamics](Dynamics.md) explains generation count and stability.
-

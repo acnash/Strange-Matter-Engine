@@ -32,15 +32,17 @@ and
 
 The explicit ridge penalty $\lambda_\beta\lVert\beta\rVert_2^2$ and CA penalty $\lambda_\theta\lVert\theta\rVert_2^2$ remain in the loss. We will not add AdamW weight decay to the initial prototype.
 
+Here $\eta_\theta$ and $\eta_\beta$ are the learning rates for the graph-CA parameters $\theta$ and readout coefficients $\beta$, respectively. Likewise, $\lambda_\theta$ and $\lambda_\beta$ are the corresponding L2-regularisation strengths.
+
 ## 1. Gradients and ordinary gradient descent
 
-For parameter vector $w$, backpropagation produces
+For parameter vector $w$, backpropagation produces, at optimisation step $s$,
 
 ```math
 g_s=\nabla_w\mathcal L_s
 ```
 
-at optimisation step $s$. Ordinary gradient descent uses
+Here $w$ denotes whichever trainable parameter vector is being updated, $\mathcal L_s$ is the loss calculated from step $s$'s mini-batch, and $g_s$ is its gradient with respect to $w$. Ordinary gradient descent uses
 
 ```math
 w_{s+1}=w_s-\eta g_s.
@@ -245,6 +247,8 @@ For mini-batch $\mathcal B_s$, the joint loss is
 +\lambda_\beta\lVert\beta\rVert_2^2
 +\lambda_\theta\lVert\theta\rVert_2^2.
 ```
+
+Here $\mathcal B_s$ is the set of examples in optimisation step $s$, and $|\mathcal B_s|$ is the number of examples in that set.
 
 Its gradient estimates the complete training-set gradient. Smaller batches introduce more sampling variation; larger batches require more memory and produce fewer updates per epoch. Batch construction is a separate design decision.
 

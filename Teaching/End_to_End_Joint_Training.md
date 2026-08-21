@@ -138,6 +138,8 @@ For $N$ training examples, the proposed objective is
 
 It contains three parts.
 
+Here $N$ is the number of observed training examples, $m$ indexes those examples, $\lambda_\beta$ and $\lambda_\theta$ are the two L2-regularisation strengths, and $\lVert\cdot\rVert_2^2$ denotes a squared Euclidean norm.
+
 ### Prediction error
 
 ```math

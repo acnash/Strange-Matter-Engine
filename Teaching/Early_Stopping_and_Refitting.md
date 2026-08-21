@@ -32,6 +32,8 @@ U_{\rm epoch}
 \right\rceil.
 ```
 
+Here $N_{\rm mol}$ is the number of training molecules, $U_{\rm epoch}$ is the number of optimiser updates in one epoch, and $\lceil\cdot\rceil$ means round upward to the next integer so that a smaller final batch is counted.
+
 Epoch number is therefore a measure of how many times the optimiser has encountered the training set, not a universal measure of computational effort across datasets.
 
 ## 2. Training and validation curves
@@ -72,6 +74,8 @@ R_{\rm best}(e)
 =
 \min_{1\le j\le e}R_{\rm val}(j).
 ```
+
+The index $j$ runs over all completed epochs from 1 through $e$; $R_{\rm best}(e)$ is the smallest validation RMSE seen in that range.
 
 When a new best value is accepted, the checkpoint must retain:
 
@@ -184,6 +188,8 @@ For selected configuration $h^*$, inner folds and confirmation seeds produce bes
 e_1^*,e_2^*,\ldots,e_M^*.
 ```
 
+Here each $e_j^*$ is the best epoch from one inner-fold-and-seed training run, $j$ indexes those runs, and $M$ is their total number.
+
 The outer-refit duration is
 
 ```math
@@ -196,6 +202,8 @@ e_1^*,e_2^*,\ldots,e_M^*
 ```
 
 rounded to an integer according to a declared rule.
+
+Thus $E_{\rm refit}$ is the fixed number of epochs used when retraining on all outer-training data.
 
 The median is robust to an occasional run that stops exceptionally early or trains to the maximum.
 
@@ -282,4 +290,3 @@ The accepted policy is:
 - [Grouped Nested Cross-Validation](Grouped_Nested_Cross_Validation.md) defines the protected outer fold.
 - [Optimisation, Adam, and Learning Rates](Optimisation_and_Learning_Rates.md) explains epoch-by-epoch parameter updates.
 - [Mini-Batching Molecular Graphs](Mini_Batching_Molecular_Graphs.md) defines an epoch.
-

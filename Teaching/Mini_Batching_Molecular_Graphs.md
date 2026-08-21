@@ -23,6 +23,8 @@ B_{\rm example}
 
 One ordinary batch therefore contains up to 64 molecule–CYP examples. Missing labels are masked from the loss rather than invented.
 
+Here $B_{\rm mol}$ is the number of distinct molecules selected for a batch, and $B_{\rm example}$ is the maximum number of molecule–CYP examples produced after expanding those molecules across the four CYP contexts.
+
 ## 1. Molecules and supervised examples
 
 Let molecule $m$ have standardised graph
@@ -31,7 +33,7 @@ Let molecule $m$ have standardised graph
 G_m=(V_m,E_m)
 ```
 
-and measured pIC50 $y_{mc}$ for CYP $c$. A prediction example is
+where $V_m$ is molecule $m$'s atom set and $E_m$ is its bond set. Let $c$ identify a CYP isoform and let $y_{mc}$ be the measured pIC50 for molecule $m$ against CYP $c$. A prediction example is
 
 ```math
 (G_m,c)\longrightarrow y_{mc}.
@@ -96,10 +98,10 @@ With complete labels,
 
 ## 4. Missing-label masks
 
-Define
+Define the binary observation mask
 
 ```math
-r_{mc}=
+M_{mc}=
 \begin{cases}
 1,&\text{if }y_{mc}\text{ is observed},\\
 0,&\text{if }y_{mc}\text{ is missing}.
@@ -114,11 +116,11 @@ The masked batch mean squared error is
 \frac{
 \sum_{m\in\mathcal M_s}
 \sum_{c\in\mathcal C}
-r_{mc}(\widehat y_{mc}-y_{mc})^2
+M_{mc}(\widehat y_{mc}-y_{mc})^2
 }{
 \sum_{m\in\mathcal M_s}
 \sum_{c\in\mathcal C}
-r_{mc}
+M_{mc}
 }.
 ```
 
@@ -133,6 +135,8 @@ Only observed labels contribute. Missing pIC50 values are never set to zero, rep
 +\lambda_\beta\lVert\beta\rVert_2^2
 +\lambda_\theta\lVert\theta\rVert_2^2.
 ```
+
+Here $\mathcal L_s$ is the complete loss at optimisation step $s$; $\beta$ contains the readout coefficients; $\theta$ contains the graph-CA parameters; and $\lambda_\beta$ and $\lambda_\theta$ are their respective L2-regularisation strengths.
 
 Backpropagation calculates gradients of this loss, and Adam makes one joint update to $\beta$ and $\theta$.
 
@@ -177,7 +181,7 @@ H_{mc}^{(t)},C_m,E_m,c
 \right).
 ```
 
-Fixed graph data $C_m,E_m$ can be reused, but four separate dynamical states are required. In general,
+Here $H_{mc}^{(t)}$ is the dynamical atom-state matrix for molecule $m$ under CYP context $c$ at generation $t$; $C_m$ is its fixed atom-chemistry matrix; $E_m$ is its fixed bond-feature data; and $F_\theta$ is the shared update rule. Fixed graph data $C_m,E_m$ can be reused, but four separate dynamical states are required. In general,
 
 ```math
 H_{m,\mathrm{1A2}}^{(t)}

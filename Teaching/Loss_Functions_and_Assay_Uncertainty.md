@@ -75,10 +75,10 @@ MSE averages squared residuals:
 ```math
 \mathrm{MSE}
 =
-\frac1N\sum_{i=1}^{N}r_i^2.
+\frac1{N_{\rm obs}}\sum_{i=1}^{N_{\rm obs}}r_i^2.
 ```
 
-Dividing by $N$ makes losses more comparable across batches containing different numbers of observed labels.
+Dividing by $N_{\rm obs}$ makes losses more comparable across batches containing different numbers of observed labels. The notation matches the definition at the start of this chapter: $N_{\rm obs}$ is the number of observed labels in the collection being averaged.
 
 MSE is measured in squared pIC50 units. For reporting, root mean squared error returns to pIC50 units:
 
@@ -170,17 +170,17 @@ Thus an RMSE of 0.5 pIC50 units represents a characteristic error scale of appro
 
 ## 6. Missing labels
 
-Let mask $r_{mc}$ equal 1 when molecule $m$ has an observed value for CYP $c$, and 0 otherwise. The batch data loss is
+Let the binary mask $M_{mc}$ equal 1 when molecule $m$ has an observed value for CYP $c$, and 0 otherwise. Here $m$ indexes molecules and $c$ indexes CYP isoforms. The batch data loss is
 
 ```math
 \mathcal L_{\rm data}
 =
 \frac{
 \sum_m\sum_c
-r_{mc}
+M_{mc}
 (\widehat y_{mc}-y_{mc})^2
 }{
-\sum_m\sum_c r_{mc}
+\sum_m\sum_c M_{mc}
 }.
 ```
 
@@ -375,4 +375,3 @@ The accepted loss design is:
 - [End-to-End Joint Training](End_to_End_Joint_Training.md) connects the loss to $\theta$ and $\beta$.
 - [Optimisation, Adam, and Learning Rates](Optimisation_and_Learning_Rates.md) explains how loss gradients become updates.
 - [Grouped Nested Cross-Validation](Grouped_Nested_Cross_Validation.md) controls future loss-function comparisons.
-

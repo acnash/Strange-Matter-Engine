@@ -12,6 +12,8 @@ Our graph CA applies one shared update rule repeatedly:
 H^{(t+1)}=F_\theta\left(H^{(t)},G,C,c_{\rm CYP}\right).
 ```
 
+Here $H^{(t)}$ is the matrix of evolving atom states at generation $t$, $F_\theta$ is the shared update rule with learned parameters $\theta$, $G$ is the molecular graph, $C$ is the fixed atom-chemistry matrix, and $c_{\rm CYP}$ is the CYP-context encoding.
+
 Backpropagation through 16 generations multiplies local Jacobian matrices through time. Schematically,
 
 ```math
@@ -36,6 +38,8 @@ Let the complete trainable parameter gradient be $g$, formed by concatenating th
 \sum_j g_j^2
 }.
 ```
+
+The index $j$ runs over the individual scalar entries of that concatenated vector, so $g_j$ is one gradient component. The subscript 2 denotes the Euclidean, or L2, vector norm.
 
 The norm describes the overall size of the proposed update direction before the optimiser rescales it.
 
@@ -128,4 +132,3 @@ Clipping also does not force atom states themselves to be small. State magnitude
 - record the proportion of steps clipped in every epoch;
 - interpret persistent clipping as a stability diagnostic; and
 - compare alternative thresholds only inside the grouped inner-validation procedure during production development.
-

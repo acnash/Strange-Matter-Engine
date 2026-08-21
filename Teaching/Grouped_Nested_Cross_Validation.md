@@ -40,7 +40,15 @@ Let molecule $m$ have observations
 \{(m,c,y_{mc}):c\in\mathcal C_m\},
 ```
 
-where $c$ identifies a CYP and $y_{mc}$ is the measured pIC50. Molecular grouping imposes
+where:
+
+- $m$ identifies one molecule;
+- $c$ identifies one CYP isoform;
+- $y_{mc}$ is the measured pIC50 for molecule $m$ against CYP $c$;
+- $\mathcal C_m$ is the set of CYP isoforms for which molecule $m$ has an observed pIC50; and
+- $\mathcal O_m$ is therefore the set of all observed molecule–CYP records belonging to molecule $m$.
+
+Molecular grouping imposes
 
 ```math
 \mathcal O_m\subseteq\mathcal D_k
@@ -105,6 +113,8 @@ In $K$-fold cross-validation, the available development data are partitioned int
 \quad(i\ne j).
 ```
 
+Here $\mathcal D$ is the complete development dataset, $\mathcal D_k$ is fold $k$, and $K$ is the total number of folds. Indices $i$ and $j$ label folds in the disjointness statement.
+
 For fold $k$, the test portion is $\mathcal D_k$ and the fitting portion is
 
 ```math
@@ -124,6 +134,8 @@ Each observation is tested once. If $\widehat y_i^{(-k)}$ denotes the prediction
 \left(y_i-\widehat y_i^{(-k)}\right)^2
 }.
 ```
+
+Here $y_i$ is observation $i$'s measured pIC50, $N$ is the total number of out-of-fold observations, and the superscript $(-k)$ means “fitted without fold $k$.”
 
 These are **out-of-fold predictions**: every prediction is made by a model that excluded the corresponding molecule group from fitting.
 
@@ -163,6 +175,8 @@ Let the outer grouped folds be
 \mathcal D^{\rm outer}_1,\ldots,\mathcal D^{\rm outer}_{K_{\rm out}}.
 ```
 
+Here $K_{\rm out}$ is the number of outer folds. Within each outer iteration, $K_{\rm in}$ is the number of inner folds, $\ell$ indexes an inner fold, $\mathcal H$ is the declared set of candidate hyperparameter configurations, and $h$ denotes one candidate from that set.
+
 For outer iteration $k$:
 
 1. reserve $\mathcal D^{\rm outer}_k$ as the outer test fold;
@@ -196,6 +210,8 @@ y_k^{\rm outer},
 \widehat y_k^{\rm outer}(h_k^*)
 \right).
 ```
+
+In this expression, $y_k^{\rm outer}$ is the vector of measured pIC50 values in outer fold $k$, $\widehat y_k^{\rm outer}(h_k^*)$ is the corresponding prediction vector from the refitted model using the selected configuration, and $s_k$ is that fold's RMSE. The symbol $\bar s$ below is the arithmetic mean of the $K_{\rm out}$ outer-fold scores.
 
 The final nested estimate is summarised across outer folds:
 
@@ -243,6 +259,8 @@ z'_{ij}
 =
 \frac{z_{ij}-\mu_{j,\rm train}}{s_{j,\rm train}}.
 ```
+
+Here $z_{ij}$ is the unstandardised value of feature $j$ for observation $i$, $z'_{ij}$ is its standardised value, and $\mu_{j,\rm train}$ and $s_{j,\rm train}$ are respectively the mean and standard deviation of feature $j$ calculated from the current training fold only.
 
 The validation or outer-test observations use the same $\mu_{j,\rm train}$ and $s_{j,\rm train}$. Their own values must not influence the transformation.
 
@@ -318,7 +336,7 @@ If repetition $r$ gives score $\bar s_r$, we can report
 \frac1R\sum_{r=1}^{R}\bar s_r
 ```
 
-along with its dispersion and the complete distribution of outer-fold results.
+Here $r$ indexes a complete repetition of nested cross-validation, $R$ is the declared number of repetitions, and $\bar s_r$ is the mean outer-fold score from repetition $r$. We report this average along with its dispersion and the complete distribution of outer-fold results.
 
 Repetition increases computational cost substantially because every outer fold contains an inner search. We will choose the number of folds, repetitions, and search budget before examining final results.
 
