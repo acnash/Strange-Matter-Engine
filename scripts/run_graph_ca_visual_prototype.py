@@ -445,9 +445,10 @@ def render() -> None:
                 f"show sticks, {obj} and not elem H", f"show spheres, {obj} and not elem H",
                 f"disable {obj}"]
     controller = OUT / "gca_trajectory_controls.py"
-    controller.write_text((ROOT / "scripts" / "pymol_gca_controller.py").read_text())
+    controller_source = (ROOT / "scripts" / "pymol_gca_controller.py").read_text()
+    controller.write_text(controller_source)
     pml += ["enable traj_01_CYP1A2", "orient traj_01_CYP1A2",
-            f'run "{controller.as_posix()}"', "gca_state 1", "refresh",
+            "python", controller_source, "python end", "gca_state 1", "refresh",
             "# Select one object in the right-hand panel, click its name to enable it,",
             "# disable the previous object, then use gca_next, gca_previous,",
             "# gca_state 1-18, or gca_play in the PyMOL command line."]
