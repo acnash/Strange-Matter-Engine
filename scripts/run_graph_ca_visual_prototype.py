@@ -29,7 +29,10 @@ DATA = ROOT / "data" / "openadmet-cyp-challenge-2026"
 TRAIN_CSV = DATA / "cyp-challenge-TRAIN_inhibition.csv"
 TEST_CSV = DATA / "cyp-challenge-TEST-BLINDED.csv"
 CACHE = Path("/private/tmp/strange_matter_graph_ca_graphs.pkl")
-OUT = ROOT / "results" / "graph_ca_visual_prototype"
+RULE = os.environ.get("SME_CA_RULE", "gated_residual")
+GENERATIONS = int(os.environ.get("SME_GENERATIONS", "16"))
+RUN_NAME = os.environ.get("SME_RUN_NAME", "graph_ca_visual_prototype")
+OUT = ROOT / "results" / RUN_NAME
 SEED = 1701
 CYPS = ("CYP1A2", "CYP2C9", "CYP2D6", "CYP3A4")
 LABEL_COLS = tuple(f"{c}_pIC50_direct_inhibition" for c in CYPS)
@@ -194,7 +197,15 @@ def train() -> None:
             self.chem = nn.Linear(chem_dim, hidden, bias=False)
             self.context = nn.Linear(4, hidden, bias=False)
             self.bias = nn.Parameter(torch.zeros(hidden))
-            self.gate = nn.Linear(hidden * 2 + chem_dim + 4, hidden)
+            if RULE == "gated_residual":
+                self.gate = nn.Linear(hidden * 2 + chem_dim + 4, hidden)
+            elif RULE == "inertial_reaction_diffusion":
+                self.raw_gamma = nn.Parameter(torch.zeros(hidden))
+                self.raw_dt = nn.Parameter(torch.zeros(hidden))
+                self.raw_diffusion = nn.Parameter(torch.full((hidden,), -1.5))
+                self.raw_restoring = nn.Parameter(torch.full((hidden,), -1.5))
+            else:
+                raise ValueError(f"Unknown CA rule: {RULE}")
             self.readout = nn.Linear(hidden * 5, 1)
 
         def forward_one(self, rec, cyp: int, return_trajectory=False):
@@ -204,23 +215,36 @@ def train() -> None:
             edge = torch.as_tensor(rec["edge"], device=device)
             context = torch.zeros(4, device=device); context[cyp] = 1.0
             h = torch.tanh(self.init(x))
+            velocity = torch.zeros_like(h)
             states = [h]
             means = [h.mean(0)]
             step_energy = torch.zeros(hidden, device=device)
-            for _ in range(16):
+            for _ in range(GENERATIONS):
                 agg = torch.zeros_like(h)
+                neighbour_mean = torch.zeros_like(h)
                 degree = torch.zeros((h.shape[0], 1), device=device)
                 if src.numel():
                     msg = self.neighbour(h[src]) + self.bond(edge)
                     agg.index_add_(0, dst, msg)
+                    neighbour_mean.index_add_(0, dst, h[src])
                     degree.index_add_(0, dst, torch.ones((dst.numel(), 1), device=device))
                     agg = agg / degree.clamp_min(1.0)
+                    neighbour_mean = neighbour_mean / degree.clamp_min(1.0)
                 c = context.expand(h.shape[0], -1)
-                candidate = torch.tanh(self.self_layer(h) + agg + self.chem(x) +
-                                       self.context(c) + self.bias)
-                alpha = torch.sigmoid(self.gate(torch.cat((h, agg, x, c), dim=1)))
-                new_h = (1.0 - alpha) * h + alpha * candidate
-                step_energy += ((new_h - h) ** 2).mean(0) / 16.0
+                reaction = torch.tanh(self.self_layer(h) + agg + self.chem(x) +
+                                      self.context(c) + self.bias)
+                if RULE == "gated_residual":
+                    alpha = torch.sigmoid(self.gate(torch.cat((h, agg, x, c), dim=1)))
+                    new_h = (1.0 - alpha) * h + alpha * reaction
+                else:
+                    gamma = 0.99 * torch.sigmoid(self.raw_gamma)
+                    dt = 0.25 * torch.sigmoid(self.raw_dt)
+                    diffusion = torch.nn.functional.softplus(self.raw_diffusion)
+                    restoring = torch.nn.functional.softplus(self.raw_restoring)
+                    force = reaction + diffusion * (neighbour_mean - h) - restoring * h
+                    velocity = gamma * velocity + dt * force
+                    new_h = torch.tanh(h + dt * velocity)
+                step_energy += ((new_h - h) ** 2).mean(0) / float(GENERATIONS)
                 h = new_h
                 states.append(h); means.append(h.mean(0))
             mean_series = torch.stack(means)
@@ -308,7 +332,8 @@ def train() -> None:
             break
     model.load_state_dict(best_state)
     OUT.mkdir(parents=True, exist_ok=True)
-    torch.save({"state_dict": best_state, "chem_dim": chem_dim, "seed": SEED}, OUT / "model.pt")
+    torch.save({"state_dict": best_state, "chem_dim": chem_dim, "seed": SEED,
+                "rule": RULE, "generations": GENERATIONS}, OUT / "model.pt")
     with (OUT / "training_history.csv").open("w", newline="") as handle:
         writer = csv.DictWriter(handle, fieldnames=history[0].keys()); writer.writeheader(); writer.writerows(history)
 
@@ -325,36 +350,106 @@ def train() -> None:
     with (OUT / "validation_predictions.csv").open("w", newline="") as handle:
         writer = csv.DictWriter(handle, fieldnames=pair_rows[0].keys()); writer.writeheader(); writer.writerows(pair_rows)
 
-    test_rows, trajectory_records = [], []
+    def dynamical_scores(trajectory):
+        mu = trajectory.mean(axis=1)
+        delta = np.diff(mu, axis=0)
+        step = np.linalg.norm(delta, axis=1)
+        late_start = max(10, len(mu) // 3)
+        late_mu = mu[late_start:]
+        late_delta = np.diff(late_mu, axis=0)
+        late_step = np.linalg.norm(late_delta, axis=1)
+        recurrence = []
+        mean_step = float(np.mean(late_step)) + 1e-8
+        for lag in range(2, min(32, len(late_mu) // 2) + 1):
+            distance = float(np.mean(np.linalg.norm(late_mu[lag:] - late_mu[:-lag], axis=1)))
+            recurrence.append((distance / (lag * mean_step), lag, distance))
+        recurrence_ratio, best_lag, recurrence_distance = min(recurrence)
+        if len(late_delta) > 1:
+            denominator = (np.linalg.norm(late_delta[:-1], axis=1) *
+                           np.linalg.norm(late_delta[1:], axis=1))
+            cosine = np.divide((late_delta[:-1] * late_delta[1:]).sum(1), denominator,
+                               out=np.zeros_like(denominator), where=denominator > 1e-12)
+            curvature = float(np.mean(1.0 - cosine))
+        else:
+            curvature = 0.0
+        centred = late_mu - late_mu.mean(axis=0, keepdims=True)
+        power = np.abs(np.fft.rfft(centred, axis=0)) ** 2
+        nonzero = power[1:]
+        spectral_concentration = float(np.mean(np.max(nonzero, axis=0) /
+                                             np.maximum(nonzero.sum(axis=0), 1e-12)))
+        return {
+            "late_motion": float(np.mean(late_step)),
+            "final_step": float(step[-1]),
+            "late_amplitude": float(np.mean(np.std(late_mu, axis=0))),
+            "best_recurrence_lag": int(best_lag),
+            "recurrence_ratio": float(recurrence_ratio),
+            "recurrence_distance": float(recurrence_distance),
+            "curvature": curvature,
+            "spectral_concentration": spectral_concentration,
+        }
+
+    test_rows, all_trajectory_records, score_rows = [], [], []
     model.eval()
     with torch.no_grad():
         all_preds = np.zeros((len(data["test"]), 4), dtype=float)
         for i, rec in enumerate(data["test"]):
             for c in range(4):
-                all_preds[i, c] = float(model.forward_one(rec, c))
+                pred, traj = model.forward_one(rec, c, return_trajectory=True)
+                trajectory = traj.cpu().numpy()
+                all_preds[i, c] = float(pred)
                 test_rows.append({"molecule_id": rec["name"], "canonical_smiles": rec["canonical_smiles"],
                                   "cyp_target": CYPS[c], "predicted_pic50": all_preds[i, c]})
-        # Five chemically valid molecules spanning the average-prediction distribution.
-        means = all_preds.mean(1); order = np.argsort(means)
-        chosen = sorted(set(order[np.linspace(0, len(order) - 1, 5).round().astype(int)].tolist()))
-        while len(chosen) < 5:
-            chosen.append(next(i for i in order if i not in chosen))
-        for i in chosen[:5]:
-            rec = data["test"][i]
-            for c in range(4):
-                pred, traj = model.forward_one(rec, c, return_trajectory=True)
-                trajectory_records.append({"test_index": i, "molecule_id": rec["name"],
-                                           "cyp_index": c, "cyp_target": CYPS[c],
-                                           "predicted_pic50": float(pred),
-                                           "trajectory": traj.cpu().numpy()})
+                scores = dynamical_scores(trajectory)
+                base = {"test_index": i, "molecule_id": rec["name"], "cyp_index": c,
+                        "cyp_target": CYPS[c], "predicted_pic50": float(pred), **scores}
+                score_rows.append(base.copy())
+                all_trajectory_records.append({**base, "trajectory": trajectory})
+
+    def ranked(metric, reverse=True):
+        return sorted(range(len(score_rows)), key=lambda j: score_rows[j][metric], reverse=reverse)
+
+    rankings = [
+        ("recurrence", ranked("recurrence_ratio", reverse=False)),
+        ("spectral", ranked("spectral_concentration")),
+        ("curved", ranked("curvature")),
+        ("persistent", ranked("late_motion")),
+    ]
+    selected, reasons = [], {}
+    rank_positions = {reason: 0 for reason, _ in rankings}
+    while len(selected) < 20:
+        for reason, order in rankings:
+            rank_position = rank_positions[reason]
+            while rank_position < len(order) and order[rank_position] in selected:
+                rank_position += 1
+            rank_positions[reason] = rank_position + 1
+            if rank_position < len(order):
+                idx = order[rank_position]
+                selected.append(idx); reasons[idx] = reason
+                if len(selected) == 20:
+                    break
+    trajectory_records = []
+    for idx in selected:
+        record = all_trajectory_records[idx]
+        record["selection_reason"] = reasons[idx]
+        trajectory_records.append(record)
+    selected_set = set(selected)
+    for idx, row in enumerate(score_rows):
+        row["selected_for_visualisation"] = idx in selected_set
+        row["selection_reason"] = reasons.get(idx, "")
     with (OUT / "blinded_test_predictions.csv").open("w", newline="") as handle:
         writer = csv.DictWriter(handle, fieldnames=test_rows[0].keys()); writer.writeheader(); writer.writerows(test_rows)
     with (OUT / "selected_trajectories.pkl").open("wb") as handle:
         pickle.dump(trajectory_records, handle, protocol=pickle.HIGHEST_PROTOCOL)
+    with (OUT / "trajectory_novelty_scores.csv").open("w", newline="") as handle:
+        writer = csv.DictWriter(handle, fieldnames=score_rows[0].keys()); writer.writeheader(); writer.writerows(score_rows)
     metrics = {"seed": SEED, "best_validation_rmse": best, "restored_fit_rmse": train_rmse,
                "restored_validation_rmse": val_rmse, "epochs_run": len(history),
                "fit_observations": len(fit_pairs), "validation_observations": len(val_pairs),
-               "selected_molecules": [data["test"][i]["name"] for i in chosen[:5]]}
+               "rule": RULE, "generations": GENERATIONS,
+               "selected_trajectories": [{"molecule_id": r["molecule_id"],
+                                           "cyp_target": r["cyp_target"],
+                                           "selection_reason": r["selection_reason"]}
+                                          for r in trajectory_records]}
     (OUT / "metrics.json").write_text(json.dumps(metrics, indent=2) + "\n")
     print(json.dumps(metrics, indent=2))
 
@@ -380,15 +475,17 @@ def pdb_trajectory(mol, trajectory: np.ndarray, path: Path) -> None:
     lo, hi = float(activity.min()), float(activity.max())
     scaled = 100.0 * (activity - lo) / max(hi - lo, 1e-8)
     lines = []
-    for state in range(18):
+    scientific_states = trajectory.shape[0]
+    display_states = scientific_states + 1
+    for state in range(display_states):
         lines.append(f"MODEL     {state + 1:4d}")
-        scientific = min(state, 16)
+        scientific = min(state, scientific_states - 1)
         for atom in display.GetAtoms():
             idx = atom.GetIdx(); pos = conf.GetAtomPosition(idx)
             if idx < heavy:
                 b = float(scaled[scientific, idx])
-            elif state == 17:
-                b = float(scaled[16, parent[idx]])
+            elif state == display_states - 1:
+                b = float(scaled[scientific_states - 1, parent[idx]])
             else:
                 b = 0.0
             symbol = atom.GetSymbol()
@@ -450,12 +547,14 @@ def render() -> None:
         manifest.append({"object": obj, "molecule_id": rec["molecule_id"],
                          "cyp_target": rec["cyp_target"], "predicted_pic50": rec["predicted_pic50"],
                          "pdb_file": f"trajectories/{pdb_path.name}", "activity_min": lo,
-                         "activity_max": hi, "states": 18})
+                         "activity_max": hi, "states": GENERATIONS + 2,
+                         "selection_reason": rec.get("selection_reason", "")})
         pml += [f'load "{pdb_path.as_posix()}", {obj}', f"hide everything, {obj}",
                 f"show sticks, {obj} and not elem H", f"show spheres, {obj} and not elem H",
                 f"disable {obj}"]
     controller = OUT / "gca_trajectory_controls.py"
     controller_source = (
+        "GCA_STATE_COUNT = " + str(GENERATIONS + 2) + "\n" +
         "GCA_DISPLAY_VALUES = " + repr(display_values) + "\n" +
         (ROOT / "scripts" / "pymol_gca_controller.py").read_text()
     )
@@ -464,7 +563,7 @@ def render() -> None:
             "python", controller_source, "python end", "gca_state 1", "refresh",
             "# Select one object in the right-hand panel, click its name to enable it,",
             "# disable the previous object, then use gca_next, gca_previous,",
-            "# gca_state 1-18, gca_play, or gca_stop in the PyMOL command line."]
+            f"# gca_state 1-{GENERATIONS + 2}, gca_play, or gca_stop in the PyMOL command line."]
     (OUT / "load_20_trajectories.pml").write_text("\n".join(pml) + "\n")
     with (OUT / "trajectory_manifest.csv").open("w", newline="") as handle:
         writer = csv.DictWriter(handle, fieldnames=manifest[0].keys()); writer.writeheader(); writer.writerows(manifest)
@@ -513,19 +612,19 @@ This is one fixed-design scientific prototype, trained with seed {SEED}. It is a
 - Restored grouped-validation RMSE: {metrics['restored_validation_rmse']:.3f} pIC50
 - Epochs run: {metrics['epochs_run']}
 - Blinded predictions: 750 molecules × four CYPs
-- Visual trajectories: five molecules × four CYPs = 20 objects
+- Visual trajectories: 20 molecule–CYP cases selected from dynamical screening
 
 ## PyMOL
 
 Open PyMOL, choose **File → Run Script**, and select `load_20_trajectories.pml` from this directory. All 20 objects appear in the right-hand object panel; the first is enabled. Enable one desired object and disable the previous one.
 
-The supplied controller does not use PyMOL's movie subsystem. Enter `gca_next`, `gca_previous`, `gca_state 18`, or `gca_play` in the PyMOL command line. `gca_play 0.25, 2` uses a 0.25-second delay and plays two cycles; `gca_stop` stops playback.
+The supplied controller does not use PyMOL's movie subsystem. Enter `gca_next`, `gca_previous`, `gca_state {GENERATIONS // 2 + 1}`, or `gca_play` in the PyMOL command line. `gca_play 0.25, 2` uses a 0.25-second delay and plays two cycles; `gca_stop` stops playback.
 
 Playback runs in the background so PyMOL can repaint between states. Only the currently enabled trajectory object is recoloured, which keeps display-memory use modest.
 
-Before recolouring, the controller explicitly installs the selected generation's activity values into the enabled object's B-factor field. This preserves the true 17-state gradient even in PyMOL versions that treat a multi-model PDB's B-factor as one shared atom property.
+Before recolouring, the controller explicitly installs the selected generation's activity values into the enabled object's B-factor field. This preserves the true {GENERATIONS + 1}-state gradient even in PyMOL versions that treat a multi-model PDB's B-factor as one shared atom property.
 
-States 1–17 are graph-CA generations 0–16. State 18 is the labelled visual coda: display-only hydrogens become lime using the final heavy-atom activity. The model never received 3D coordinates or hydrogen nodes.
+States 1–{GENERATIONS + 1} are graph-CA generations 0–{GENERATIONS}. State {GENERATIONS + 2} is the labelled visual coda: display-only hydrogens become lime using the final heavy-atom activity. The model never received 3D coordinates or hydrogen nodes.
 
 The PDB B-factor column stores scaled eight-channel atom-state magnitude. It is unrelated to the learned ridge coefficient beta. Lossless eight-channel values are in the matching NPZ files.
 

@@ -6,7 +6,7 @@ import threading
 from pymol import cmd
 
 
-_STATE_COUNT = 18
+_STATE_COUNT = int(globals().get("GCA_STATE_COUNT", 18))
 _current_state = 1
 _play_thread = None
 _stop_playback = threading.Event()
@@ -38,7 +38,7 @@ def gca_state(state=1):
         else:
             cmd.hide("sticks", hydrogen_selection)
     cmd.refresh()
-    print(f"Graph-CA display state {state}/18")
+    print(f"Graph-CA display state {state}/{_STATE_COUNT}")
 
 
 def gca_next():
@@ -86,4 +86,4 @@ cmd.extend("gca_previous", gca_previous)
 cmd.extend("gca_play", gca_play)
 cmd.extend("gca_stop", gca_stop)
 
-print("Graph-CA controls loaded: gca_next, gca_previous, gca_state 1-18, gca_play, gca_stop")
+print(f"Graph-CA controls loaded: gca_next, gca_previous, gca_state 1-{_STATE_COUNT}, gca_play, gca_stop")

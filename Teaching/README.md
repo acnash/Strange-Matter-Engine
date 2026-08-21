@@ -27,6 +27,7 @@ The notes are divided into subjects as they might be taught at a university:
 21. [Grouped Nested Cross-Validation](Grouped_Nested_Cross_Validation.md) — molecular and scaffold grouping, nested model selection, leakage prevention, and production evaluation.
 22. [Scientific Visualisation](Scientific_Visualisation.md) — making the model's real dynamics visible and interpretable.
 23. [Trajectory Visualisation and PyMOL](Trajectory_Visualisation_and_PyMOL.md) — multi-state molecular animation, display B values, 3D viewing conformers, and the hydrogen visual coda.
+24. [Inertial Reaction–Diffusion Graph CA](Inertial_Reaction_Diffusion_Graph_CA.md) — momentum, graph diffusion, restoring forces, nonlinear reactions, and the dynamics observed in prototype two.
 
 ## Learning rule
 
