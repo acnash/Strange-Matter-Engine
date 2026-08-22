@@ -43,7 +43,7 @@ GRAD_CLIP = float(os.environ.get("SME_GRAD_CLIP", "1.0"))
 PATIENCE_LIMIT = int(os.environ.get("SME_PATIENCE", "20"))
 MIN_DELTA = float(os.environ.get("SME_MIN_DELTA", "0.005"))
 TUNING_ONLY = os.environ.get("SME_TUNING_ONLY", "0") == "1"
-SEED = 1701
+SEED = int(os.environ.get("SME_SEED", "1701"))
 CYPS = ("CYP1A2", "CYP2C9", "CYP2D6", "CYP3A4")
 LABEL_COLS = tuple(f"{c}_pIC50_direct_inhibition" for c in CYPS)
 
@@ -280,7 +280,8 @@ def train() -> None:
             pooled.index_add_(0, graph_index, values)
             return pooled / atom_counts[:, None]
 
-        def forward_batch(self, examples):
+        def forward_batch(self, examples, initial_perturbations=None,
+                          return_node_trajectory=False):
             """Evaluate independent molecule-CYP graphs as one disconnected graph."""
             graph_count = len(examples)
             xs, srcs, dsts, edges, graph_ids, contexts, atom_counts = [], [], [], [], [], [], []
@@ -309,7 +310,10 @@ def train() -> None:
                 edge = torch.empty((0, bond_dim), device=device)
 
             h = torch.tanh(self.init(x))
+            if initial_perturbations is not None:
+                h = h + torch.cat(initial_perturbations)
             velocity = torch.zeros_like(h)
+            node_states = [h] if return_node_trajectory else None
             temporal_atom_sum = h.clone()
             graph_mean = self._graph_mean(h, graph_index, graph_count, atom_counts_tensor)
             graph_mean_sum = graph_mean.clone()
@@ -341,6 +345,8 @@ def train() -> None:
                     new_h = torch.tanh(h + dt * velocity)
                 step_energy += (new_h - h).square() / float(GENERATIONS)
                 h = new_h
+                if return_node_trajectory:
+                    node_states.append(h)
                 temporal_atom_sum += h
                 graph_mean = self._graph_mean(h, graph_index, graph_count, atom_counts_tensor)
                 graph_mean_sum += graph_mean
@@ -356,7 +362,10 @@ def train() -> None:
             series_mean = graph_mean_sum / float(GENERATIONS + 1)
             series_var = (graph_mean_sq_sum / float(GENERATIONS + 1) - series_mean.square()).clamp_min(0.0)
             energy_mean = self._graph_mean(step_energy, graph_index, graph_count, atom_counts_tensor)
-            return torch.cat((final_mean, final_var, temporal_mean, series_var, energy_mean), dim=1)
+            fingerprint = torch.cat((final_mean, final_var, temporal_mean, series_var, energy_mean), dim=1)
+            if return_node_trajectory:
+                return fingerprint, torch.stack(node_states), graph_index, atom_counts
+            return fingerprint
 
         def forward_one(self, rec, cyp: int, return_trajectory=False,
                         initial_perturbation=None):
@@ -467,8 +476,9 @@ def train() -> None:
         model.train()
         molecule_order = list(fit_indices); rng.shuffle(molecule_order)
         total_sq, total_n, raw_norms, clipped_norms = 0.0, 0, [], []
-        for start in range(0, len(molecule_order), 16):
-            molecule_batch = molecule_order[start:start + 16]
+        batch_molecules = int(os.environ.get("SME_BATCH_MOLECULES", "16"))
+        for start in range(0, len(molecule_order), batch_molecules):
+            molecule_batch = molecule_order[start:start + batch_molecules]
             support_count = max(2, min(len(molecule_batch) - 1,
                                        round(0.75 * len(molecule_batch))))
             support_molecules = molecule_batch[:support_count]
@@ -567,6 +577,173 @@ def train() -> None:
         "hyperparameters": {"ca_lr": CA_LR,
         "ridge": RIDGE_STRENGTH, "ca_l2": CA_L2,
         "gradient_clip": GRAD_CLIP}}
+    if TUNING_ONLY and os.environ.get("SME_ANALYSE_VALIDATION", "0") == "1":
+        print(json.dumps({"dynamics_phase": "screen_start",
+                          "validation_pairs": len(val_pairs)}), flush=True)
+        def trajectory_scores(trajectory):
+            mean_state = trajectory.mean(axis=1)
+            steps = np.linalg.norm(np.diff(mean_state, axis=0), axis=1)
+            late_start = max(10, len(mean_state) // 2)
+            late = mean_state[late_start:]
+            late_steps = np.linalg.norm(np.diff(late, axis=0), axis=1)
+            mean_step = float(np.mean(late_steps)) + 1e-12
+            recurrence = []
+            for lag in range(2, min(64, max(2, len(late) // 3)) + 1):
+                distance = float(np.mean(np.linalg.norm(late[lag:] - late[:-lag], axis=1)))
+                recurrence.append((distance / (lag * mean_step + 1e-12), lag, distance))
+            recurrence_ratio, recurrence_lag, recurrence_distance = min(recurrence)
+            centered = late - late.mean(axis=0, keepdims=True)
+            power = np.abs(np.fft.rfft(centered, axis=0)) ** 2
+            power = power[1:]
+            normalized = power / np.maximum(power.sum(axis=0, keepdims=True), 1e-12)
+            spectral_entropy = float(np.mean(
+                -np.sum(normalized * np.log(np.maximum(normalized, 1e-12)), axis=0)
+                / np.log(max(2, len(normalized)))
+            ))
+            spectral_concentration = float(np.mean(
+                np.max(power, axis=0) / np.maximum(power.sum(axis=0), 1e-12)
+            ))
+            return {
+                "late_motion": mean_step,
+                "final_step": float(steps[-1]),
+                "late_amplitude": float(np.mean(np.std(late, axis=0))),
+                "recurrence_ratio": float(recurrence_ratio),
+                "recurrence_lag": int(recurrence_lag),
+                "recurrence_distance": float(recurrence_distance),
+                "spectral_entropy": spectral_entropy,
+                "spectral_concentration": spectral_concentration,
+            }
+
+        score_rows = []
+        model.eval()
+        with torch.no_grad():
+            for index, (i, c, y) in enumerate(val_pairs):
+                fingerprint, trajectory_tensor = model.forward_one(
+                    data["train"][i], c, return_trajectory=True
+                )
+                prediction = differentiable_ridge_predict(
+                    fingerprint.unsqueeze(0), final_ridge_state
+                ).squeeze(0)
+                trajectory = trajectory_tensor.cpu().numpy()
+                score_rows.append({
+                    "validation_pair_index": index,
+                    "training_index": i,
+                    "molecule_id": data["train"][i]["name"],
+                    "cyp_index": c,
+                    "cyp_target": CYPS[c],
+                    "experimental_pic50": y,
+                    "predicted_pic50": float(prediction),
+                    **trajectory_scores(trajectory),
+                })
+        print(json.dumps({"dynamics_phase": "screen_complete",
+                          "validation_pairs": len(score_rows)}), flush=True)
+        late_threshold = float(np.quantile([r["late_motion"] for r in score_rows], 0.75))
+        entropy_threshold = float(np.quantile([r["spectral_entropy"] for r in score_rows], 0.75))
+        perturbation_case_limit = int(os.environ.get("SME_PERTURBATION_CASES", "20"))
+        ranked = sorted(
+            range(len(score_rows)),
+            key=lambda j: (
+                score_rows[j]["late_motion"] *
+                (1.0 + score_rows[j]["spectral_entropy"]) /
+                max(score_rows[j]["recurrence_ratio"], 1e-6)
+            ),
+            reverse=True,
+        )[:perturbation_case_limit]
+        selected_dir = OUT / "selected_validation_trajectories"
+        selected_dir.mkdir(parents=True, exist_ok=True)
+        perturbation_rows = []
+        epsilon = 1e-5
+        if ranked:
+          with torch.no_grad():
+            print(json.dumps({"dynamics_phase": "perturbation_start",
+                              "selected": len(ranked)}), flush=True)
+            selected_examples = []
+            reference_perturbations = []
+            perturbed_perturbations = []
+            for rank, score_index in enumerate(ranked, start=1):
+                row = score_rows[score_index]
+                rec = data["train"][row["training_index"]]
+                generator = torch.Generator(device=device).manual_seed(SEED + rank)
+                shape = (len(rec["x"]), hidden)
+                direction = torch.randn(shape, generator=generator,
+                                        device=device)
+                direction = epsilon * direction / torch.linalg.vector_norm(direction)
+                selected_examples.append((rec, row["cyp_index"]))
+                reference_perturbations.append(torch.zeros_like(direction))
+                perturbed_perturbations.append(direction)
+            paired_examples = selected_examples + selected_examples
+            paired_perturbations = reference_perturbations + perturbed_perturbations
+            _, paired_states, _, atom_counts = model.forward_batch(
+                paired_examples, initial_perturbations=paired_perturbations,
+                return_node_trajectory=True,
+            )
+            offsets = np.cumsum([0] + atom_counts)
+            selected_count = len(selected_examples)
+            for rank, score_index in enumerate(ranked, start=1):
+                row = score_rows[score_index]
+                reference_tensor = paired_states[:, offsets[rank - 1]:offsets[rank]]
+                paired_index = selected_count + rank - 1
+                perturbed_tensor = paired_states[:, offsets[paired_index]:offsets[paired_index + 1]]
+                distances = torch.linalg.vector_norm(
+                    perturbed_tensor - reference_tensor, dim=(1, 2)
+                ).cpu().numpy()
+                fit_end = min(100, len(distances) - 1)
+                times = np.arange(1, fit_end + 1)
+                log_growth = np.log(np.maximum(distances[1:fit_end + 1], 1e-12) / epsilon)
+                exponent = float(np.polyfit(times, log_growth, 1)[0])
+                classification = "complex_transient"
+                if row["late_motion"] < 1e-4 and row["final_step"] < 1e-5:
+                    classification = "point_attractor_candidate"
+                elif (row["recurrence_ratio"] < 0.25 and
+                      row["spectral_concentration"] > 0.5):
+                    classification = "periodic_attractor_candidate"
+                elif (exponent > 0.01 and row["late_motion"] >= late_threshold and
+                      row["spectral_entropy"] >= entropy_threshold):
+                    classification = "chaos_candidate_requires_confirmation"
+                row["selected_for_perturbation"] = True
+                row["dynamical_classification"] = classification
+                perturbation_rows.append({
+                    "molecule_id": row["molecule_id"],
+                    "cyp_target": row["cyp_target"],
+                    "epsilon": epsilon,
+                    "fit_generations": f"1-{fit_end}",
+                    "finite_time_lyapunov": exponent,
+                    "final_separation": float(distances[-1]),
+                    "maximum_separation": float(distances.max()),
+                    "classification": classification,
+                })
+                safe_name = f"{rank:02d}_{row['molecule_id']}_{row['cyp_target']}.npz"
+                np.savez_compressed(
+                    selected_dir / safe_name,
+                    trajectory=reference_tensor.cpu().numpy(),
+                    perturbed_trajectory=perturbed_tensor.cpu().numpy(),
+                    distances=distances,
+                )
+          print(json.dumps({"dynamics_phase": "perturbation_complete",
+                            "selected": len(perturbation_rows)}), flush=True)
+        for row in score_rows:
+            row.setdefault("selected_for_perturbation", False)
+            row.setdefault("dynamical_classification", "not_selected")
+        with (OUT / "validation_dynamics.csv").open("w", newline="") as handle:
+            writer = csv.DictWriter(handle, fieldnames=score_rows[0].keys())
+            writer.writeheader(); writer.writerows(score_rows)
+        perturbation_fields = ["molecule_id", "cyp_target", "epsilon",
+                               "fit_generations", "finite_time_lyapunov",
+                               "final_separation", "maximum_separation",
+                               "classification"]
+        with (OUT / "validation_perturbations.csv").open("w", newline="") as handle:
+            writer = csv.DictWriter(handle, fieldnames=perturbation_fields)
+            writer.writeheader(); writer.writerows(perturbation_rows)
+        common_metrics["dynamical_analysis"] = {
+            "validation_trajectories_screened": len(score_rows),
+            "perturbation_cases": len(perturbation_rows),
+            "classification_counts": {
+                label: sum(r["classification"] == label for r in perturbation_rows)
+                for label in sorted({r["classification"] for r in perturbation_rows})
+            },
+            "perturbation_status": ("complete" if perturbation_rows else
+                                    "deferred_after_native_cuda_failure"),
+        }
     if TUNING_ONLY:
         (OUT / "metrics.json").write_text(json.dumps(common_metrics, indent=2) + "\n")
         print(json.dumps(common_metrics, indent=2))
