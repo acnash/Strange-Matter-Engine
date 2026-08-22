@@ -14,6 +14,38 @@ The evolving [Teaching curriculum](Teaching/README.md) records the scientific an
 
 The [Visual Laboratory](notebooks/README.md) provides interactive, code-hidden Jupyter experiences with clean RDKit molecular depictions, a restrained cyberpunk visual system, graph views, atom and bond inspectors, encoding heatmaps, and a transparent first graph cellular automaton.
 
+## Project visual standard
+
+All future notebooks, plots, reports, molecular diagrams, trajectory visualisations, and presentation graphics must reproduce the established **clean cyberpunk** visual language. This is a persistent project requirement, not a one-off styling suggestion.
+
+### Core palette
+
+| Role | Colour | Hexadecimal value |
+|---|---|---|
+| Deep-ink background | Near-black | `#070914` |
+| Raised panels and code backgrounds | Midnight blue | `#11152A` |
+| Primary signal, graph connectivity, and starts | Electric cyan | `#27E1FF` |
+| Secondary signal, selections, and endpoints | Hot magenta | `#FF3CAC` |
+| Strong changes and checkpoints | Acid yellow–lime | `#F9F871` |
+| Categorical accent | Cyber orange | `#FF9F43` |
+| Intermediate states and aromatic edges | Muted violet | `#7A5CFA` |
+| Main text and carbon skeletons | Cool off-white | `#DCE6F2` |
+| Secondary lines and subdued annotations | Steel grey | `#65758B` |
+| Fluorine and chlorine | Cyber green | `#43F6A7` |
+
+Scientific plots may use the closely matched high-contrast plotting variants cyan `#00E5FF`, magenta `#FF1493`, lime `#A6FF00`, violet `#6C4CFF`, and orange `#FF9F1C` when stronger separation is required against the deep-ink background.
+
+### Consistent meaning
+
+- Use deep ink for figure and axes backgrounds, with cool off-white labels and restrained grid lines.
+- Use cyan for primary information, graph connectivity, reference trajectories, and starting states.
+- Use magenta for selected or contrasting information, predictions, and terminal states.
+- Use lime or acid yellow for the strongest activity, important thresholds, and exceptional changes.
+- Use violet and orange for additional categories rather than changing the principal cyan–magenta hierarchy.
+- Preserve clean RDKit chemical rendering: carbon and ordinary bonds are off-white, nitrogen is cyan, oxygen is hot magenta, sulfur and phosphorus are acid yellow, fluorine and chlorine are green, and bromine is orange.
+- Colours must encode a stated scientific quantity or category and must be accompanied by labels, legends, or colour bars. They must not imply molecular motion or chemical meaning that the model did not calculate.
+- When an existing project graphic is extended or regenerated, retain this palette and semantic mapping unless a scientifically necessary visual encoding is documented explicitly.
+
 ## Goal
 
 The primary goal is to build, understand, validate, and submit a complete end-to-end model that maps:
