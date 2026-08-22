@@ -18,6 +18,7 @@ ROOT = Path(__file__).resolve().parents[1]
 PYTHON = Path(r"C:\Users\Anthony\anaconda3\envs\strange-matter-gpu\python.exe")
 RUNNER = ROOT / "scripts" / "run_graph_ca_visual_prototype.py"
 SEARCH_SEED = 260822
+SEARCH_VERSION = "conditioned_v2"
 
 
 def search_space():
@@ -25,10 +26,10 @@ def search_space():
         (16, 32, 64, 125, 250, 500),
         (4, 8, 16),
         (3e-4, 1e-3, 3e-3),
-        (1e-4, 1e-3, 1e-2),
+        (1e-2, 1e-1, 1.0),
         (1e-6, 1e-5, 1e-4),
         (0.5, 1.0, 2.0),
-        (16, 32),
+        (64, 128),
     )
     return [dict(zip(
         ("generations", "hidden_channels", "ca_lr", "ridge", "ca_l2",
@@ -38,8 +39,8 @@ def search_space():
 
 def sampled_candidates(count=32):
     default = dict(generations=64, hidden_channels=8, ca_lr=1e-3,
-                   ridge=1e-3, ca_l2=1e-5, gradient_clip=1.0,
-                   batch_molecules=16)
+                   ridge=1e-1, ca_l2=1e-5, gradient_clip=1.0,
+                   batch_molecules=64)
     space = search_space()
     rng = random.Random(SEARCH_SEED)
     rng.shuffle(space)
@@ -98,11 +99,24 @@ def run_fit(rule, study_name, label, config, seed, epochs, patience,
     metrics = json.loads(metrics_file.read_text())
     metrics["wall_seconds"] = time.time() - started
     metrics["study_config"] = config
+    history_path = metrics_file.parent / "training_history.csv"
+    with history_path.open(newline="") as handle:
+        history = list(csv.DictReader(handle))
+    metrics["stability"] = {
+        "maximum_query_train_rmse": max(float(r["train_rmse"]) for r in history),
+        "maximum_raw_gradient_norm": max(float(r["mean_raw_gradient_norm"]) for r in history),
+    }
+    metrics["stability"]["passed"] = (
+        metrics["stability"]["maximum_query_train_rmse"] < 20.0 and
+        metrics["stability"]["maximum_raw_gradient_norm"] < 1e7
+    )
     metrics_file.write_text(json.dumps(metrics, indent=2) + "\n")
     return metrics
 
 
 def score(metrics):
+    if not metrics.get("stability", {}).get("passed", True):
+        return float("inf")
     value = metrics.get("restored_validation_rmse", float("inf"))
     return value if value == value else float("inf")
 
@@ -118,13 +132,14 @@ def main():
     args = parser.parse_args()
     rule = args.rule
     short_name = "gated_residual" if rule == "gated_residual" else "inertial_reaction_diffusion"
-    study_name = f"production_{short_name}"
+    study_name = f"production_{short_name}_{SEARCH_VERSION}"
     study_dir = ROOT / "results" / study_name
     study_dir.mkdir(parents=True, exist_ok=True)
     study_started = time.time()
     candidates = sampled_candidates()
     (study_dir / "search_space.json").write_text(json.dumps({
         "search_seed": SEARCH_SEED,
+        "search_version": SEARCH_VERSION,
         "sampled_configurations": candidates,
     }, indent=2) + "\n")
 
@@ -182,6 +197,7 @@ def main():
         "study": study_name,
         "rule": rule,
         "search_seed": SEARCH_SEED,
+        "search_version": SEARCH_VERSION,
         "elapsed_seconds": time.time() - study_started,
         "winner": winner,
         "winner_confirmation_mean_rmse": winner_mean,
