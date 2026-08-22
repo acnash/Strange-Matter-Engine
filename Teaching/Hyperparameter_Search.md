@@ -428,3 +428,9 @@ This is **multi-fidelity tuning**: inexpensive approximations screen candidates 
 The screened hyperparameters were Graph-CA learning rate, readout learning rate, ridge strength, and gradient-clipping norm. The winning values were 0.002, 0.003, 0.001, and 1.0 respectively.
 
 The prototype is an engineering experiment, not the final nested-cross-validation estimate. Its grouped-validation result must not be used to repeatedly redesign the search and then be presented as untouched test performance. The production study will retain protected outer folds and perform model selection only inside each outer training partition.
+
+## Transition-rule comparison policy
+
+All future transition-rule prototypes must receive their own hyperparameter tuning under comparable budgets and identical grouped folds. Hyperparameters optimised for one dynamical rule will not be transferred unchanged and then used to rank a structurally different rule.
+
+The rule comparison will tune common optimisation parameters and each rule's distinctive dynamical parameters. Complete spaces and results will be retained, including unstable trials. See [Graph CA Transition Rules](Graph_CA_Transition_Rules.md) for the five-rule programme and prototype lineage.
