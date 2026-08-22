@@ -474,6 +474,8 @@ Change the rule parameters and unrolling length. The left panel is the forward t
 ## Scientific checkpoint
 
 Backpropagation computes a gradient; an optimiser uses that gradient to propose a parameter update. Learning rate, optimiser, regularisation, stopping rule, and data splitting remain separate experimental choices.
+
+In the production pIC50 model, query error also differentiates through a support-fitted ridge solve. Adam updates the CA parameters; ridge coefficients are obtained with a linear solve and have no optimizer learning rate.
 """),
     ],
 )
@@ -505,7 +507,13 @@ After centring the target and standardising each fingerprint component, the clos
 
 $$\hat\beta=(Z^\mathsf T Z+\lambda I)^{-1}Z^\mathsf T y.$$
 
-The penalty $\lambda\geq0$ trades training fit against coefficient size. The intercept is not penalised. Standardisation is learned from the training data only whenever held-out predictions are made.
+The penalty $\lambda>0$ trades training fit against coefficient size. The intercept is not penalised. Standardisation is learned from the fitting data only whenever held-out predictions are made. Computation uses a linear solve rather than an explicit matrix inverse.
+
+## Differentiable ridge in the graph CA
+
+During CA optimization, each molecule-centred batch is divided into support and query molecules. Support fingerprints determine means, scales, the intercept, and $\hat\beta$ through `torch.linalg.solve`. Query error is then differentiated through that solve, through both fingerprint paths, and through every CA generation. Adam updates only the CA parameters $\theta$; it never treats $\beta$ as a neural-network parameter.
+
+At grouped validation, the ridge state is refitted on all permitted fitting observations and frozen before validation prediction. This separation prevents held-out labels from influencing scaling or coefficients.
 """),
         markdown(r"""
 ## Interactive regularisation laboratory
@@ -516,7 +524,7 @@ Change $\lambda$ across several orders of magnitude. Observe the training fit an
         markdown(r"""
 ## Scientific checkpoint
 
-Small training error can coexist with poor prediction of new molecules. Ridge regularisation constrains the readout, but only a held-out evaluation can measure generalisation.
+Small training error can coexist with poor prediction of new molecules. Ridge regularisation constrains the readout, but only a held-out evaluation can measure generalisation. A linear layer trained by Adam with an L2 term has a related objective, but it is not the genuine differentiable ridge solve used by this project.
 """),
     ],
 )

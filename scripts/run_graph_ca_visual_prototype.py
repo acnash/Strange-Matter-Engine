@@ -28,13 +28,15 @@ ROOT = Path(__file__).resolve().parents[1]
 DATA = ROOT / "data" / "openadmet-cyp-challenge-2026"
 TRAIN_CSV = DATA / "cyp-challenge-TRAIN_inhibition.csv"
 TEST_CSV = DATA / "cyp-challenge-TEST-BLINDED.csv"
-CACHE = Path("/private/tmp/strange_matter_graph_ca_graphs.pkl")
+CACHE = Path(os.environ.get(
+    "SME_GRAPH_CACHE",
+    str(ROOT / "tmp" / "strange_matter_graph_ca_graphs.pkl"),
+))
 RULE = os.environ.get("SME_CA_RULE", "gated_residual")
 GENERATIONS = int(os.environ.get("SME_GENERATIONS", "16"))
 RUN_NAME = os.environ.get("SME_RUN_NAME", "graph_ca_visual_prototype")
 OUT = ROOT / "results" / RUN_NAME
 CA_LR = float(os.environ.get("SME_CA_LR", "1e-3"))
-READOUT_LR = float(os.environ.get("SME_READOUT_LR", "3e-3"))
 RIDGE_STRENGTH = float(os.environ.get("SME_RIDGE", "1e-3"))
 CA_L2 = float(os.environ.get("SME_CA_L2", "1e-5"))
 GRAD_CLIP = float(os.environ.get("SME_GRAD_CLIP", "1.0"))
@@ -49,6 +51,44 @@ LABEL_COLS = tuple(f"{c}_pIC50_direct_inhibition" for c in CYPS)
 def set_seeds() -> None:
     random.seed(SEED)
     np.random.seed(SEED)
+
+
+def differentiable_ridge_fit(features, targets, penalty: float):
+    """Solve standardized ridge without penalizing the intercept.
+
+    All returned tensors remain connected to ``features`` and ``targets`` so a
+    query loss can differentiate through the linear solve.
+    """
+    import torch
+
+    if features.ndim != 2 or targets.ndim != 1 or len(features) != len(targets):
+        raise ValueError("Ridge features must be [n, p] and targets must be [n]")
+    if len(features) < 2:
+        raise ValueError("Differentiable ridge requires at least two support observations")
+    if penalty <= 0:
+        raise ValueError("Ridge penalty must be strictly positive")
+    feature_mean = features.mean(0)
+    feature_scale = features.std(0, unbiased=False).clamp_min(1e-6)
+    target_mean = targets.mean()
+    standardized = (features - feature_mean) / feature_scale
+    centered_target = targets - target_mean
+    identity = torch.eye(features.shape[1], dtype=features.dtype, device=features.device)
+    coefficients = torch.linalg.solve(
+        standardized.T @ standardized + penalty * identity,
+        standardized.T @ centered_target,
+    )
+    return {
+        "coefficients": coefficients,
+        "intercept": target_mean,
+        "feature_mean": feature_mean,
+        "feature_scale": feature_scale,
+    }
+
+
+def differentiable_ridge_predict(features, ridge_state):
+    standardized = ((features - ridge_state["feature_mean"])
+                    / ridge_state["feature_scale"])
+    return ridge_state["intercept"] + standardized @ ridge_state["coefficients"]
 
 
 def atom_features(atom, donor_ids: set[int], acceptor_ids: set[int]) -> list[float]:
@@ -155,15 +195,19 @@ def prepare() -> None:
 
     set_seeds()
     train_df = pd.read_csv(TRAIN_CSV)
-    test_df = pd.read_csv(TEST_CSV)
+    include_blind = os.environ.get("SME_INCLUDE_BLIND", "1") == "1"
+    test_df = pd.read_csv(TEST_CSV) if include_blind else None
     train, test, rejected = [], [], []
     for row in train_df.itertuples(index=False):
         labels = [getattr(row, col) for col in LABEL_COLS]
         rec = graph_record(row.Molecule_Name, row.SMILES, labels)
         (train if rec is not None else rejected).append(rec if rec is not None else row.Molecule_Name)
-    for row in test_df.itertuples(index=False):
-        rec = graph_record(row.Molecule_Name, row.SMILES)
-        (test if rec is not None else rejected).append(rec if rec is not None else row.Molecule_Name)
+    if test_df is not None:
+        for row in test_df.itertuples(index=False):
+            rec = graph_record(row.Molecule_Name, row.SMILES)
+            (test if rec is not None else rejected).append(
+                rec if rec is not None else row.Molecule_Name
+            )
 
     groups = sorted({r["scaffold"] for r in train})
     rng = random.Random(SEED)
@@ -178,6 +222,7 @@ def prepare() -> None:
         pickle.dump(payload, handle, protocol=pickle.HIGHEST_PROTOCOL)
     print(json.dumps({"training_molecules": len(train), "blinded_molecules": len(test),
                       "fit_molecules": len(train_idx), "validation_molecules": len(val_idx),
+                      "blinded_data_loaded": include_blind,
                       "rejected": rejected, "cache": str(CACHE)}, indent=2))
 
 
@@ -190,10 +235,24 @@ def train() -> None:
     torch.set_num_threads(max(1, min(4, os.cpu_count() or 1)))
     with CACHE.open("rb") as handle:
         data = pickle.load(handle)
-    device = torch.device("cpu")
+    requested_device = os.environ.get("SME_DEVICE", "auto").lower()
+    if requested_device == "auto":
+        requested_device = "cuda" if torch.cuda.is_available() else "cpu"
+    if requested_device == "cuda" and not torch.cuda.is_available():
+        raise RuntimeError("SME_DEVICE=cuda was requested, but CUDA is unavailable")
+    device = torch.device(requested_device)
+    if device.type == "cuda":
+        torch.cuda.manual_seed_all(SEED)
+        torch.backends.cuda.matmul.allow_tf32 = True
+    print(json.dumps({
+        "device": str(device),
+        "gpu": torch.cuda.get_device_name(device) if device.type == "cuda" else None,
+        "pytorch": torch.__version__,
+        "pytorch_cuda": torch.version.cuda,
+    }), flush=True)
     chem_dim = len(data["train"][0]["x"][0])
     bond_dim = 9
-    hidden = 8
+    hidden = int(os.environ.get("SME_HIDDEN_CHANNELS", "8"))
 
     class GraphCA(nn.Module):
         def __init__(self):
@@ -214,7 +273,90 @@ def train() -> None:
                 self.raw_restoring = nn.Parameter(torch.full((hidden,), -1.5))
             else:
                 raise ValueError(f"Unknown CA rule: {RULE}")
-            self.readout = nn.Linear(hidden * 5, 1)
+
+        @staticmethod
+        def _graph_mean(values, graph_index, graph_count, atom_counts):
+            pooled = torch.zeros((graph_count, values.shape[1]), device=device)
+            pooled.index_add_(0, graph_index, values)
+            return pooled / atom_counts[:, None]
+
+        def forward_batch(self, examples):
+            """Evaluate independent molecule-CYP graphs as one disconnected graph."""
+            graph_count = len(examples)
+            xs, srcs, dsts, edges, graph_ids, contexts, atom_counts = [], [], [], [], [], [], []
+            offset = 0
+            for graph_id, (rec, cyp) in enumerate(examples):
+                x_part = torch.as_tensor(rec["x"], device=device)
+                atom_count = x_part.shape[0]
+                xs.append(x_part)
+                graph_ids.append(torch.full((atom_count,), graph_id, dtype=torch.long, device=device))
+                context = torch.zeros(4, device=device); context[cyp] = 1.0
+                contexts.append(context.expand(atom_count, -1))
+                atom_counts.append(atom_count)
+                if rec["src"]:
+                    srcs.append(torch.as_tensor(rec["src"], device=device) + offset)
+                    dsts.append(torch.as_tensor(rec["dst"], device=device) + offset)
+                    edges.append(torch.as_tensor(rec["edge"], device=device))
+                offset += atom_count
+            x = torch.cat(xs)
+            graph_index = torch.cat(graph_ids)
+            c = torch.cat(contexts)
+            atom_counts_tensor = torch.tensor(atom_counts, dtype=x.dtype, device=device)
+            if srcs:
+                src, dst, edge = torch.cat(srcs), torch.cat(dsts), torch.cat(edges)
+            else:
+                src = dst = torch.empty(0, dtype=torch.long, device=device)
+                edge = torch.empty((0, bond_dim), device=device)
+
+            h = torch.tanh(self.init(x))
+            velocity = torch.zeros_like(h)
+            temporal_atom_sum = h.clone()
+            graph_mean = self._graph_mean(h, graph_index, graph_count, atom_counts_tensor)
+            graph_mean_sum = graph_mean.clone()
+            graph_mean_sq_sum = graph_mean.square()
+            step_energy = torch.zeros_like(h)
+            for _ in range(GENERATIONS):
+                agg = torch.zeros_like(h)
+                neighbour_mean = torch.zeros_like(h)
+                degree = torch.zeros((h.shape[0], 1), device=device)
+                if src.numel():
+                    msg = self.neighbour(h[src]) + self.bond(edge)
+                    agg.index_add_(0, dst, msg)
+                    neighbour_mean.index_add_(0, dst, h[src])
+                    degree.index_add_(0, dst, torch.ones((dst.numel(), 1), device=device))
+                    agg = agg / degree.clamp_min(1.0)
+                    neighbour_mean = neighbour_mean / degree.clamp_min(1.0)
+                reaction = torch.tanh(self.self_layer(h) + agg + self.chem(x) +
+                                      self.context(c) + self.bias)
+                if RULE == "gated_residual":
+                    alpha = torch.sigmoid(self.gate(torch.cat((h, agg, x, c), dim=1)))
+                    new_h = (1.0 - alpha) * h + alpha * reaction
+                else:
+                    gamma = 0.99 * torch.sigmoid(self.raw_gamma)
+                    dt = 0.25 * torch.sigmoid(self.raw_dt)
+                    diffusion = torch.nn.functional.softplus(self.raw_diffusion)
+                    restoring = torch.nn.functional.softplus(self.raw_restoring)
+                    force = reaction + diffusion * (neighbour_mean - h) - restoring * h
+                    velocity = gamma * velocity + dt * force
+                    new_h = torch.tanh(h + dt * velocity)
+                step_energy += (new_h - h).square() / float(GENERATIONS)
+                h = new_h
+                temporal_atom_sum += h
+                graph_mean = self._graph_mean(h, graph_index, graph_count, atom_counts_tensor)
+                graph_mean_sum += graph_mean
+                graph_mean_sq_sum += graph_mean.square()
+
+            final_mean = self._graph_mean(h, graph_index, graph_count, atom_counts_tensor)
+            final_second = self._graph_mean(h.square(), graph_index, graph_count, atom_counts_tensor)
+            final_var = (final_second - final_mean.square()).clamp_min(0.0)
+            temporal_mean = self._graph_mean(
+                temporal_atom_sum / float(GENERATIONS + 1),
+                graph_index, graph_count, atom_counts_tensor,
+            )
+            series_mean = graph_mean_sum / float(GENERATIONS + 1)
+            series_var = (graph_mean_sq_sum / float(GENERATIONS + 1) - series_mean.square()).clamp_min(0.0)
+            energy_mean = self._graph_mean(step_energy, graph_index, graph_count, atom_counts_tensor)
+            return torch.cat((final_mean, final_var, temporal_mean, series_var, energy_mean), dim=1)
 
         def forward_one(self, rec, cyp: int, return_trajectory=False,
                         initial_perturbation=None):
@@ -264,19 +406,15 @@ def train() -> None:
                 torch.stack(states).mean((0, 1)),
                 mean_series.var(0, unbiased=False), step_energy,
             ))
-            pred = self.readout(fingerprint).squeeze()
+            pred = fingerprint
             if return_trajectory:
                 return pred, torch.stack(states)
             return pred
 
     model = GraphCA().to(device)
-    readout_params = list(model.readout.parameters())
-    readout_ids = {id(p) for p in readout_params}
-    ca_params = [p for p in model.parameters() if id(p) not in readout_ids]
-    optimizer = torch.optim.Adam([
-        {"params": ca_params, "lr": CA_LR},
-        {"params": readout_params, "lr": READOUT_LR},
-    ], betas=(0.9, 0.999), eps=1e-8)
+    ca_params = list(model.parameters())
+    optimizer = torch.optim.Adam(ca_params, lr=CA_LR,
+                                 betas=(0.9, 0.999), eps=1e-8)
 
     def observed_pairs(indices):
         pairs = []
@@ -297,37 +435,71 @@ def train() -> None:
     fit_pairs = observed_pairs(fit_indices)
     val_pairs = observed_pairs(validation_indices)
 
-    def evaluate(pairs):
-        model.eval(); ys, ps = [], []
+    def fingerprints_and_targets(pairs):
+        fingerprints, targets = [], []
         with torch.no_grad():
-            for i, c, y in pairs:
-                ps.append(float(model.forward_one(data["train"][i], c)))
-                ys.append(y)
-        ys, ps = np.asarray(ys), np.asarray(ps)
+            for start in range(0, len(pairs), 64):
+                chunk = pairs[start:start + 64]
+                fingerprints.append(model.forward_batch([
+                    (data["train"][i], c) for i, c, _ in chunk
+                ]))
+                targets.extend(y for _, _, y in chunk)
+        return torch.cat(fingerprints), torch.tensor(targets, dtype=torch.float32, device=device)
+
+    def fitted_ridge_state():
+        model.eval()
+        features, targets = fingerprints_and_targets(fit_pairs)
+        return differentiable_ridge_fit(features, targets, RIDGE_STRENGTH)
+
+    def evaluate(pairs, ridge_state):
+        model.eval(); ys, ps = [], []
+        features, targets = fingerprints_and_targets(pairs)
+        with torch.no_grad():
+            predictions = differentiable_ridge_predict(features, ridge_state)
+        ys = targets.cpu().numpy(); ps = predictions.cpu().numpy()
         return float(np.sqrt(np.mean((ys - ps) ** 2))), ys, ps
 
     history, best, best_state, patience = [], math.inf, None, 0
     rng = random.Random(SEED)
     max_epochs = int(os.environ.get("SME_MAX_EPOCHS", "200"))
+    training_started = __import__("time").perf_counter()
     for epoch in range(1, max_epochs + 1):
         model.train()
         molecule_order = list(fit_indices); rng.shuffle(molecule_order)
         total_sq, total_n, raw_norms, clipped_norms = 0.0, 0, [], []
         for start in range(0, len(molecule_order), 16):
             molecule_batch = molecule_order[start:start + 16]
-            batch = []
-            for i in molecule_batch:
+            support_count = max(2, min(len(molecule_batch) - 1,
+                                       round(0.75 * len(molecule_batch))))
+            support_molecules = molecule_batch[:support_count]
+            query_molecules = molecule_batch[support_count:]
+            support_batch, query_batch = [], []
+            for i in support_molecules:
                 for c, y in enumerate(data["train"][i]["labels"]):
-                    if np.isfinite(y): batch.append((i, c, float(y)))
-            if not batch:
+                    if np.isfinite(y): support_batch.append((i, c, float(y)))
+            for i in query_molecules:
+                for c, y in enumerate(data["train"][i]["labels"]):
+                    if np.isfinite(y): query_batch.append((i, c, float(y)))
+            if len(support_batch) < 2 or not query_batch:
                 continue
             optimizer.zero_grad()
-            preds = torch.stack([model.forward_one(data["train"][i], c) for i, c, _ in batch])
-            targets = torch.tensor([y for _, _, y in batch], dtype=torch.float32, device=device)
+            combined = support_batch + query_batch
+            fingerprints = model.forward_batch([
+                (data["train"][i], c) for i, c, _ in combined
+            ])
+            support_targets = torch.tensor([y for _, _, y in support_batch],
+                                           dtype=torch.float32, device=device)
+            targets = torch.tensor([y for _, _, y in query_batch],
+                                   dtype=torch.float32, device=device)
+            ridge_state = differentiable_ridge_fit(
+                fingerprints[:len(support_batch)], support_targets, RIDGE_STRENGTH
+            )
+            preds = differentiable_ridge_predict(
+                fingerprints[len(support_batch):], ridge_state
+            )
             mse = ((preds - targets) ** 2).mean()
-            ridge = RIDGE_STRENGTH * sum((p ** 2).sum() for p in readout_params)
             ca_penalty = CA_L2 * sum((p ** 2).sum() for p in ca_params)
-            loss = mse + ridge + ca_penalty
+            loss = mse + ca_penalty
             loss.backward()
             raw = float(torch.sqrt(sum((p.grad.detach() ** 2).sum() for p in model.parameters()
                                        if p.grad is not None)))
@@ -335,9 +507,10 @@ def train() -> None:
             clipped = min(raw, GRAD_CLIP)
             optimizer.step()
             total_sq += float(((preds.detach() - targets) ** 2).sum())
-            total_n += len(batch); raw_norms.append(raw); clipped_norms.append(clipped)
+            total_n += len(query_batch); raw_norms.append(raw); clipped_norms.append(clipped)
         train_rmse = math.sqrt(total_sq / total_n)
-        val_rmse, _, _ = evaluate(val_pairs)
+        epoch_ridge_state = fitted_ridge_state()
+        val_rmse, _, _ = evaluate(val_pairs, epoch_ridge_state)
         row = {"epoch": epoch, "train_rmse": train_rmse, "validation_rmse": val_rmse,
                "mean_raw_gradient_norm": float(np.mean(raw_norms)),
                "fraction_gradients_clipped": float(np.mean(np.asarray(raw_norms) > GRAD_CLIP))}
@@ -350,18 +523,25 @@ def train() -> None:
             patience += 1
         if patience >= PATIENCE_LIMIT:
             break
+    if device.type == "cuda":
+        torch.cuda.synchronize()
+    training_seconds = __import__("time").perf_counter() - training_started
     model.load_state_dict(best_state)
+    final_ridge_state = fitted_ridge_state()
     OUT.mkdir(parents=True, exist_ok=True)
     torch.save({"state_dict": best_state, "chem_dim": chem_dim, "seed": SEED,
-                "rule": RULE, "generations": GENERATIONS,
-                "hyperparameters": {"ca_lr": CA_LR, "readout_lr": READOUT_LR,
+                "rule": RULE, "generations": GENERATIONS, "device": str(device),
+                "gpu": torch.cuda.get_device_name(device) if device.type == "cuda" else None,
+                "training_seconds": training_seconds,
+                "ridge_state": {k: v.detach().cpu() for k, v in final_ridge_state.items()},
+                "hyperparameters": {"ca_lr": CA_LR,
                     "ridge": RIDGE_STRENGTH, "ca_l2": CA_L2,
                     "gradient_clip": GRAD_CLIP}}, OUT / "model.pt")
     with (OUT / "training_history.csv").open("w", newline="") as handle:
         writer = csv.DictWriter(handle, fieldnames=history[0].keys()); writer.writeheader(); writer.writerows(history)
 
-    train_rmse, train_y, train_p = evaluate(fit_pairs)
-    val_rmse, val_y, val_p = evaluate(val_pairs)
+    train_rmse, train_y, train_p = evaluate(fit_pairs, final_ridge_state)
+    val_rmse, val_y, val_p = evaluate(val_pairs, final_ridge_state)
     pair_rows = []
     for split, pairs, ys, ps in (("fit", fit_pairs, train_y, train_p),
                                 ("validation", val_pairs, val_y, val_p)):
@@ -377,8 +557,15 @@ def train() -> None:
         "restored_fit_rmse": train_rmse, "restored_validation_rmse": val_rmse,
         "epochs_run": len(history), "fit_observations": len(fit_pairs),
         "validation_observations": len(val_pairs), "rule": RULE,
-        "generations": GENERATIONS, "hyperparameters": {"ca_lr": CA_LR,
-        "readout_lr": READOUT_LR, "ridge": RIDGE_STRENGTH, "ca_l2": CA_L2,
+        "generations": GENERATIONS, "hidden_channels": hidden,
+        "device": str(device),
+        "gpu": torch.cuda.get_device_name(device) if device.type == "cuda" else None,
+        "training_seconds": training_seconds,
+        "peak_gpu_memory_bytes": (torch.cuda.max_memory_allocated(device)
+                                  if device.type == "cuda" else 0),
+        "readout": "differentiable_closed_form_ridge",
+        "hyperparameters": {"ca_lr": CA_LR,
+        "ridge": RIDGE_STRENGTH, "ca_l2": CA_L2,
         "gradient_clip": GRAD_CLIP}}
     if TUNING_ONLY:
         (OUT / "metrics.json").write_text(json.dumps(common_metrics, indent=2) + "\n")
@@ -429,7 +616,10 @@ def train() -> None:
         all_preds = np.zeros((len(data["test"]), 4), dtype=float)
         for i, rec in enumerate(data["test"]):
             for c in range(4):
-                pred, traj = model.forward_one(rec, c, return_trajectory=True)
+                fingerprint, traj = model.forward_one(rec, c, return_trajectory=True)
+                pred = differentiable_ridge_predict(
+                    fingerprint.unsqueeze(0), final_ridge_state
+                ).squeeze(0)
                 trajectory = traj.cpu().numpy()
                 all_preds[i, c] = float(pred)
                 test_rows.append({"molecule_id": rec["name"], "canonical_smiles": rec["canonical_smiles"],

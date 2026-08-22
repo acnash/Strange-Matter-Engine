@@ -4,16 +4,14 @@
 
 Backpropagation calculates how the loss changes with each parameter. An **optimiser** uses those derivatives to change the parameters.
 
-For the first prototype, Adam will update the graph-CA parameters $\theta$ and ridge-regularised readout parameters $\beta$ with separate learning rates.
+Adam updates only the graph-CA parameters $\theta$. Ridge coefficients $\beta$ are obtained by solving the regularized normal equations and therefore have no optimizer learning rate.
 
 ## The accepted production decision
 
 The defaults are
 
 ```math
-\eta_\theta=10^{-3},
-\qquad
-\eta_\beta=3\times10^{-3}.
+\eta_\theta=10^{-3}.
 ```
 
 Inner grouped cross-validation will evaluate
@@ -23,16 +21,9 @@ Inner grouped cross-validation will evaluate
 \left\{3\times10^{-4},10^{-3},3\times10^{-3}\right\}
 ```
 
-and
+The ridge penalty $\lambda_\beta$ enters the matrix $Z^{\mathsf T}Z+\lambda_\beta I$. The CA penalty $\lambda_\theta\lVert\theta\rVert_2^2$ remains in the query loss. We do not add AdamW weight decay.
 
-```math
-\eta_\beta\in
-\left\{10^{-3},3\times10^{-3},10^{-2}\right\}.
-```
-
-The explicit ridge penalty $\lambda_\beta\lVert\beta\rVert_2^2$ and CA penalty $\lambda_\theta\lVert\theta\rVert_2^2$ remain in the loss. We will not add AdamW weight decay to the initial prototype.
-
-Here $\eta_\theta$ and $\eta_\beta$ are the learning rates for the graph-CA parameters $\theta$ and readout coefficients $\beta$, respectively. Likewise, $\lambda_\theta$ and $\lambda_\beta$ are the corresponding L2-regularisation strengths.
+Here $\eta_\theta$ is the learning rate for graph-CA parameters, $\lambda_\theta$ is their explicit L2 strength, and $\lambda_\beta$ is the genuine ridge penalty.
 
 ## 1. Gradients and ordinary gradient descent
 
@@ -72,7 +63,7 @@ If $\eta$ is too large, updates may overshoot useful regions. Loss can oscillate
 
 An appropriate learning rate makes reliable progress without destabilising the learned dynamics. It is a hyperparameter selected from inner-validation evidence, never from blinded-test outcomes.
 
-## 3. Why theta and beta have separate rates
+## 3. Why only theta has a learning rate
 
 The linear readout is shallow:
 
@@ -96,13 +87,14 @@ We therefore permit
 \theta_s-\eta_\theta u_{\theta,s},
 ```
 
+Ridge coefficients are instead recomputed on each fitting boundary:
+
 ```math
-\beta_{s+1}
-=
-\beta_s-\eta_\beta u_{\beta,s},
+\beta=(Z_{\rm support}^{\mathsf T}Z_{\rm support}+\lambda_\beta I)^{-1}
+Z_{\rm support}^{\mathsf T}y_{\rm support}.
 ```
 
-where $u_{\theta,s}$ and $u_{\beta,s}$ are Adam-adjusted directions. The larger default readout rate allows the simple linear mapping to adapt faster while the recurrent dynamics change more cautiously.
+The implementation uses `torch.linalg.solve` rather than an explicit inverse. Query loss differentiates through this solve, so support and query fingerprints both teach $\theta$.
 
 ## 4. Adam's first moment
 
@@ -236,38 +228,26 @@ Later updates depend on the accumulated histories $m_s$ and $v_s$, not only the 
 
 ## 9. Mini-batch gradients
 
-For mini-batch $\mathcal B_s$, the joint loss is
+For a molecule-centred mini-batch split into ridge-support set $\mathcal S_s$ and query set $\mathcal Q_s$, the optimization loss is
 
 ```math
-\mathcal L_{\mathcal B_s}
+\mathcal L_s
 =
-\frac1{|\mathcal B_s|}
-\sum_{m\in\mathcal B_s}
+\frac1{|\mathcal Q_s|}
+\sum_{m\in\mathcal Q_s}
 (\widehat y_m-y_m)^2
-+\lambda_\beta\lVert\beta\rVert_2^2
 +\lambda_\theta\lVert\theta\rVert_2^2.
 ```
 
-Here $\mathcal B_s$ is the set of examples in optimisation step $s$, and $|\mathcal B_s|$ is the number of examples in that set.
+The ridge state used for $\widehat y_m$ is solved from $\mathcal S_s$ with penalty $\lambda_\beta$. Splitting by molecule prevents observations from one molecule appearing on both sides of the same differentiable solve.
 
 Its gradient estimates the complete training-set gradient. Smaller batches introduce more sampling variation; larger batches require more memory and produce fewer updates per epoch. Batch construction is a separate design decision.
 
 The accepted molecule-centred batch is developed in [Mini-Batching Molecular Graphs and CYP Contexts](Mini_Batching_Molecular_Graphs.md).
 
-## 10. Explicit L2 regularisation
+## 10. CA regularisation and ridge shrinkage
 
-The regularisation gradients are
-
-```math
-\nabla_\beta
-\left(
-\lambda_\beta\lVert\beta\rVert_2^2
-\right)
-=
-2\lambda_\beta\beta
-```
-
-and
+The explicit CA regularisation gradient is
 
 ```math
 \nabla_\theta
@@ -278,7 +258,7 @@ and
 2\lambda_\theta\theta.
 ```
 
-They become part of the raw gradients supplied to Adam. This keeps the ridge penalty explicit and tied to the declared scientific objective.
+It becomes part of the raw gradient supplied to Adam. Ridge shrinkage acts inside the differentiable solve and influences $\theta$ through the derivative of that solve.
 
 ## 11. Adam versus AdamW
 
@@ -286,9 +266,9 @@ AdamW adds **decoupled weight decay**, a separate shrinkage operation. This is m
 
 The initial prototype uses Adam plus explicit L2 penalties. It will not silently add AdamW decay on top. AdamW can later be tested as a replacement design under the same validation protocol.
 
-## 12. Selecting the rate pair
+## 12. Selecting the CA learning rate
 
-The proposed values create a $3\times3=9$-combination grid. Every pair must use:
+The proposed values create three CA learning-rate candidates. Every candidate must use:
 
 - the same inner folds;
 - the same declared initialisation seeds;
@@ -304,9 +284,9 @@ Rates are spaced multiplicatively because their useful scale is usually explored
 Every run will record:
 
 - training prediction loss;
-- readout and CA regularisation terms;
+- ridge penalty and CA regularisation diagnostics;
 - inner-validation RMSE and MAE;
-- gradient norms for $\theta$ and $\beta$;
+- gradient norms for $\theta$ and ridge-solve conditioning;
 - parameter norms;
 - atom-state minima, maxima, means, and variances;
 - tanh saturation;
@@ -333,10 +313,10 @@ The first prototype will use constant learning rates with early stopping. Schedu
 
 An exact training checkpoint must retain:
 
-- $\theta$ and $\beta$;
+- $\theta$ and the support-fitted ridge state;
 - Adam first and second moments;
 - optimisation-step count;
-- learning rates and moment constants;
+- CA learning rate and Adam moment constants;
 - random-number-generator states;
 - data-order state; and
 - complete preprocessing and model configuration.
@@ -352,9 +332,9 @@ The accepted design is:
 - $\rho_2=0.999$;
 - $\epsilon=10^{-8}$;
 - default $\eta_\theta=10^{-3}$;
-- default $\eta_\beta=3\times10^{-3}$;
-- a three-by-three inner-validation rate search;
-- explicit $\lambda_\beta$ and $\lambda_\theta$;
+- no readout learning rate;
+- a three-candidate CA learning-rate search;
+- ridge-solve $\lambda_\beta$ and explicit CA penalty $\lambda_\theta$;
 - no additional AdamW decay; and
 - constant rates initially.
 

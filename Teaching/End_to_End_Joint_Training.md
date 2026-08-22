@@ -2,16 +2,16 @@
 
 ## Learning objective
 
-End-to-end joint training means that one measured pIC50 error teaches both:
+End-to-end differentiable ridge training means that query pIC50 error teaches:
 
-- the **linear readout coefficients** $\beta$, which convert a dynamical fingerprint into a prediction; and
-- the **graph cellular-automaton parameters** $\theta$, which create the trajectory from which that fingerprint is measured.
+- the **graph cellular-automaton parameters** $\theta$, which create the support and query fingerprints; while
+- the **ridge coefficients** $\beta$ are solved exactly from support fingerprints and labels rather than updated by Adam.
 
 The complete prediction pathway is treated as one connected mathematical function. Backpropagation applies the chain rule through that entire pathway.
 
 ## The accepted production decision
 
-For the first prototype, we will train the graph CA and the pIC50 readout jointly:
+The accepted implementation partitions each molecule-centred optimization batch into support and query molecules:
 
 ```math
 \text{molecular graph}
@@ -20,7 +20,9 @@ For the first prototype, we will train the graph CA and the pIC50 readout jointl
 \longrightarrow
 \text{differentiable fingerprint}
 \longrightarrow
-\text{linear pIC50 prediction}
+\text{support ridge solve}
+\longrightarrow
+\text{query pIC50 prediction}
 \longrightarrow
 \text{loss}.
 ```
@@ -28,9 +30,9 @@ For the first prototype, we will train the graph CA and the pIC50 readout jointl
 The learning signal then travels in the reverse direction:
 
 ```math
-\text{loss}
+\text{query loss}
 \longrightarrow
-\beta
+\text{differentiable ridge solve}
 \longrightarrow
 \text{fingerprint}
 \longrightarrow
@@ -39,12 +41,12 @@ The learning signal then travels in the reverse direction:
 \theta.
 ```
 
-This is **Learning 1 and Learning 2 in one optimisation process**:
+This connects representation learning and ridge regression in one differentiable process:
 
 - backpropagation is the derivative-calculation mechanism;
-- the optimiser updates the parameters;
+- Adam updates $\theta$ only;
 - the CA parameters learn the molecular dynamics; and
-- the linear readout learns a ridge-regularised mapping to pIC50.
+- `torch.linalg.solve` obtains a genuine ridge mapping from support fingerprints to pIC50.
 
 ## 1. The four stages of one prediction
 
@@ -113,40 +115,41 @@ The prediction depends on both parameter sets:
 
 Changing $\beta$ changes how the existing fingerprint is interpreted. Changing $\theta$ changes the CA trajectory and therefore changes the fingerprint itself.
 
-Joint training repeatedly performs:
+Training repeatedly performs:
 
-1. a forward pass using the current $\theta$ and $\beta$;
-2. loss calculation;
-3. backpropagation to obtain gradients for both parameter sets; and
-4. simultaneous parameter updates.
+1. generate support and query fingerprints using the current $\theta$;
+2. standardize support fingerprints using support-only statistics;
+3. solve $\beta$ and the unpenalized intercept from support observations;
+4. predict query observations with the frozen support ridge state;
+5. backpropagate query error through the solve and both fingerprint paths; and
+6. update $\theta$ with Adam.
 
-Neither parameter set is permanently fitted before the other begins.
+The ridge state is recomputed as the representation changes. It is never an independently optimized neural parameter.
 
 ## 3. The training objective
 
-For $N$ training examples, the proposed objective is
+For query set $\mathcal Q$ and ridge state solved from disjoint support set $\mathcal S$, the optimization objective is
 
 ```math
-\mathcal L(\theta,\beta)
+\mathcal L(\theta)
 =
-\frac1N
-\sum_{m=1}^{N}
+\frac1{|\mathcal Q|}
+\sum_{m\in\mathcal Q}
 \left(\widehat y_m-y_m\right)^2
-+\lambda_\beta\lVert\beta\rVert_2^2
 +\lambda_\theta\lVert\theta\rVert_2^2.
 ```
 
-It contains three parts.
+It contains query prediction error and explicit CA regularisation. Ridge regularisation is enforced inside the support solve.
 
-Here $N$ is the number of observed training examples, $m$ indexes those examples, $\lambda_\beta$ and $\lambda_\theta$ are the two L2-regularisation strengths, and $\lVert\cdot\rVert_2^2$ denotes a squared Euclidean norm.
+Here $m$ indexes query examples, $\lambda_\beta$ is the ridge strength used in the support solve, $\lambda_\theta$ is the CA L2 strength, and $\lVert\cdot\rVert_2^2$ denotes a squared Euclidean norm.
 
 ### Prediction error
 
 ```math
 \mathcal L_{\rm data}
 =
-\frac1N
-\sum_{m=1}^{N}
+\frac1{|\mathcal Q|}
+\sum_{m\in\mathcal Q}
 \left(\widehat y_m-y_m\right)^2.
 ```
 
@@ -162,7 +165,7 @@ This rewards agreement with measured pIC50. Large residuals receive greater weig
 \lambda_\beta\sum_{k=1}^{p}\beta_k^2.
 ```
 
-This is the ridge penalty. It discourages the linear readout from relying on very large, unstable coefficients.
+This ridge penalty is enforced by the support solve itself. It is not added again to the query loss, and the intercept is excluded through support centring.
 
 ### CA regularisation
 
@@ -202,11 +205,11 @@ Z=Z_\theta,
 
 because the fingerprints depend on the learned CA parameters. Every update to $\theta$ changes the design matrix.
 
-We therefore optimise the linear coefficients and CA parameters together using gradients. The readout is accurately described as a **ridge-regularised linear readout** because it is linear and has the same L2 penalty. It is not a single, one-time closed-form ridge fit while the fingerprints remain fixed.
+We solve the linear coefficients again whenever the fingerprint matrix changes. PyTorch differentiates the query loss through this solve, giving a genuine differentiable ridge layer rather than an Adam-trained approximation to the ridge objective.
 
 This distinction is mathematical rather than cosmetic.
 
-## 5. How one error teaches beta
+## 5. How one error differentiates through beta
 
 For one example,
 
@@ -426,24 +429,18 @@ For one mini-batch, the training cycle is:
 3. initialise eight dynamical channels to zero;
 4. apply the gated residual CA for 16 generations;
 5. calculate differentiable trajectory summaries;
-6. standardise fingerprints using training-fold statistics;
-7. calculate pIC50 predictions;
-8. calculate prediction and regularisation losses;
-9. backpropagate through the readout and all generations;
-10. update $\beta$ and $\theta$; and
+6. divide molecules into support and query subsets;
+7. standardise using support-only statistics and solve ridge on support observations;
+8. calculate query pIC50 predictions and loss;
+9. backpropagate through the solve and all generations;
+10. update $\theta$ with Adam; and
 11. record loss, gradients, state magnitudes, and validation diagnostics.
 
 This cycle repeats over many mini-batches and epochs.
 
-## 11. Learning rates
+## 11. Learning rate
 
-The two parameter families may require different learning rates:
-
-```math
-\beta_{\rm new}
-=
-\beta-\eta_\beta\nabla_\beta\mathcal L,
-```
+Only the CA parameters have an optimizer learning rate:
 
 ```math
 \theta_{\rm new}
@@ -451,7 +448,7 @@ The two parameter families may require different learning rates:
 \theta-\eta_\theta\nabla_\theta\mathcal L.
 ```
 
-Using separate $\eta_\beta$ and $\eta_\theta$ allows the simple linear readout and recurrent CA to learn at different speeds. Whether one shared learning rate is sufficient is a model-selection decision.
+The ridge coefficients are solved, not stepped. The ridge penalty $\lambda_\beta$ controls coefficient shrinkage and is selected separately from $\eta_\theta$.
 
 The accepted Adam optimiser and learning-rate search are derived in [Optimisation, Adam, and Learning Rates](Optimisation_and_Learning_Rates.md).
 
@@ -519,12 +516,12 @@ After the production design is locked, the model is fitted to all released label
 - **Forward pass:** calculate trajectory, fingerprint, prediction, and loss.
 - **Backpropagation:** calculate derivatives of that loss through the connected model.
 - **Optimiser:** use gradients and learning rates to update parameters.
-- **Joint training:** update $\theta$ and $\beta$ within the same training process.
+- **Joint training:** recompute $\beta$ and update $\theta$ within the same differentiable training process.
 - **End-to-end:** allow the final pIC50 error to influence every differentiable learned component.
-- **Ridge-regularised readout:** a linear readout with an L2 penalty on $\beta$.
-- **Closed-form ridge:** solve ridge coefficients algebraically for a fixed fingerprint matrix.
+- **Differentiable ridge readout:** solve ridge coefficients algebraically while retaining autograd connections to the fingerprint matrix.
+- **Support/query training:** solve ridge on support molecules and teach the CA using disjoint query error.
 
-Our accepted prototype uses joint gradient optimisation of a ridge-regularised linear readout and the graph CA.
+Our accepted implementation uses a differentiable ridge solve and Adam optimization of the graph CA only.
 
 ## Connection to the course
 

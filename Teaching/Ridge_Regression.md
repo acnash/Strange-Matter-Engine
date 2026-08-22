@@ -398,20 +398,31 @@ This is easiest to interpret because the dynamical representation and readout ar
 
 This allows the representation and readout to adapt to one another.
 
-### End-to-end learning
+### End-to-end differentiable ridge
 
-Treat the ridge-style penalty as part of a differentiable objective:
+Partition a molecule-centred optimization batch into support and query sets. Solve genuine ridge on the support fingerprints:
 
 ```math
-\mathcal L(\theta,\beta)
-=\left\|y-Z_\theta\beta\right\|_2^2
-+\lambda_\beta\|\beta\|_2^2
+\widehat\beta(\theta)
+=
+\left(Z_{\mathcal S,\theta}^{\mathsf T}Z_{\mathcal S,\theta}
++\lambda_\beta I\right)^{-1}
+Z_{\mathcal S,\theta}^{\mathsf T}y_{\mathcal S}.
+```
+
+After support-only centring and scaling, query error is
+
+```math
+\mathcal L_{\mathcal Q}(\theta)
+=
+\left\|y_{\mathcal Q}
+-Z_{\mathcal Q,\theta}\widehat\beta(\theta)\right\|_2^2
 +\lambda_\theta R(\theta).
 ```
 
-Backpropagation then computes gradients for both $\theta$ and $\beta$. This is mathematically convenient when the fingerprint components are differentiable. It changes the optimisation procedure, while the readout remains linear and L2-regularised.
+The implementation uses `torch.linalg.solve`. Autograd differentiates through the solve into support fingerprints and through query predictions into query fingerprints. Adam updates $\theta$ only; $\beta$ has no learning rate and is recomputed whenever the representation changes.
 
-The training schedule will be treated as an experimental design choice. We will compare it under identical, leakage-free splits rather than assuming that greater coupling is better.
+At validation and blind prediction boundaries, ridge is fitted on all permitted fitting observations, then its feature means, scales, coefficients, and intercept are frozen before held-out prediction.
 
 The accepted separate penalty strengths and their selection are explained in [Regularisation and Parameter Shrinkage](Regularisation_and_Parameter_Shrinkage.md).
 

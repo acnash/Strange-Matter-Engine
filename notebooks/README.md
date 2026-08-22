@@ -14,7 +14,7 @@ These notebooks are the interactive teaching environment for the project. They p
 8. [Perturbations and Stability](07_Perturbations_and_Stability.ipynb) — compare nearby trajectories and learn finite-time sensitivity and Lyapunov-analysis discipline.
 9. [A Parameterised Local Rule](08_Parameterised_Local_Rule.ipynb) — explore how shared self, neighbour, and bias parameters define a family of graph-CA dynamics.
 10. [Backpropagation Through Time](09_Backpropagation_Through_Time.ipynb) — follow prediction error backward through the repeated shared rule.
-11. [Ridge Regression Readout](10_Ridge_Regression_Readout.ipynb) — map dynamical fingerprints to `pIC50` and study regularisation.
+11. [Ridge Regression Readout](10_Ridge_Regression_Readout.ipynb) — solve genuine ridge regression, differentiate query error through the solve, and study regularisation.
 12. [Scientific Validation](11_Scientific_Validation.ipynb) — compare held-out dynamical and descriptor models using transparent split schemes and error metrics.
 13. [Fundamentals Examination](12_Fundamentals_Examination.ipynb) — answer 75 three-option questions with immediate explanations and a domain-level learning diagnostic.
 

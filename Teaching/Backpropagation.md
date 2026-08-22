@@ -33,7 +33,7 @@ where:
 - $\widehat y_m$ is predicted pIC50; and
 - $y_m$ is experimental pIC50.
 
-The ridge readout learns coefficients $\beta$. Backpropagation carries the prediction error further backwards through $z_m$ and through all $T$ CA generations to learn $\theta$.
+The ridge readout solves coefficients $\beta$ from support fingerprints. Query error differentiates through `torch.linalg.solve`, through the support and query fingerprints, and through all $T$ CA generations to learn $\theta$. Adam does not update $\beta$ directly.
 
 ## 1. Derivatives as sensitivity
 

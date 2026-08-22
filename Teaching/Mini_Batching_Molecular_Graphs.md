@@ -126,19 +126,18 @@ M_{mc}
 
 Only observed labels contribute. Missing pIC50 values are never set to zero, replaced with a mean, or interpreted as weak inhibition.
 
-## 5. The complete batch loss
+## 5. The support/query batch loss
 
 ```math
 \mathcal L_s
 =
-\mathcal L_{\rm data}^{(s)}
-+\lambda_\beta\lVert\beta\rVert_2^2
+\mathcal L_{\rm query}^{(s)}
 +\lambda_\theta\lVert\theta\rVert_2^2.
 ```
 
-Here $\mathcal L_s$ is the complete loss at optimisation step $s$; $\beta$ contains the readout coefficients; $\theta$ contains the graph-CA parameters; and $\lambda_\beta$ and $\lambda_\theta$ are their respective L2-regularisation strengths.
+Molecules are split into support and query subsets. The support fingerprints and labels determine $\beta$ through $(Z^{\mathsf T}Z+\lambda_\beta I)\beta=Z^{\mathsf T}y$. Query observations determine $\mathcal L_{\rm query}^{(s)}$.
 
-Backpropagation calculates gradients of this loss, and Adam makes one joint update to $\beta$ and $\theta$.
+Backpropagation differentiates through the support ridge solve and query predictions. Adam updates $\theta$ only; $\beta$ is recomputed by the solve.
 
 ## 6. Why mini-batches
 

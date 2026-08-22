@@ -25,7 +25,7 @@ Learned parameters include:
 
 - graph-CA weights and biases $\theta$;
 - gate parameters;
-- linear readout coefficients $\beta$; and
+- ridge coefficients $\beta$, obtained by a differentiable linear solve; and
 - the readout intercept $\beta_0$.
 
 They are updated from gradients within a training run.
@@ -34,7 +34,7 @@ Hyperparameters include:
 
 - dynamical width $d_h$;
 - generation count $T$;
-- learning rates $\eta_\theta$ and $\eta_\beta$;
+- graph-CA learning rate $\eta_\theta$;
 - penalties $\lambda_\theta$ and $\lambda_\beta$;
 - training budget;
 - early-stopping settings; and
@@ -56,18 +56,11 @@ and
 T\in\{8,16,32,64\}.
 ```
 
-Learning-rate pairs come from
+Graph-CA learning rates come from
 
 ```math
 \eta_\theta\in
 \{3\times10^{-4},10^{-3},3\times10^{-3}\}
-```
-
-and
-
-```math
-\eta_\beta\in
-\{10^{-3},3\times10^{-3},10^{-2}\}.
 ```
 
 Regularisation pairs come from
@@ -89,8 +82,8 @@ and
 There are
 
 ```math
-4\times4\times3\times3\times3\times3
-=1296
+4\times4\times3\times3\times3
+=432
 ```
 
 unique configurations.
@@ -98,7 +91,7 @@ unique configurations.
 If one inner evaluation uses $K_{\rm in}$ folds, the number of fitted models is
 
 ```math
-1296K_{\rm in}.
+432K_{\rm in}.
 ```
 
 Here $K_{\rm in}$ is the number of grouped inner-validation folds. One separate model fit is required for every configuration–fold combination.
@@ -106,7 +99,7 @@ Here $K_{\rm in}$ is the number of grouped inner-validation folds. One separate 
 With four inner folds,
 
 ```math
-1296\times4=5184
+432\times4=1728
 ```
 
 training runs are required for one outer-training partition before repeated seeds or outer folds are considered.
@@ -139,7 +132,7 @@ Random search samples combinations from the declared space.
 Let the complete set be $\mathcal H$ with
 
 ```math
-|\mathcal H|=1296.
+|\mathcal H|=432.
 ```
 
 Using a pseudo-random generator with recorded seed $s_{\rm search}$, we select
@@ -166,7 +159,6 @@ The accepted default is:
 d_h&=8,\\
 T&=16,\\
 \eta_\theta&=10^{-3},\\
-\eta_\beta&=3\times10^{-3},\\
 \lambda_\theta&=10^{-5},\\
 \lambda_\beta&=10^{-3}.
 \end{aligned}
@@ -425,7 +417,7 @@ The 200-generation prototype used a deliberately modest preliminary search rathe
 
 This is **multi-fidelity tuning**: inexpensive approximations screen candidates before costly high-fidelity evaluation. It is useful when a complete training run is extremely expensive, but it assumes that rankings at lower fidelity contain information about rankings at full fidelity.
 
-The screened hyperparameters were Graph-CA learning rate, readout learning rate, ridge strength, and gradient-clipping norm. The winning values were 0.002, 0.003, 0.001, and 1.0 respectively.
+The historical prototype screened Graph-CA learning rate, readout learning rate, L2 strength, and gradient-clipping norm because its readout was an Adam-trained linear layer. That readout has now been replaced. Production searches tune the Graph-CA learning rate, genuine ridge penalty, CA regularisation, clipping, channel width, generation count, and rule-specific stability parameters. There is no readout learning rate because $\beta$ is solved rather than updated by Adam.
 
 The prototype is an engineering experiment, not the final nested-cross-validation estimate. Its grouped-validation result must not be used to repeatedly redesign the search and then be presented as untouched test performance. The production study will retain protected outer folds and perform model selection only inside each outer training partition.
 

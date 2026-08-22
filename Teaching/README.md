@@ -14,9 +14,9 @@ The notes are divided into subjects as they might be taught at a university:
 8. [Differentiable Dynamical Fingerprint](Differentiable_Dynamical_Fingerprint.md) — the accepted 40-component trajectory representation used during training.
 9. [Machine Learning](Machine_Learning.md) — overview of loss, the two learned components, and model training.
 10. [Backpropagation](Backpropagation.md) — derivatives, the chain rule, backpropagation through the graph CA, and learning the shared rule `θ`.
-11. [Ridge Regression](Ridge_Regression.md) — regularised linear regression, dynamical fingerprints, and learning the pIC50 readout `β`.
-12. [End-to-End Joint Training](End_to_End_Joint_Training.md) — how one pIC50 loss jointly teaches the CA and ridge-regularised readout.
-13. [Optimisation, Adam, and Learning Rates](Optimisation_and_Learning_Rates.md) — gradients, adaptive moments, separate parameter-group rates, and explicit regularisation.
+11. [Ridge Regression](Ridge_Regression.md) — regularised linear regression, differentiable linear solves, and the pIC50 readout `β`.
+12. [End-to-End Joint Training](End_to_End_Joint_Training.md) — how query loss differentiates through a support-fitted ridge solve to teach the CA.
+13. [Optimisation, Adam, and Learning Rates](Optimisation_and_Learning_Rates.md) — Adam updates for the CA while ridge coefficients are solved exactly at each fitting boundary.
 14. [Regularisation and Parameter Shrinkage](Regularisation_and_Parameter_Shrinkage.md) — separate L2 control of the readout and graph CA.
 15. [Mini-Batching Molecular Graphs](Mini_Batching_Molecular_Graphs.md) — molecule-centred batches, four CYP contexts, variable graph sizes, and missing-label masks.
 16. [Gradient Clipping](Gradient_Clipping.md) — exploding gradients, global norm clipping, Adam, and recurrent graph-CA stability diagnostics.

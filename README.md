@@ -98,7 +98,7 @@ experimental pIC50                  experimental is_TDI label
                 └─────────────┬─────────────┘
                               ▼
 LEARNING 1: shared CA rule    LEARNING 2: task-specific readouts
-Backpropagation through       Ridge regression learns pIC50
+Backpropagation through       Differentiable ridge solves pIC50
 all T CA generations learns   coefficients βreg; a regularised
 the shared transition         logistic readout learns TDI
 parameters θ                  coefficients βTDI
@@ -113,4 +113,4 @@ parameters θ                  coefficients βTDI
        submitted finite pIC50        submitted Boolean is_TDI
 ```
 
-The model therefore contains a shared learning process and two task-specific readouts. Direct-inhibition error and TDI-classification error can be backpropagated through the repeated CA evolution to optimise the shared transition parameters (`θ`). Ridge regression learns regularised coefficients (`βreg`) mapping the trajectory-derived fingerprint to `pIC50`; a regularised logistic readout learns coefficients (`βTDI`) mapping the same fingerprint to a TDI probability. The classification threshold will be selected without using blinded test outcomes, with Matthews correlation coefficient as the primary validation objective to match the challenge metric. The precise training schedule—joint, alternating, or staged—will be treated as an experimental design choice and taught before implementation. Once training, validation, and threshold selection are complete, all parameters will be frozen and the identical pipeline will generate the two independent blind-set submission files.
+The direct-inhibition model backpropagates query error through a genuine ridge solve and through repeated CA evolution to optimise the shared transition parameters (`θ`). Ridge coefficients (`βreg`) are solved with `torch.linalg.solve` from support fingerprints and labels; Adam updates only `θ`. At validation and blind-prediction boundaries, scaling and ridge state are fitted using permitted fitting observations, then frozen. The later TDI programme will use its own regularised logistic readout and training protocol. Once training and validation are complete, all parameters and transformations will be frozen before generating blind-set predictions.

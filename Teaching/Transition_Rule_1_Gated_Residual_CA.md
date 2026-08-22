@@ -116,7 +116,7 @@ The update is therefore the old state plus a gated residual displacement. Small 
 
 - number of generations;
 - state width;
-- Graph-CA and readout learning rates;
+- Graph-CA learning rate and ridge penalty;
 - ridge and CA regularisation;
 - gradient-clipping threshold;
 - batch size; and

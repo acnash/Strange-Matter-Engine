@@ -5,7 +5,7 @@
 Strange Matter Engine currently proposes two conceptually distinct learned systems:
 
 1. the shared graph-CA transition parameters `θ`; and
-2. the readout coefficients `β` that map a dynamical fingerprint to predicted `pIC50`.
+2. the ridge coefficients `β`, solved from training fingerprints and labels, that map a dynamical fingerprint to predicted `pIC50`.
 
 The precise joint, alternating, or staged training schedule remains an experimental question.
 
@@ -27,7 +27,7 @@ This is backpropagation through time: the computational graph is formed by unrol
 
 ## Ridge regression
 
-Ridge regression predicts `pIC50` as a weighted sum of dynamical fingerprint components plus an intercept. It fits the coefficients while adding a penalty proportional to the sum of their squared magnitudes.
+Ridge regression predicts `pIC50` as a weighted sum of standardized dynamical fingerprint components plus an unpenalized intercept. The implementation solves the regularized normal equations with `torch.linalg.solve`; gradients through that solve teach the graph-CA representation.
 
 The penalty discourages excessively large coefficients, helps when fingerprint components are correlated, and trades a small amount of bias for potentially improved stability and generalisation. The penalty strength is a hyperparameter selected using training data only.
 
