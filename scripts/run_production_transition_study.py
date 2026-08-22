@@ -207,7 +207,8 @@ def main():
     }
     (study_dir / "study_summary.json").write_text(json.dumps(summary, indent=2) + "\n")
     write_progress(study_dir, {"stage": "complete", "summary": summary})
-    subprocess.run([str(PYTHON), str(ROOT / "scripts" / "build_production_report.py"),
+    report_python = Path(os.environ.get("SME_REPORT_PYTHON", str(PYTHON)))
+    subprocess.run([str(report_python), str(ROOT / "scripts" / "build_production_report.py"),
                     "--study", study_name], cwd=ROOT, check=True)
     print(json.dumps(summary, indent=2))
 

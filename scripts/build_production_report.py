@@ -54,7 +54,7 @@ def main():
         ax.scatter(q.generations, q.validation_rmse, c=colour, alpha=.7, label=stage)
     ax.set(xscale="log", xlabel="CA generations", ylabel="Validation RMSE (pIC50)",
            title="Hyperparameter search by trajectory length")
-    ax.grid(alpha=.18); ax.legend(); fig.tight_layout()
+    ax.grid(alpha=.18); ax.legend(); fig.subplots_adjust(left=.12, right=.97, bottom=.13, top=.90)
     fig.savefig(figures / "01_search.png", dpi=200); plt.close(fig)
 
     fig, ax = plt.subplots(figsize=(6, 6))
@@ -65,7 +65,7 @@ def main():
     ax.plot([lo, hi], [lo, hi], "--", c=LIME)
     ax.set(xlabel="Experimental pIC50", ylabel="Predicted pIC50",
            title="Grouped-validation predictions"); ax.grid(alpha=.18)
-    fig.tight_layout(); fig.savefig(figures / "02_validation.png", dpi=200); plt.close(fig)
+    fig.subplots_adjust(left=.14, right=.97, bottom=.12, top=.91); fig.savefig(figures / "02_validation.png", dpi=200); plt.close(fig)
 
     per_cyp = q.groupby("cyp_target").apply(
         lambda x: np.sqrt(np.mean((x.predicted_pic50 - x.experimental_pic50) ** 2)),
@@ -74,14 +74,14 @@ def main():
     fig, ax = plt.subplots(figsize=(8, 4.5))
     ax.bar(per_cyp.index, per_cyp.values, color=(CYAN, MAGENTA, LIME, "#7A5CFA"))
     ax.set(ylabel="Validation RMSE (pIC50)", title="Per-CYP predictive performance")
-    ax.grid(axis="y", alpha=.18); fig.tight_layout()
+    ax.grid(axis="y", alpha=.18); fig.subplots_adjust(left=.12, right=.97, bottom=.14, top=.88)
     fig.savefig(figures / "03_per_cyp.png", dpi=200); plt.close(fig)
 
     fig, ax = plt.subplots(figsize=(8, 4.5))
     ax.plot(history.epoch, history.train_rmse, c=CYAN, label="query training")
     ax.plot(history.epoch, history.validation_rmse, c=MAGENTA, label="validation")
     ax.set(xlabel="Epoch", ylabel="RMSE (pIC50)", title="Final-model learning curve")
-    ax.grid(alpha=.18); ax.legend(); fig.tight_layout()
+    ax.grid(alpha=.18); ax.legend(); fig.subplots_adjust(left=.12, right=.97, bottom=.14, top=.88)
     fig.savefig(figures / "04_learning.png", dpi=200); plt.close(fig)
 
     fig, ax = plt.subplots(figsize=(8, 5))
@@ -90,7 +90,7 @@ def main():
     ax.set(xlabel="Recurrence ratio", ylabel="Late motion",
            title="Validation dynamical regimes"); ax.set_yscale("log")
     fig.colorbar(scatter, ax=ax, label="Spectral entropy")
-    ax.grid(alpha=.15); fig.tight_layout()
+    ax.grid(alpha=.15); fig.subplots_adjust(left=.12, right=.97, bottom=.14, top=.88)
     fig.savefig(figures / "05_dynamics.png", dpi=200); plt.close(fig)
 
     fig, ax = plt.subplots(figsize=(8, 4.5))
@@ -103,7 +103,7 @@ def main():
                 ha="center", va="center", transform=ax.transAxes, color=MAGENTA, fontsize=14)
     ax.set(xlabel="Selected validation case",
         ylabel="Finite-time divergence slope", title="Perturbation-response screening")
-    ax.grid(axis="y", alpha=.18); fig.tight_layout()
+    ax.grid(axis="y", alpha=.18); fig.subplots_adjust(left=.12, right=.97, bottom=.14, top=.88)
     fig.savefig(figures / "06_perturbations.png", dpi=200); plt.close(fig)
 
     output_dir = ROOT / "output" / "pdf"; output_dir.mkdir(parents=True, exist_ok=True)

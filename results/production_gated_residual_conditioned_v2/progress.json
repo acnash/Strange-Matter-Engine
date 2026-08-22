@@ -1,0 +1,70 @@
+{
+  "stage": "complete",
+  "summary": {
+    "study": "production_gated_residual_conditioned_v2",
+    "rule": "gated_residual",
+    "search_seed": 260822,
+    "search_version": "conditioned_v2",
+    "elapsed_seconds": 2779.664954662323,
+    "winner": {
+      "generations": 16,
+      "hidden_channels": 16,
+      "ca_lr": 0.001,
+      "ridge": 0.1,
+      "ca_l2": 1e-06,
+      "gradient_clip": 1.0,
+      "batch_molecules": 64
+    },
+    "winner_confirmation_mean_rmse": 0.8822178641955057,
+    "confirmation_seeds": [
+      1701,
+      2909,
+      4211
+    ],
+    "final_metrics": {
+      "seed": 1701,
+      "best_validation_rmse": 0.8816978931427002,
+      "restored_fit_rmse": 0.822945773601532,
+      "restored_validation_rmse": 0.8817110061645508,
+      "epochs_run": 10,
+      "fit_observations": 5216,
+      "validation_observations": 1309,
+      "rule": "gated_residual",
+      "generations": 16,
+      "hidden_channels": 16,
+      "device": "cuda",
+      "gpu": "NVIDIA GeForce RTX 5070 Ti",
+      "training_seconds": 48.336481300066225,
+      "peak_gpu_memory_bytes": 54759936,
+      "readout": "differentiable_closed_form_ridge",
+      "hyperparameters": {
+        "ca_lr": 0.001,
+        "ridge": 0.1,
+        "ca_l2": 1e-06,
+        "gradient_clip": 1.0
+      },
+      "dynamical_analysis": {
+        "validation_trajectories_screened": 1309,
+        "perturbation_cases": 0,
+        "classification_counts": {},
+        "perturbation_status": "deferred_after_native_cuda_failure"
+      },
+      "wall_seconds": 65.63634395599365,
+      "study_config": {
+        "generations": 16,
+        "hidden_channels": 16,
+        "ca_lr": 0.001,
+        "ridge": 0.1,
+        "ca_l2": 1e-06,
+        "gradient_clip": 1.0,
+        "batch_molecules": 64
+      },
+      "stability": {
+        "maximum_query_train_rmse": 1.364315296798014,
+        "maximum_raw_gradient_norm": 23.485140000620195,
+        "passed": true
+      }
+    },
+    "blind_data_used": false
+  }
+}
