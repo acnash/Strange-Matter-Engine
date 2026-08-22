@@ -1,0 +1,70 @@
+{
+  "stage": "complete",
+  "summary": {
+    "study": "production_inertial_reaction_diffusion_conditioned_v2",
+    "rule": "inertial_reaction_diffusion",
+    "search_seed": 260822,
+    "search_version": "conditioned_v2",
+    "elapsed_seconds": 4338.555834054947,
+    "winner": {
+      "generations": 500,
+      "hidden_channels": 16,
+      "ca_lr": 0.003,
+      "ridge": 1.0,
+      "ca_l2": 1e-05,
+      "gradient_clip": 1.0,
+      "batch_molecules": 128
+    },
+    "winner_confirmation_mean_rmse": 0.881539007027944,
+    "confirmation_seeds": [
+      1701,
+      2909,
+      4211
+    ],
+    "final_metrics": {
+      "seed": 1701,
+      "best_validation_rmse": 0.8881078362464905,
+      "restored_fit_rmse": 0.8285953998565674,
+      "restored_validation_rmse": 0.8881093263626099,
+      "epochs_run": 10,
+      "fit_observations": 5216,
+      "validation_observations": 1309,
+      "rule": "inertial_reaction_diffusion",
+      "generations": 500,
+      "hidden_channels": 16,
+      "device": "cuda",
+      "gpu": "NVIDIA GeForce RTX 5070 Ti",
+      "training_seconds": 538.1817477999721,
+      "peak_gpu_memory_bytes": 1973557760,
+      "readout": "differentiable_closed_form_ridge",
+      "hyperparameters": {
+        "ca_lr": 0.003,
+        "ridge": 1.0,
+        "ca_l2": 1e-05,
+        "gradient_clip": 1.0
+      },
+      "dynamical_analysis": {
+        "validation_trajectories_screened": 1309,
+        "perturbation_cases": 0,
+        "classification_counts": {},
+        "perturbation_status": "deferred_after_native_cuda_failure"
+      },
+      "wall_seconds": 920.1821639537811,
+      "study_config": {
+        "generations": 500,
+        "hidden_channels": 16,
+        "ca_lr": 0.003,
+        "ridge": 1.0,
+        "ca_l2": 1e-05,
+        "gradient_clip": 1.0,
+        "batch_molecules": 128
+      },
+      "stability": {
+        "maximum_query_train_rmse": 1.1119859314906049,
+        "maximum_raw_gradient_norm": 15.432705025519095,
+        "passed": true
+      }
+    },
+    "blind_data_used": false
+  }
+}
