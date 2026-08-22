@@ -29,6 +29,11 @@ The notes are divided into subjects as they might be taught at a university:
 23. [Trajectory Visualisation and PyMOL](Trajectory_Visualisation_and_PyMOL.md) — multi-state molecular animation, display B values, 3D viewing conformers, and the hydrogen visual coda.
 24. [Inertial Reaction–Diffusion Graph CA](Inertial_Reaction_Diffusion_Graph_CA.md) — momentum, graph diffusion, restoring forces, nonlinear reactions, and the dynamics observed in prototype two.
 25. [Graph CA Transition Rules](Graph_CA_Transition_Rules.md) — five candidate update rules, the corrected prototype lineage, and the mandatory fair-tuning policy for future comparisons.
+26. [Rule 1: Gated Residual CA](Transition_Rule_1_Gated_Residual_CA.md) — messages, candidate states, gates, residual updates, and worked calculations.
+27. [Rule 2: Inertial Reaction–Diffusion CA](Transition_Rule_2_Inertial_Reaction_Diffusion_CA.md) — velocity, diffusion, restoration, damping, and worked calculations.
+28. [Rule 3: Activator–Inhibitor CA](Transition_Rule_3_Activator_Inhibitor_CA.md) — excitation, inhibition, nullclines, waves, and limit cycles.
+29. [Rule 4: Coupled-Map CA](Transition_Rule_4_Coupled_Map_CA.md) — nonlinear maps, coupling, bifurcations, synchronisation, and Lyapunov analysis.
+30. [Rule 5: Damped Symplectic CA](Transition_Rule_5_Damped_Symplectic_CA.md) — latent coordinates, momentum, potentials, energy, and oscillatory modes.
 
 ## Learning rule
 

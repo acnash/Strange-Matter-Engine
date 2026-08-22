@@ -115,3 +115,11 @@ The tuning record will include every attempted configuration, failure, score, se
 5. Trial the damped symplectic rule for persistent collective modes.
 
 Predictive performance and dynamical richness will be reported separately. A fascinating trajectory is not automatically a better pIC50 predictor, and a low RMSE does not by itself establish scientifically meaningful dynamics.
+
+## Dedicated lessons
+
+- [Rule 1: Gated Residual CA](Transition_Rule_1_Gated_Residual_CA.md)
+- [Rule 2: Inertial Reaction–Diffusion CA](Transition_Rule_2_Inertial_Reaction_Diffusion_CA.md)
+- [Rule 3: Activator–Inhibitor CA](Transition_Rule_3_Activator_Inhibitor_CA.md)
+- [Rule 4: Coupled-Map CA](Transition_Rule_4_Coupled_Map_CA.md)
+- [Rule 5: Damped Symplectic CA](Transition_Rule_5_Damped_Symplectic_CA.md)
