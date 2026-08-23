@@ -119,6 +119,19 @@ A complete production search is computationally expensive on the Mac and is norm
 4. Expect small floating-point differences between CPU and CUDA. Compare them using declared numerical tolerances rather than requiring bit-for-bit equality.
 5. Never use blinded challenge labels for training, hyperparameter selection, early stopping, or dynamical-candidate selection.
 
+### Frozen long-horizon dynamics
+
+Long-horizon dynamical investigation is performed only after production training and model selection. It loads a frozen checkpoint, selects validation molecule–CYP cases using several complementary short-trajectory criteria, and propagates those cases without backpropagation or parameter updates.
+
+The coupled-map study defaults to 100 candidates, balanced as 25 cases per CYP target, 5,000 generations, and a 1,000-generation discarded transient:
+
+```bash
+conda activate strange-matter-cpu
+sh scripts/run_extended_coupled_map_dynamics.sh
+```
+
+The analysis measures the complete atom-by-channel state rather than only the molecule-level mean. It writes recurrence, late-motion, frequency, autocorrelation, and finite-time perturbation summaries to `results/coupled_map_5000_generation_dynamics`. It stores molecule-level mean trajectories for plotting but deliberately creates no PyMOL or atom-coordinate files. PyMOL generation begins only after scientifically interesting structures have been reviewed and selected.
+
 ## Goal
 
 The primary goal is to build, understand, validate, and submit a complete end-to-end model that maps:

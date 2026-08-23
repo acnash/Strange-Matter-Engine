@@ -23,7 +23,10 @@ from pathlib import Path
 
 import numpy as np
 
-from runtime_device import resolve_torch_device, runtime_metadata
+try:
+    from runtime_device import load_checkpoint, resolve_torch_device, runtime_metadata
+except ModuleNotFoundError:  # Imported as scripts.run_graph_ca_visual_prototype.
+    from scripts.runtime_device import load_checkpoint, resolve_torch_device, runtime_metadata
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -244,7 +247,9 @@ def prepare() -> None:
                       "rejected": rejected, "cache": str(CACHE)}, indent=2))
 
 
-def train() -> None:
+def train(extended_dynamics: bool = False) -> None:
+    global RULE, GENERATIONS, UPDATE_SCALE, INIT_SCALE, INITIAL_NOISE
+    global SUPPORT_FRACTION, BOND_TEMPERATURE, DYN_A, DYN_B, DYN_C, DYN_D
     import torch
     from torch import nn
 
@@ -259,9 +264,29 @@ def train() -> None:
         torch.backends.cuda.matmul.allow_tf32 = True
     run_runtime = runtime_metadata(torch, device)
     print(json.dumps(run_runtime), flush=True)
+    checkpoint = None
+    if extended_dynamics:
+        checkpoint_path = os.environ.get("SME_CHECKPOINT")
+        if not checkpoint_path:
+            raise ValueError("SME_CHECKPOINT is required for extended-dynamics mode")
+        checkpoint = load_checkpoint(torch, checkpoint_path, device)
+        hyperparameters = checkpoint["hyperparameters"]
+        RULE = checkpoint["rule"]
+        GENERATIONS = int(os.environ.get("SME_EXTENDED_GENERATIONS", "5000"))
+        UPDATE_SCALE = float(hyperparameters["update_scale"])
+        INIT_SCALE = float(hyperparameters["init_scale"])
+        INITIAL_NOISE = 0.0
+        SUPPORT_FRACTION = float(hyperparameters["support_fraction"])
+        BOND_TEMPERATURE = float(hyperparameters["bond_temperature"])
+        DYN_A = float(hyperparameters["dyn_a"])
+        DYN_B = float(hyperparameters["dyn_b"])
+        DYN_C = float(hyperparameters["dyn_c"])
+        DYN_D = float(hyperparameters["dyn_d"])
     chem_dim = len(data["train"][0]["x"][0])
     bond_dim = 9
-    hidden = int(os.environ.get("SME_HIDDEN_CHANNELS", "8"))
+    hidden = (int(checkpoint["state_dict"]["init.weight"].shape[0])
+              if checkpoint is not None
+              else int(os.environ.get("SME_HIDDEN_CHANNELS", "8")))
 
     class GraphCA(nn.Module):
         def __init__(self):
@@ -505,6 +530,27 @@ def train() -> None:
             return pred
 
     model = GraphCA().to(device)
+    if extended_dynamics:
+        model.load_state_dict(checkpoint["state_dict"])
+        model.eval()
+        try:
+            from run_extended_coupled_map_dynamics import run_extended_analysis
+        except ModuleNotFoundError:
+            from scripts.run_extended_coupled_map_dynamics import run_extended_analysis
+        run_extended_analysis(
+            model=model,
+            data=data,
+            device=device,
+            torch_module=torch,
+            hidden_channels=hidden,
+            generations=GENERATIONS,
+            checkpoint_path=Path(os.environ["SME_CHECKPOINT"]),
+            screening_path=Path(os.environ["SME_SCREENING_CSV"]),
+            output_dir=Path(os.environ["SME_EXTENDED_OUTPUT"]),
+            candidate_count=int(os.environ.get("SME_EXTENDED_CANDIDATES", "100")),
+            burn_in=int(os.environ.get("SME_EXTENDED_BURN_IN", "1000")),
+        )
+        return
     ca_params = list(model.parameters())
     optimizer = torch.optim.Adam(ca_params, lr=CA_LR,
                                  betas=(0.9, 0.999), eps=1e-8)
@@ -1167,9 +1213,10 @@ The PDB B-factor column stores scaled eight-channel atom-state magnitude. It is 
 
 def main() -> None:
     parser = argparse.ArgumentParser()
-    parser.add_argument("phase", choices=("prepare", "train", "render"))
+    parser.add_argument("phase", choices=("prepare", "train", "render", "extended-dynamics"))
     args = parser.parse_args()
-    {"prepare": prepare, "train": train, "render": render}[args.phase]()
+    {"prepare": prepare, "train": train, "render": render,
+     "extended-dynamics": lambda: train(extended_dynamics=True)}[args.phase]()
 
 
 if __name__ == "__main__":

@@ -12,7 +12,10 @@ import subprocess
 import time
 from pathlib import Path
 
-from runtime_device import python_executable, requested_device
+try:
+    from runtime_device import python_executable, requested_device
+except ModuleNotFoundError:  # Imported as scripts.run_production_transition_study.
+    from scripts.runtime_device import python_executable, requested_device
 
 
 ROOT = Path(__file__).resolve().parents[1]
