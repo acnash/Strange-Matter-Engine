@@ -201,9 +201,19 @@ parameters θ                  coefficients βTDI
 
 The direct-inhibition model backpropagates query error through a genuine ridge solve and through repeated CA evolution to optimise the shared transition parameters (`θ`). Ridge coefficients (`βreg`) are solved with `torch.linalg.solve` from support fingerprints and labels; Adam updates only `θ`. At validation and blind-prediction boundaries, scaling and ridge state are fitted using permitted fitting observations, then frozen. The later TDI programme will use its own regularised logistic readout and training protocol. Once training and validation are complete, all parameters and transformations will be frozen before generating blind-set predictions.
 
-## Enhanced five-rule production framework
+## Enhanced ten-rule production framework
 
-The production encoder compares five differentiable local transition laws: gated residual, inertial reaction-diffusion, activator-inhibitor, coupled map, and damped symplectic. Every rule updates atoms synchronously, shares its parameters across atoms and generations, and communicates only along declared chemical bonds. Bond descriptors gate neighbour messages, so bond type, aromaticity, conjugation, ring membership, and stereochemistry can modulate information transfer without introducing a global molecular shortcut.
+The production encoder supports ten differentiable local transition laws: gated residual, inertial reaction-diffusion, activator-inhibitor, coupled map, damped symplectic, FitzHugh-Nagumo, Gray-Scott, Kuramoto-Sakaguchi, conservative graph flux, and delayed memory. Every rule updates atoms synchronously, shares its parameters across atoms and generations, and communicates only along declared chemical bonds. Bond descriptors gate neighbour messages, so bond type, aromaticity, conjugation, ring membership, and stereochemistry can modulate information transfer without introducing a global molecular shortcut.
+
+The five new candidates use the same grouped-validation production controller:
+
+```bash
+python scripts/run_production_transition_study.py --rule fitzhugh_nagumo --device auto
+python scripts/run_production_transition_study.py --rule gray_scott --device auto
+python scripts/run_production_transition_study.py --rule kuramoto_sakaguchi --device auto
+python scripts/run_production_transition_study.py --rule conservative_graph_flux --device auto
+python scripts/run_production_transition_study.py --rule delayed_memory --device auto
+```
 
 All rules share tunable update scale, initial-state scale and training noise, support/query fraction, bond-gate temperature, channel count, generation count, optimisation controls, and a cosine learning-rate schedule. Rule-specific dynamical controls retain their scientific interpretation. The molecular fingerprint concatenates final-state means and variances with temporal means, temporal variances, and accumulated motion, allowing transient and terminal CA behaviour to enter the genuine closed-form ridge readout.
 

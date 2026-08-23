@@ -318,6 +318,21 @@ def train(extended_dynamics: bool = False) -> None:
                 if hidden % 2:
                     raise ValueError("Damped-symplectic rule requires an even channel count")
                 self.force_drive = nn.Linear(hidden, hidden // 2)
+            elif RULE == "fitzhugh_nagumo":
+                if hidden % 2:
+                    raise ValueError("FitzHugh-Nagumo rule requires an even channel count")
+                self.excitation_drive = nn.Linear(hidden, hidden // 2)
+                self.recovery_drive = nn.Linear(hidden, hidden // 2)
+            elif RULE == "gray_scott":
+                if hidden % 2:
+                    raise ValueError("Gray-Scott rule requires an even channel count")
+                self.gray_scott_drive = nn.Linear(hidden, hidden)
+            elif RULE == "kuramoto_sakaguchi":
+                self.frequency_drive = nn.Linear(hidden, hidden)
+            elif RULE == "conservative_graph_flux":
+                self.flux_drive = nn.Linear(hidden, hidden, bias=False)
+            elif RULE == "delayed_memory":
+                self.delayed_drive = nn.Linear(hidden * 2, hidden)
             else:
                 raise ValueError(f"Unknown CA rule: {RULE}")
 
@@ -362,6 +377,7 @@ def train(extended_dynamics: bool = False) -> None:
             if initial_perturbations is not None:
                 h = h + torch.cat(initial_perturbations)
             velocity = torch.zeros_like(h)
+            state_history = [h]
             node_states = [h] if return_node_trajectory else None
             temporal_atom_sum = h.clone()
             graph_mean = self._graph_mean(h, graph_index, graph_count, atom_counts_tensor)
@@ -413,7 +429,7 @@ def train(extended_dynamics: bool = False) -> None:
                     coupling = min(0.95, UPDATE_SCALE * DYN_B)
                     mapped = (1.0 - coupling) * local + coupling * neighbour_map
                     new_h = 2.0 * mapped.clamp(0.0, 1.0) - 1.0
-                else:  # damped_symplectic
+                elif RULE == "damped_symplectic":
                     q, p = h.chunk(2, dim=1)
                     neighbour_q = neighbour_mean[:, :q.shape[1]]
                     force = (torch.tanh(self.force_drive(reaction))
@@ -422,8 +438,74 @@ def train(extended_dynamics: bool = False) -> None:
                     new_p = damping * p + UPDATE_SCALE * force
                     new_q = torch.tanh(q + UPDATE_SCALE * new_p)
                     new_h = torch.cat((new_q, torch.tanh(new_p)), dim=1)
+                elif RULE == "fitzhugh_nagumo":
+                    u, v = h.chunk(2, dim=1)
+                    neighbour_u, neighbour_v = neighbour_mean.chunk(2, dim=1)
+                    stimulus = torch.tanh(self.excitation_drive(reaction))
+                    recovery_input = torch.tanh(self.recovery_drive(reaction))
+                    epsilon = 0.01 + 0.19 * DYN_D
+                    threshold = 0.2 + 0.8 * DYN_B
+                    du = (u - u.pow(3) / 3.0 - v + DYN_C * stimulus
+                          + DYN_A * (neighbour_u - u))
+                    dv = epsilon * (u + threshold - v + 0.1 * recovery_input)
+                    dv = dv + 0.25 * DYN_A * (neighbour_v - v)
+                    new_h = torch.tanh(torch.cat(
+                        (u + UPDATE_SCALE * du, v + UPDATE_SCALE * dv), dim=1
+                    ))
+                elif RULE == "gray_scott":
+                    u_raw, v_raw = h.chunk(2, dim=1)
+                    neighbour_u_raw, neighbour_v_raw = neighbour_mean.chunk(2, dim=1)
+                    u, v = (u_raw + 1.0) * 0.5, (v_raw + 1.0) * 0.5
+                    neighbour_u = (neighbour_u_raw + 1.0) * 0.5
+                    neighbour_v = (neighbour_v_raw + 1.0) * 0.5
+                    drive_u, drive_v = torch.tanh(self.gray_scott_drive(reaction)).chunk(2, dim=1)
+                    diffusion_u = 0.01 + 0.19 * DYN_A
+                    diffusion_v = 0.005 + 0.095 * DYN_B
+                    feed = 0.01 + 0.07 * DYN_C
+                    kill = 0.03 + 0.04 * DYN_D
+                    reaction_uv = u * v.square()
+                    du = (diffusion_u * (neighbour_u - u) - reaction_uv
+                          + feed * (1.0 - u) + 0.02 * drive_u)
+                    dv = (diffusion_v * (neighbour_v - v) + reaction_uv
+                          - (feed + kill) * v + 0.02 * drive_v)
+                    next_u = (u + UPDATE_SCALE * du).clamp(0.0, 1.0)
+                    next_v = (v + UPDATE_SCALE * dv).clamp(0.0, 1.0)
+                    new_h = 2.0 * torch.cat((next_u, next_v), dim=1) - 1.0
+                elif RULE == "kuramoto_sakaguchi":
+                    phase = math.pi * h
+                    phase_coupling = torch.zeros_like(h)
+                    if src.numel():
+                        lag = math.pi * (DYN_C - 0.5)
+                        phase_messages = edge_gate * torch.sin(phase[src] - phase[dst] - lag)
+                        phase_coupling.index_add_(0, dst, phase_messages)
+                        phase_coupling = phase_coupling / degree.clamp_min(1.0)
+                    natural_frequency = DYN_A * torch.tanh(self.frequency_drive(reaction))
+                    next_phase = phase + UPDATE_SCALE * (
+                        natural_frequency + DYN_B * phase_coupling
+                    )
+                    new_h = torch.atan2(torch.sin(next_phase), torch.cos(next_phase)) / math.pi
+                elif RULE == "conservative_graph_flux":
+                    net_flux = torch.zeros_like(h)
+                    if src.numel():
+                        # Each undirected bond is stored in both directions.  The odd
+                        # flux law therefore produces equal and opposite transfers.
+                        directed_flux = edge_gate * torch.tanh(self.flux_drive(h[src] - h[dst]))
+                        net_flux.index_add_(0, dst, directed_flux)
+                    normalizer = degree.max().clamp_min(1.0)
+                    new_h = h + UPDATE_SCALE * DYN_A * net_flux / normalizer
+                else:  # delayed_memory
+                    delay = max(1, min(len(state_history), round(1 + 15 * DYN_A)))
+                    delayed_h = state_history[-delay]
+                    delayed_reaction = torch.tanh(self.delayed_drive(torch.cat((reaction, delayed_h), dim=1)))
+                    memory_mix = 0.1 + 0.8 * DYN_B
+                    damping = 0.05 + 0.45 * DYN_D
+                    drive = ((1.0 - memory_mix) * reaction + memory_mix * delayed_reaction
+                             + DYN_C * (delayed_h - h))
+                    new_h = torch.tanh((1.0 - damping * UPDATE_SCALE) * h
+                                       + UPDATE_SCALE * drive)
                 step_energy += (new_h - h).square() / float(GENERATIONS)
                 h = new_h
+                state_history.append(h)
                 if return_node_trajectory:
                     node_states.append(h)
                 temporal_atom_sum += h
@@ -457,6 +539,7 @@ def train(extended_dynamics: bool = False) -> None:
             if initial_perturbation is not None:
                 h = h + initial_perturbation
             velocity = torch.zeros_like(h)
+            state_history = [h]
             states = [h]
             means = [h.mean(0)]
             step_energy = torch.zeros(hidden, device=device)
@@ -506,7 +589,7 @@ def train(extended_dynamics: bool = False) -> None:
                     coupling = min(0.95, UPDATE_SCALE * DYN_B)
                     mapped = (1.0 - coupling) * local + coupling * neighbour_map
                     new_h = 2.0 * mapped.clamp(0.0, 1.0) - 1.0
-                else:
+                elif RULE == "damped_symplectic":
                     q, p = h.chunk(2, dim=1)
                     neighbour_q = neighbour_mean[:, :q.shape[1]]
                     force = (torch.tanh(self.force_drive(reaction))
@@ -515,8 +598,67 @@ def train(extended_dynamics: bool = False) -> None:
                     new_p = damping * p + UPDATE_SCALE * force
                     new_q = torch.tanh(q + UPDATE_SCALE * new_p)
                     new_h = torch.cat((new_q, torch.tanh(new_p)), dim=1)
+                elif RULE == "fitzhugh_nagumo":
+                    u, v = h.chunk(2, dim=1)
+                    neighbour_u, neighbour_v = neighbour_mean.chunk(2, dim=1)
+                    stimulus = torch.tanh(self.excitation_drive(reaction))
+                    recovery_input = torch.tanh(self.recovery_drive(reaction))
+                    epsilon = 0.01 + 0.19 * DYN_D
+                    threshold = 0.2 + 0.8 * DYN_B
+                    du = (u - u.pow(3) / 3.0 - v + DYN_C * stimulus
+                          + DYN_A * (neighbour_u - u))
+                    dv = (epsilon * (u + threshold - v + 0.1 * recovery_input)
+                          + 0.25 * DYN_A * (neighbour_v - v))
+                    new_h = torch.tanh(torch.cat(
+                        (u + UPDATE_SCALE * du, v + UPDATE_SCALE * dv), dim=1
+                    ))
+                elif RULE == "gray_scott":
+                    u_raw, v_raw = h.chunk(2, dim=1)
+                    neighbour_u_raw, neighbour_v_raw = neighbour_mean.chunk(2, dim=1)
+                    u, v = (u_raw + 1.0) * 0.5, (v_raw + 1.0) * 0.5
+                    neighbour_u = (neighbour_u_raw + 1.0) * 0.5
+                    neighbour_v = (neighbour_v_raw + 1.0) * 0.5
+                    drive_u, drive_v = torch.tanh(self.gray_scott_drive(reaction)).chunk(2, dim=1)
+                    diffusion_u = 0.01 + 0.19 * DYN_A
+                    diffusion_v = 0.005 + 0.095 * DYN_B
+                    feed = 0.01 + 0.07 * DYN_C
+                    kill = 0.03 + 0.04 * DYN_D
+                    reaction_uv = u * v.square()
+                    next_u = (u + UPDATE_SCALE * (diffusion_u * (neighbour_u - u)
+                              - reaction_uv + feed * (1.0 - u) + 0.02 * drive_u)).clamp(0.0, 1.0)
+                    next_v = (v + UPDATE_SCALE * (diffusion_v * (neighbour_v - v)
+                              + reaction_uv - (feed + kill) * v + 0.02 * drive_v)).clamp(0.0, 1.0)
+                    new_h = 2.0 * torch.cat((next_u, next_v), dim=1) - 1.0
+                elif RULE == "kuramoto_sakaguchi":
+                    phase = math.pi * h
+                    phase_coupling = torch.zeros_like(h)
+                    if src.numel():
+                        lag = math.pi * (DYN_C - 0.5)
+                        phase_messages = edge_gate * torch.sin(phase[src] - phase[dst] - lag)
+                        phase_coupling.index_add_(0, dst, phase_messages)
+                        phase_coupling = phase_coupling / degree.clamp_min(1.0)
+                    natural_frequency = DYN_A * torch.tanh(self.frequency_drive(reaction))
+                    next_phase = phase + UPDATE_SCALE * (natural_frequency + DYN_B * phase_coupling)
+                    new_h = torch.atan2(torch.sin(next_phase), torch.cos(next_phase)) / math.pi
+                elif RULE == "conservative_graph_flux":
+                    net_flux = torch.zeros_like(h)
+                    if src.numel():
+                        directed_flux = edge_gate * torch.tanh(self.flux_drive(h[src] - h[dst]))
+                        net_flux.index_add_(0, dst, directed_flux)
+                    new_h = h + UPDATE_SCALE * DYN_A * net_flux / degree.max().clamp_min(1.0)
+                else:  # delayed_memory
+                    delay = max(1, min(len(state_history), round(1 + 15 * DYN_A)))
+                    delayed_h = state_history[-delay]
+                    delayed_reaction = torch.tanh(self.delayed_drive(torch.cat((reaction, delayed_h), dim=1)))
+                    memory_mix = 0.1 + 0.8 * DYN_B
+                    damping = 0.05 + 0.45 * DYN_D
+                    drive = ((1.0 - memory_mix) * reaction + memory_mix * delayed_reaction
+                             + DYN_C * (delayed_h - h))
+                    new_h = torch.tanh((1.0 - damping * UPDATE_SCALE) * h
+                                       + UPDATE_SCALE * drive)
                 step_energy += ((new_h - h) ** 2).mean(0) / float(GENERATIONS)
                 h = new_h
+                state_history.append(h)
                 states.append(h); means.append(h.mean(0))
             mean_series = torch.stack(means)
             fingerprint = torch.cat((

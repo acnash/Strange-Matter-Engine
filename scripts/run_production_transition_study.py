@@ -28,6 +28,11 @@ RULES = (
     "activator_inhibitor",
     "coupled_map",
     "damped_symplectic",
+    "fitzhugh_nagumo",
+    "gray_scott",
+    "kuramoto_sakaguchi",
+    "conservative_graph_flux",
+    "delayed_memory",
 )
 
 

@@ -89,6 +89,36 @@ q_i^{(t+1)}=q_i^{(t)}+\Delta t\,p_i^{(t+1)}.
 
 The learned potential $U_{\theta}$ couples bonded atoms and chemical context; $\rho$ introduces controlled damping. This structure naturally supports oscillatory modes and long-lived collective motion while making the source of dissipation explicit.
 
+## Rule 6: FitzHugh–Nagumo excitable graph CA
+
+Each channel pair contains a fast excitation variable and a slower recovery variable. Chemical and CYP information supplies a learned stimulus, while graph diffusion carries excitation to bonded atoms. The recovery variable creates a refractory period after a pulse. This is an explicitly excitable candidate distinct from the broader activator–inhibitor implementation used as rule 3.
+
+The four generic controls represent excitation diffusion, excitation threshold, stimulus strength, and recovery timescale.
+
+## Rule 7: Gray–Scott graph reaction–diffusion CA
+
+Each channel pair contains two bounded fields. They diffuse at different rates and react through a cubic interaction. Feed and removal terms continually replenish one field and remove the other. On a molecular graph this can form localised activity, travelling patterns, multiple stable regimes, or convergence.
+
+The four generic controls represent the two diffusion coefficients, feed rate, and removal rate.
+
+## Rule 8: Kuramoto–Sakaguchi graph oscillator CA
+
+Every dynamical channel is interpreted as a circular phase. Each atom has a chemically conditioned natural frequency and is coupled to the phases of bonded neighbours. A phase lag permits synchronisation, phase-locked clusters, travelling phase waves, and frustrated oscillation.
+
+The principal generic controls represent natural-frequency scale, coupling strength, and phase lag. The fourth generic control remains available to the shared search interface but is not used by this rule.
+
+## Rule 9: conservative graph-flux CA
+
+This rule moves latent quantity across each bond using equal and opposite fluxes. Consequently, the sum of every dynamical channel over all atoms is conserved to floating-point precision during the transition. It tests whether pIC50-relevant information can be represented by redistribution through the molecule rather than by creating or destroying latent activity.
+
+The first generic control scales the flux. The remaining three generic controls remain available to the shared search interface but are not used by this rule.
+
+## Rule 10: delayed-memory graph CA
+
+The next state depends on the present reaction and a state retained from an earlier generation. This gives the system an explicit time delay rather than relying only on information stored in the current state. Delayed feedback can produce slow oscillation, bifurcation, long transients, and multistability.
+
+The four generic controls represent delay length, delayed-state mixture, feedback strength, and damping.
+
 ## Mandatory fair-tuning policy
 
 From prototype four onward, every transition rule will receive its own hyperparameter tuning. We will not use hyperparameters optimised for one rule as evidence that another rule performs poorly.
@@ -106,13 +136,15 @@ For a fair comparison:
 
 The tuning record will include every attempted configuration, failure, score, seed, computational budget, and promoted checkpoint.
 
-## Recommended trial order
+## Original five-rule trial order
 
 1. Retune the gated residual rule as the predictive baseline.
 2. Retune the inertial reaction–diffusion rule as the current dynamical baseline.
 3. Trial the activator–inhibitor rule for waves and oscillation.
 4. Trial the coupled-map rule for bifurcation and possible chaos.
 5. Trial the damped symplectic rule for persistent collective modes.
+
+The second trial series comprises FitzHugh–Nagumo, Gray–Scott, Kuramoto–Sakaguchi, conservative graph flux, and delayed memory. Each receives the same independent tuning and seed-confirmation procedure before comparison with the original five.
 
 Predictive performance and dynamical richness will be reported separately. A fascinating trajectory is not automatically a better pIC50 predictor, and a low RMSE does not by itself establish scientifically meaningful dynamics.
 
