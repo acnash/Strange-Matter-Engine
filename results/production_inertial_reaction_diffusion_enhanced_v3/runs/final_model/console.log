@@ -1,0 +1,48 @@
+{"device": "cuda", "gpu": "NVIDIA GeForce RTX 5070 Ti", "pytorch": "2.11.0+cu128", "pytorch_cuda": "12.8"}
+{"epoch": 1, "train_rmse": 1.4747773808946003, "validation_rmse": 0.8997842073440552, "mean_raw_gradient_norm": 54.83843629590927, "fraction_gradients_clipped": 1.0}
+{"epoch": 2, "train_rmse": 1.2409278396371837, "validation_rmse": 0.9078002572059631, "mean_raw_gradient_norm": 18.481217184374408, "fraction_gradients_clipped": 1.0}
+{"epoch": 3, "train_rmse": 1.1878386956495204, "validation_rmse": 0.9034646153450012, "mean_raw_gradient_norm": 15.9277982711792, "fraction_gradients_clipped": 1.0}
+{"epoch": 4, "train_rmse": 1.2892082902521318, "validation_rmse": 0.909756064414978, "mean_raw_gradient_norm": 16.88296324206937, "fraction_gradients_clipped": 1.0}
+{"epoch": 5, "train_rmse": 1.1807090601140426, "validation_rmse": 0.9090742468833923, "mean_raw_gradient_norm": 9.79445303640058, "fraction_gradients_clipped": 1.0}
+{"epoch": 6, "train_rmse": 1.1600038169319664, "validation_rmse": 0.9012774229049683, "mean_raw_gradient_norm": 9.428384696283649, "fraction_gradients_clipped": 1.0}
+{"dynamics_phase": "screen_start", "validation_pairs": 1309}
+{"dynamics_phase": "screen_complete", "validation_pairs": 1309}
+{
+  "seed": 1701,
+  "best_validation_rmse": 0.8997842073440552,
+  "restored_fit_rmse": 0.8417310118675232,
+  "restored_validation_rmse": 0.899786651134491,
+  "epochs_run": 6,
+  "fit_observations": 5216,
+  "validation_observations": 1309,
+  "rule": "inertial_reaction_diffusion",
+  "generations": 125,
+  "hidden_channels": 16,
+  "device": "cuda",
+  "gpu": "NVIDIA GeForce RTX 5070 Ti",
+  "training_seconds": 103.48568189993966,
+  "peak_gpu_memory_bytes": 678892544,
+  "readout": "differentiable_closed_form_ridge",
+  "hyperparameters": {
+    "ca_lr": 0.003,
+    "ridge": 0.1,
+    "ca_l2": 1e-05,
+    "gradient_clip": 0.5,
+    "update_scale": 0.25,
+    "init_scale": 1.5,
+    "initial_noise": 0.005,
+    "support_fraction": 0.6,
+    "bond_temperature": 1.0,
+    "dyn_a": 0.5,
+    "dyn_b": 0.2,
+    "dyn_c": 0.8,
+    "dyn_d": 0.15,
+    "lr_schedule": "cosine_0.1x"
+  },
+  "dynamical_analysis": {
+    "validation_trajectories_screened": 1309,
+    "perturbation_cases": 0,
+    "classification_counts": {},
+    "perturbation_status": "deferred_after_native_cuda_failure"
+  }
+}
