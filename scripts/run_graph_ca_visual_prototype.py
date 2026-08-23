@@ -82,10 +82,17 @@ def differentiable_ridge_fit(features, targets, penalty: float):
     standardized = (features - feature_mean) / feature_scale
     centered_target = targets - target_mean
     identity = torch.eye(features.shape[1], dtype=features.dtype, device=features.device)
-    coefficients = torch.linalg.solve(
-        standardized.T @ standardized + penalty * identity,
-        standardized.T @ centered_target,
-    )
+    system = standardized.T @ standardized + penalty * identity
+    rhs = standardized.T @ centered_target
+    try:
+        coefficients = torch.linalg.solve(system, rhs)
+    except torch._C._LinAlgError:
+        # Highly correlated trajectory statistics can still make the
+        # float32 normal equations numerically singular.  The Hermitian
+        # pseudoinverse preserves the same ridge objective and remains
+        # differentiable, while allowing an unstable search candidate to be
+        # measured rather than aborting the complete production study.
+        coefficients = torch.linalg.pinv(system, hermitian=True) @ rhs
     return {
         "coefficients": coefficients,
         "intercept": target_mean,

@@ -111,7 +111,17 @@ def run_fit(rule, study_name, label, config, seed, epochs, patience,
             stdout=log, stderr=subprocess.STDOUT, text=True,
         )
     if process.returncode:
-        raise RuntimeError(f"Run {label} failed; inspect {log_path}")
+        metrics = {
+            "rule": rule,
+            "seed": seed,
+            "restored_validation_rmse": float("inf"),
+            "wall_seconds": time.time() - started,
+            "study_config": config,
+            "stability": {"passed": False},
+            "failure": f"Run failed with exit code {process.returncode}; inspect {log_path.name}",
+        }
+        metrics_file.write_text(json.dumps(metrics, indent=2) + "\n")
+        return metrics
     metrics = json.loads(metrics_file.read_text())
     metrics["wall_seconds"] = time.time() - started
     metrics["study_config"] = config

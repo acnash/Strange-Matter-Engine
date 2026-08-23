@@ -1,0 +1,21 @@
+{"device": "cuda", "gpu": "NVIDIA GeForce RTX 5070 Ti", "pytorch": "2.11.0+cu128", "pytorch_cuda": "12.8"}
+Traceback (most recent call last):
+  File "C:\Users\Anthony\OneDrive\Documents\ChatGPT\Strange Matter Engine\scripts\run_graph_ca_visual_prototype.py", line 88, in differentiable_ridge_fit
+    coefficients = torch.linalg.solve(system, rhs)
+                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+torch._C._LinAlgError: torch.linalg.solve: The solver failed because the input matrix is singular.
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "C:\Users\Anthony\OneDrive\Documents\ChatGPT\Strange Matter Engine\scripts\run_graph_ca_visual_prototype.py", line 1182, in <module>
+    main()
+  File "C:\Users\Anthony\OneDrive\Documents\ChatGPT\Strange Matter Engine\scripts\run_graph_ca_visual_prototype.py", line 1178, in main
+    {"prepare": prepare, "train": train, "render": render}[args.phase]()
+  File "C:\Users\Anthony\OneDrive\Documents\ChatGPT\Strange Matter Engine\scripts\run_graph_ca_visual_prototype.py", line 598, in train
+    ridge_state = differentiable_ridge_fit(
+                  ^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Anthony\OneDrive\Documents\ChatGPT\Strange Matter Engine\scripts\run_graph_ca_visual_prototype.py", line 95, in differentiable_ridge_fit
+    coefficients = torch.linalg.pinv(system, hermitian=True) @ rhs
+                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+torch._C._LinAlgError: linalg.eigh: The algorithm failed to converge because the input matrix is ill-conditioned or has too many repeated eigenvalues (error code: 41).
