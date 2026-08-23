@@ -114,3 +114,11 @@ parameters θ                  coefficients βTDI
 ```
 
 The direct-inhibition model backpropagates query error through a genuine ridge solve and through repeated CA evolution to optimise the shared transition parameters (`θ`). Ridge coefficients (`βreg`) are solved with `torch.linalg.solve` from support fingerprints and labels; Adam updates only `θ`. At validation and blind-prediction boundaries, scaling and ridge state are fitted using permitted fitting observations, then frozen. The later TDI programme will use its own regularised logistic readout and training protocol. Once training and validation are complete, all parameters and transformations will be frozen before generating blind-set predictions.
+
+## Enhanced five-rule production framework
+
+The production encoder compares five differentiable local transition laws: gated residual, inertial reaction-diffusion, activator-inhibitor, coupled map, and damped symplectic. Every rule updates atoms synchronously, shares its parameters across atoms and generations, and communicates only along declared chemical bonds. Bond descriptors gate neighbour messages, so bond type, aromaticity, conjugation, ring membership, and stereochemistry can modulate information transfer without introducing a global molecular shortcut.
+
+All rules share tunable update scale, initial-state scale and training noise, support/query fraction, bond-gate temperature, channel count, generation count, optimisation controls, and a cosine learning-rate schedule. Rule-specific dynamical controls retain their scientific interpretation. The molecular fingerprint concatenates final-state means and variances with temporal means, temporal variances, and accumulated motion, allowing transient and terminal CA behaviour to enter the genuine closed-form ridge readout.
+
+Production selection uses grouped validation only. Stable finalists are repeated across three seeds and ranked by mean RMSE plus one quarter of the seed standard deviation. Dynamical measurements remain descriptive secondary outputs and never influence predictive promotion. The blinded challenge set remains outside tuning, selection, and report generation.

@@ -426,3 +426,15 @@ The prototype is an engineering experiment, not the final nested-cross-validatio
 All future transition-rule prototypes must receive their own hyperparameter tuning under comparable budgets and identical grouped folds. Hyperparameters optimised for one dynamical rule will not be transferred unchanged and then used to rank a structurally different rule.
 
 The rule comparison will tune common optimisation parameters and each rule's distinctive dynamical parameters. Complete spaces and results will be retained, including unstable trials. See [Graph CA Transition Rules](Graph_CA_Transition_Rules.md) for the five-rule programme and prototype lineage.
+
+## Enhanced-v3 production execution
+
+The implemented five-rule production series uses a common staged budget of 36 first-stage configurations, ten promoted configurations, and three finalists confirmed across seeds 1701, 2909, and 4211. The confirmation score is
+
+```math
+S_h=\overline{\mathrm{RMSE}}_h+0.25\,\sigma_h.
+```
+
+The additional shared search dimensions are CA update scale, chemical initial-state scale, training-only initial-state noise, ridge support/query fraction, and bond-gate temperature. Four bounded rule-dynamics controls are interpreted according to the selected transition equation. Molecular pooling uses final spatial mean and variance, trajectory mean and variance, and accumulated update energy. These summaries remain permutation invariant and derive solely from repeated bonded-graph CA evolution.
+
+This enhanced-v3 series is a new experimental phase. Its results should be compared across the five rules within the series; the earlier conditioned-v2 gated and inertial studies remain historical baselines.

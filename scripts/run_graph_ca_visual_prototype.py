@@ -40,6 +40,15 @@ CA_LR = float(os.environ.get("SME_CA_LR", "1e-3"))
 RIDGE_STRENGTH = float(os.environ.get("SME_RIDGE", "1e-3"))
 CA_L2 = float(os.environ.get("SME_CA_L2", "1e-5"))
 GRAD_CLIP = float(os.environ.get("SME_GRAD_CLIP", "1.0"))
+UPDATE_SCALE = float(os.environ.get("SME_UPDATE_SCALE", "0.25"))
+INIT_SCALE = float(os.environ.get("SME_INIT_SCALE", "1.0"))
+INITIAL_NOISE = float(os.environ.get("SME_INITIAL_NOISE", "0.0"))
+SUPPORT_FRACTION = float(os.environ.get("SME_SUPPORT_FRACTION", "0.75"))
+BOND_TEMPERATURE = float(os.environ.get("SME_BOND_TEMPERATURE", "1.0"))
+DYN_A = float(os.environ.get("SME_DYN_A", "0.5"))
+DYN_B = float(os.environ.get("SME_DYN_B", "0.5"))
+DYN_C = float(os.environ.get("SME_DYN_C", "0.5"))
+DYN_D = float(os.environ.get("SME_DYN_D", "0.5"))
 PATIENCE_LIMIT = int(os.environ.get("SME_PATIENCE", "20"))
 MIN_DELTA = float(os.environ.get("SME_MIN_DELTA", "0.005"))
 TUNING_ONLY = os.environ.get("SME_TUNING_ONLY", "0") == "1"
@@ -261,6 +270,7 @@ def train() -> None:
             self.self_layer = nn.Linear(hidden, hidden, bias=False)
             self.neighbour = nn.Linear(hidden, hidden, bias=False)
             self.bond = nn.Linear(bond_dim, hidden, bias=False)
+            self.bond_gate = nn.Linear(bond_dim, hidden)
             self.chem = nn.Linear(chem_dim, hidden, bias=False)
             self.context = nn.Linear(4, hidden, bias=False)
             self.bias = nn.Parameter(torch.zeros(hidden))
@@ -271,6 +281,18 @@ def train() -> None:
                 self.raw_dt = nn.Parameter(torch.zeros(hidden))
                 self.raw_diffusion = nn.Parameter(torch.full((hidden,), -1.5))
                 self.raw_restoring = nn.Parameter(torch.full((hidden,), -1.5))
+            elif RULE == "activator_inhibitor":
+                if hidden % 2:
+                    raise ValueError("Activator-inhibitor rule requires an even channel count")
+                half = hidden // 2
+                self.activator_drive = nn.Linear(hidden, half)
+                self.inhibitor_drive = nn.Linear(hidden, half)
+            elif RULE == "coupled_map":
+                self.map_drive = nn.Linear(hidden, hidden)
+            elif RULE == "damped_symplectic":
+                if hidden % 2:
+                    raise ValueError("Damped-symplectic rule requires an even channel count")
+                self.force_drive = nn.Linear(hidden, hidden // 2)
             else:
                 raise ValueError(f"Unknown CA rule: {RULE}")
 
@@ -309,7 +331,9 @@ def train() -> None:
                 src = dst = torch.empty(0, dtype=torch.long, device=device)
                 edge = torch.empty((0, bond_dim), device=device)
 
-            h = torch.tanh(self.init(x))
+            h = torch.tanh(INIT_SCALE * self.init(x))
+            if self.training and INITIAL_NOISE > 0:
+                h = h + INITIAL_NOISE * torch.randn_like(h)
             if initial_perturbations is not None:
                 h = h + torch.cat(initial_perturbations)
             velocity = torch.zeros_like(h)
@@ -324,7 +348,8 @@ def train() -> None:
                 neighbour_mean = torch.zeros_like(h)
                 degree = torch.zeros((h.shape[0], 1), device=device)
                 if src.numel():
-                    msg = self.neighbour(h[src]) + self.bond(edge)
+                    edge_gate = torch.sigmoid(self.bond_gate(edge) / BOND_TEMPERATURE)
+                    msg = edge_gate * self.neighbour(h[src]) + self.bond(edge)
                     agg.index_add_(0, dst, msg)
                     neighbour_mean.index_add_(0, dst, h[src])
                     degree.index_add_(0, dst, torch.ones((dst.numel(), 1), device=device))
@@ -334,15 +359,44 @@ def train() -> None:
                                       self.context(c) + self.bias)
                 if RULE == "gated_residual":
                     alpha = torch.sigmoid(self.gate(torch.cat((h, agg, x, c), dim=1)))
-                    new_h = (1.0 - alpha) * h + alpha * reaction
-                else:
+                    scaled_alpha = (UPDATE_SCALE * alpha).clamp(max=1.0)
+                    new_h = (1.0 - scaled_alpha) * h + scaled_alpha * reaction
+                elif RULE == "inertial_reaction_diffusion":
                     gamma = 0.99 * torch.sigmoid(self.raw_gamma)
-                    dt = 0.25 * torch.sigmoid(self.raw_dt)
-                    diffusion = torch.nn.functional.softplus(self.raw_diffusion)
-                    restoring = torch.nn.functional.softplus(self.raw_restoring)
+                    dt = UPDATE_SCALE * torch.sigmoid(self.raw_dt)
+                    diffusion = DYN_A * torch.nn.functional.softplus(self.raw_diffusion)
+                    restoring = DYN_B * torch.nn.functional.softplus(self.raw_restoring)
                     force = reaction + diffusion * (neighbour_mean - h) - restoring * h
-                    velocity = gamma * velocity + dt * force
+                    velocity = (0.5 + 0.49 * DYN_C) * gamma * velocity + dt * force
                     new_h = torch.tanh(h + dt * velocity)
+                elif RULE == "activator_inhibitor":
+                    u, v = h.chunk(2, dim=1)
+                    neighbour_u, neighbour_v = neighbour_mean.chunk(2, dim=1)
+                    drive_u = torch.tanh(self.activator_drive(reaction))
+                    drive_v = torch.tanh(self.inhibitor_drive(reaction))
+                    du = u - u.pow(3) / 3.0 - v + DYN_C * drive_u + DYN_A * (neighbour_u - u)
+                    dv = DYN_D * (u + (2.0 * DYN_B - 1.0) - (0.5 + DYN_C) * v) + DYN_B * (neighbour_v - v) + 0.1 * drive_v
+                    new_h = torch.tanh(torch.cat((u + UPDATE_SCALE * du, v + UPDATE_SCALE * dv), dim=1))
+                elif RULE == "coupled_map":
+                    q = (h + 1.0) * 0.5
+                    r = 2.5 + 1.5 * DYN_A
+                    local = r * q * (1.0 - q)
+                    conditioned = torch.sigmoid(self.map_drive(reaction))
+                    local = (1.0 - 0.25 * DYN_C) * local + 0.25 * DYN_C * conditioned
+                    neighbour_q = (neighbour_mean + 1.0) * 0.5
+                    neighbour_map = r * neighbour_q * (1.0 - neighbour_q)
+                    coupling = min(0.95, UPDATE_SCALE * DYN_B)
+                    mapped = (1.0 - coupling) * local + coupling * neighbour_map
+                    new_h = 2.0 * mapped.clamp(0.0, 1.0) - 1.0
+                else:  # damped_symplectic
+                    q, p = h.chunk(2, dim=1)
+                    neighbour_q = neighbour_mean[:, :q.shape[1]]
+                    force = (torch.tanh(self.force_drive(reaction))
+                             + DYN_A * (neighbour_q - q) - DYN_B * q)
+                    damping = 0.8 + 0.199 * DYN_C
+                    new_p = damping * p + UPDATE_SCALE * force
+                    new_q = torch.tanh(q + UPDATE_SCALE * new_p)
+                    new_h = torch.cat((new_q, torch.tanh(new_p)), dim=1)
                 step_energy += (new_h - h).square() / float(GENERATIONS)
                 h = new_h
                 if return_node_trajectory:
@@ -374,7 +428,7 @@ def train() -> None:
             dst = torch.as_tensor(rec["dst"], device=device)
             edge = torch.as_tensor(rec["edge"], device=device)
             context = torch.zeros(4, device=device); context[cyp] = 1.0
-            h = torch.tanh(self.init(x))
+            h = torch.tanh(INIT_SCALE * self.init(x))
             if initial_perturbation is not None:
                 h = h + initial_perturbation
             velocity = torch.zeros_like(h)
@@ -386,7 +440,8 @@ def train() -> None:
                 neighbour_mean = torch.zeros_like(h)
                 degree = torch.zeros((h.shape[0], 1), device=device)
                 if src.numel():
-                    msg = self.neighbour(h[src]) + self.bond(edge)
+                    edge_gate = torch.sigmoid(self.bond_gate(edge) / BOND_TEMPERATURE)
+                    msg = edge_gate * self.neighbour(h[src]) + self.bond(edge)
                     agg.index_add_(0, dst, msg)
                     neighbour_mean.index_add_(0, dst, h[src])
                     degree.index_add_(0, dst, torch.ones((dst.numel(), 1), device=device))
@@ -397,15 +452,44 @@ def train() -> None:
                                       self.context(c) + self.bias)
                 if RULE == "gated_residual":
                     alpha = torch.sigmoid(self.gate(torch.cat((h, agg, x, c), dim=1)))
-                    new_h = (1.0 - alpha) * h + alpha * reaction
-                else:
+                    scaled_alpha = (UPDATE_SCALE * alpha).clamp(max=1.0)
+                    new_h = (1.0 - scaled_alpha) * h + scaled_alpha * reaction
+                elif RULE == "inertial_reaction_diffusion":
                     gamma = 0.99 * torch.sigmoid(self.raw_gamma)
-                    dt = 0.25 * torch.sigmoid(self.raw_dt)
-                    diffusion = torch.nn.functional.softplus(self.raw_diffusion)
-                    restoring = torch.nn.functional.softplus(self.raw_restoring)
+                    dt = UPDATE_SCALE * torch.sigmoid(self.raw_dt)
+                    diffusion = DYN_A * torch.nn.functional.softplus(self.raw_diffusion)
+                    restoring = DYN_B * torch.nn.functional.softplus(self.raw_restoring)
                     force = reaction + diffusion * (neighbour_mean - h) - restoring * h
-                    velocity = gamma * velocity + dt * force
+                    velocity = (0.5 + 0.49 * DYN_C) * gamma * velocity + dt * force
                     new_h = torch.tanh(h + dt * velocity)
+                elif RULE == "activator_inhibitor":
+                    u, v = h.chunk(2, dim=1)
+                    neighbour_u, neighbour_v = neighbour_mean.chunk(2, dim=1)
+                    drive_u = torch.tanh(self.activator_drive(reaction))
+                    drive_v = torch.tanh(self.inhibitor_drive(reaction))
+                    du = u - u.pow(3) / 3.0 - v + DYN_C * drive_u + DYN_A * (neighbour_u - u)
+                    dv = DYN_D * (u + (2.0 * DYN_B - 1.0) - (0.5 + DYN_C) * v) + DYN_B * (neighbour_v - v) + 0.1 * drive_v
+                    new_h = torch.tanh(torch.cat((u + UPDATE_SCALE * du, v + UPDATE_SCALE * dv), dim=1))
+                elif RULE == "coupled_map":
+                    q = (h + 1.0) * 0.5
+                    r = 2.5 + 1.5 * DYN_A
+                    local = r * q * (1.0 - q)
+                    conditioned = torch.sigmoid(self.map_drive(reaction))
+                    local = (1.0 - 0.25 * DYN_C) * local + 0.25 * DYN_C * conditioned
+                    neighbour_q = (neighbour_mean + 1.0) * 0.5
+                    neighbour_map = r * neighbour_q * (1.0 - neighbour_q)
+                    coupling = min(0.95, UPDATE_SCALE * DYN_B)
+                    mapped = (1.0 - coupling) * local + coupling * neighbour_map
+                    new_h = 2.0 * mapped.clamp(0.0, 1.0) - 1.0
+                else:
+                    q, p = h.chunk(2, dim=1)
+                    neighbour_q = neighbour_mean[:, :q.shape[1]]
+                    force = (torch.tanh(self.force_drive(reaction))
+                             + DYN_A * (neighbour_q - q) - DYN_B * q)
+                    damping = 0.8 + 0.199 * DYN_C
+                    new_p = damping * p + UPDATE_SCALE * force
+                    new_q = torch.tanh(q + UPDATE_SCALE * new_p)
+                    new_h = torch.cat((new_q, torch.tanh(new_p)), dim=1)
                 step_energy += ((new_h - h) ** 2).mean(0) / float(GENERATIONS)
                 h = new_h
                 states.append(h); means.append(h.mean(0))
@@ -471,6 +555,9 @@ def train() -> None:
     history, best, best_state, patience = [], math.inf, None, 0
     rng = random.Random(SEED)
     max_epochs = int(os.environ.get("SME_MAX_EPOCHS", "200"))
+    scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(
+        optimizer, T_max=max_epochs, eta_min=CA_LR * 0.1
+    )
     training_started = __import__("time").perf_counter()
     for epoch in range(1, max_epochs + 1):
         model.train()
@@ -480,7 +567,7 @@ def train() -> None:
         for start in range(0, len(molecule_order), batch_molecules):
             molecule_batch = molecule_order[start:start + batch_molecules]
             support_count = max(2, min(len(molecule_batch) - 1,
-                                       round(0.75 * len(molecule_batch))))
+                                       round(SUPPORT_FRACTION * len(molecule_batch))))
             support_molecules = molecule_batch[:support_count]
             query_molecules = molecule_batch[support_count:]
             support_batch, query_batch = [], []
@@ -525,6 +612,7 @@ def train() -> None:
                "mean_raw_gradient_norm": float(np.mean(raw_norms)),
                "fraction_gradients_clipped": float(np.mean(np.asarray(raw_norms) > GRAD_CLIP))}
         history.append(row)
+        scheduler.step()
         print(json.dumps(row), flush=True)
         if val_rmse < best - MIN_DELTA:
             best, patience = val_rmse, 0
@@ -546,7 +634,13 @@ def train() -> None:
                 "ridge_state": {k: v.detach().cpu() for k, v in final_ridge_state.items()},
                 "hyperparameters": {"ca_lr": CA_LR,
                     "ridge": RIDGE_STRENGTH, "ca_l2": CA_L2,
-                    "gradient_clip": GRAD_CLIP}}, OUT / "model.pt")
+                    "gradient_clip": GRAD_CLIP, "update_scale": UPDATE_SCALE,
+                    "init_scale": INIT_SCALE, "initial_noise": INITIAL_NOISE,
+                    "support_fraction": SUPPORT_FRACTION,
+                    "bond_temperature": BOND_TEMPERATURE,
+                    "dyn_a": DYN_A, "dyn_b": DYN_B,
+                    "dyn_c": DYN_C, "dyn_d": DYN_D,
+                    "lr_schedule": "cosine_0.1x"}}, OUT / "model.pt")
     with (OUT / "training_history.csv").open("w", newline="") as handle:
         writer = csv.DictWriter(handle, fieldnames=history[0].keys()); writer.writeheader(); writer.writerows(history)
 
@@ -576,7 +670,13 @@ def train() -> None:
         "readout": "differentiable_closed_form_ridge",
         "hyperparameters": {"ca_lr": CA_LR,
         "ridge": RIDGE_STRENGTH, "ca_l2": CA_L2,
-        "gradient_clip": GRAD_CLIP}}
+        "gradient_clip": GRAD_CLIP, "update_scale": UPDATE_SCALE,
+        "init_scale": INIT_SCALE, "initial_noise": INITIAL_NOISE,
+        "support_fraction": SUPPORT_FRACTION,
+        "bond_temperature": BOND_TEMPERATURE,
+        "dyn_a": DYN_A, "dyn_b": DYN_B,
+        "dyn_c": DYN_C, "dyn_d": DYN_D,
+        "lr_schedule": "cosine_0.1x"}}
     if TUNING_ONLY and os.environ.get("SME_ANALYSE_VALIDATION", "0") == "1":
         print(json.dumps({"dynamics_phase": "screen_start",
                           "validation_pairs": len(val_pairs)}), flush=True)

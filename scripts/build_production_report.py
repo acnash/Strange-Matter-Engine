@@ -132,7 +132,8 @@ def main():
                   ["Ridge penalty", str(winner["ridge"])],
                   ["CA L2", str(winner["ca_l2"])],
                   ["Gradient clip", str(winner["gradient_clip"])],
-                  ["Confirmation mean RMSE", f"{summary['winner_confirmation_mean_rmse']:.4f}"]]
+                  ["Confirmation mean RMSE", f"{summary['winner_confirmation_mean_rmse']:.4f}"],
+                  ["Confirmation seed SD", f"{summary.get('winner_confirmation_seed_sd', 0.0):.4f}"]]
     table = Table(table_data, colWidths=(70*mm, 85*mm))
     table.setStyle(TableStyle([("BACKGROUND", (0,0), (-1,0), colors.HexColor(PANEL)),
                                ("TEXTCOLOR", (0,0), (-1,0), colors.HexColor(WHITE)),
@@ -141,13 +142,19 @@ def main():
                                ("VALIGN", (0,0), (-1,-1), "MIDDLE"),
                                ("ROWBACKGROUNDS", (0,1), (-1,-1),
                                 [colors.white, colors.HexColor("#EEF3F8")])]))
-    story += [table, Spacer(1, 5*mm), Image(str(figures / "01_search.png"), width=170*mm, height=106*mm),
+    enhanced = (f"Enhanced CA controls: update scale {winner.get('update_scale')}, initial-state scale "
+                f"{winner.get('init_scale')}, support fraction {winner.get('support_fraction')}, "
+                f"bond temperature {winner.get('bond_temperature')}. Rule dynamics: "
+                f"A={winner.get('dyn_a')}, B={winner.get('dyn_b')}, "
+                f"C={winner.get('dyn_c')}, D={winner.get('dyn_d')}.")
+    story += [table, Spacer(1, 2*mm), Paragraph(enhanced, body), Spacer(1, 3*mm),
+              Image(str(figures / "01_search.png"), width=170*mm, height=106*mm),
               PageBreak(), Paragraph("Predictive validation", heading),
               Paragraph("Model selection used grouped-validation RMSE only. Dynamical-interest scores did not influence promotion.", body),
               Image(str(figures / "02_validation.png"), width=124*mm, height=124*mm),
               Image(str(figures / "03_per_cyp.png"), width=170*mm, height=96*mm),
               PageBreak(), Paragraph("Optimization", heading),
-              Paragraph("Ridge coefficients and the unpenalized intercept were solved from permitted fitting fingerprints. Query error differentiated through the solve into the graph CA; Adam updated only CA parameters.", body),
+              Paragraph("Ridge coefficients and the unpenalized intercept were solved from permitted fitting fingerprints. Query error differentiated through the solve into the graph CA; Adam updated only CA parameters. Bond-conditioned messages, cosine learning-rate decay, and multitime trajectory statistics were shared across all five rules.", body),
               Image(str(figures / "04_learning.png"), width=170*mm, height=96*mm),
               PageBreak(), Paragraph("Emergent dynamics", heading),
               Paragraph("The validation trajectories were screened for convergence, recurrence, persistent motion, spectral complexity, and perturbation sensitivity. Labels ending in candidate require longer, renormalized and seed-repeated confirmation before any attractor or chaos claim.", body),

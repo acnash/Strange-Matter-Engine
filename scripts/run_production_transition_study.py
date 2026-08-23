@@ -5,7 +5,6 @@ from __future__ import annotations
 
 import argparse
 import csv
-import itertools
 import json
 import os
 import random
@@ -18,38 +17,46 @@ ROOT = Path(__file__).resolve().parents[1]
 PYTHON = Path(r"C:\Users\Anthony\anaconda3\envs\strange-matter-gpu\python.exe")
 RUNNER = ROOT / "scripts" / "run_graph_ca_visual_prototype.py"
 SEARCH_SEED = 260822
-SEARCH_VERSION = "conditioned_v2"
+SEARCH_VERSION = "enhanced_v3"
+RULES = (
+    "gated_residual",
+    "inertial_reaction_diffusion",
+    "activator_inhibitor",
+    "coupled_map",
+    "damped_symplectic",
+)
 
 
-def search_space():
-    values = itertools.product(
-        (16, 32, 64, 125, 250, 500),
-        (4, 8, 16),
-        (3e-4, 1e-3, 3e-3),
-        (1e-2, 1e-1, 1.0),
-        (1e-6, 1e-5, 1e-4),
-        (0.5, 1.0, 2.0),
-        (64, 128),
-    )
-    return [dict(zip(
-        ("generations", "hidden_channels", "ca_lr", "ridge", "ca_l2",
-         "gradient_clip", "batch_molecules"), row
-    )) for row in values]
-
-
-def sampled_candidates(count=32):
+def sampled_candidates(count=36):
     default = dict(generations=64, hidden_channels=8, ca_lr=1e-3,
                    ridge=1e-1, ca_l2=1e-5, gradient_clip=1.0,
-                   batch_molecules=64)
-    space = search_space()
+                   batch_molecules=64, update_scale=0.25, init_scale=1.0,
+                   initial_noise=0.0, support_fraction=0.75,
+                   bond_temperature=1.0, dyn_a=0.5, dyn_b=0.5,
+                   dyn_c=0.5, dyn_d=0.2)
     rng = random.Random(SEARCH_SEED)
-    rng.shuffle(space)
     chosen = [default]
-    for config in space:
+    while len(chosen) < count:
+        config = {
+            "generations": rng.choice((16, 32, 64, 125, 250, 500)),
+            "hidden_channels": rng.choice((4, 8, 16)),
+            "ca_lr": rng.choice((3e-4, 1e-3, 3e-3)),
+            "ridge": rng.choice((1e-2, 1e-1, 1.0)),
+            "ca_l2": rng.choice((1e-6, 1e-5, 1e-4)),
+            "gradient_clip": rng.choice((0.5, 1.0, 2.0)),
+            "batch_molecules": rng.choice((64, 128)),
+            "update_scale": rng.choice((0.08, 0.15, 0.25, 0.4)),
+            "init_scale": rng.choice((0.5, 1.0, 1.5)),
+            "initial_noise": rng.choice((0.0, 0.005, 0.01)),
+            "support_fraction": rng.choice((0.6, 0.75, 0.85)),
+            "bond_temperature": rng.choice((0.5, 1.0, 2.0)),
+            "dyn_a": rng.choice((0.2, 0.5, 0.8)),
+            "dyn_b": rng.choice((0.2, 0.5, 0.8)),
+            "dyn_c": rng.choice((0.2, 0.5, 0.8)),
+            "dyn_d": rng.choice((0.05, 0.15, 0.3)),
+        }
         if config not in chosen:
             chosen.append(config)
-        if len(chosen) == count:
-            break
     return chosen
 
 
@@ -73,6 +80,15 @@ def run_fit(rule, study_name, label, config, seed, epochs, patience,
         "SME_CA_L2": str(config["ca_l2"]),
         "SME_GRAD_CLIP": str(config["gradient_clip"]),
         "SME_BATCH_MOLECULES": str(config["batch_molecules"]),
+        "SME_UPDATE_SCALE": str(config["update_scale"]),
+        "SME_INIT_SCALE": str(config["init_scale"]),
+        "SME_INITIAL_NOISE": str(config["initial_noise"]),
+        "SME_SUPPORT_FRACTION": str(config["support_fraction"]),
+        "SME_BOND_TEMPERATURE": str(config["bond_temperature"]),
+        "SME_DYN_A": str(config["dyn_a"]),
+        "SME_DYN_B": str(config["dyn_b"]),
+        "SME_DYN_C": str(config["dyn_c"]),
+        "SME_DYN_D": str(config["dyn_d"]),
         "SME_RUN_NAME": run_name,
         "SME_DEVICE": "cuda",
         "SME_SEED": str(seed),
@@ -127,11 +143,10 @@ def write_progress(study_dir, payload):
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--rule", required=True,
-                        choices=("gated_residual", "inertial_reaction_diffusion"))
+    parser.add_argument("--rule", required=True, choices=RULES)
     args = parser.parse_args()
     rule = args.rule
-    short_name = "gated_residual" if rule == "gated_residual" else "inertial_reaction_diffusion"
+    short_name = rule
     study_name = f"production_{short_name}_{SEARCH_VERSION}"
     study_dir = ROOT / "results" / study_name
     study_dir.mkdir(parents=True, exist_ok=True)
@@ -151,15 +166,15 @@ def main():
         write_progress(study_dir, {"stage": "stage1", "completed": index,
                                    "total": len(candidates),
                                    "best_rmse": min(score(m) for _, m in stage1)})
-    promoted8 = sorted(stage1, key=lambda item: score(item[1]))[:8]
+    promoted10 = sorted(stage1, key=lambda item: score(item[1]))[:10]
 
     stage2 = []
-    for index, (config, _) in enumerate(promoted8, 1):
+    for index, (config, _) in enumerate(promoted10, 1):
         metrics = run_fit(rule, study_name, f"stage2_{index:02d}", config,
                           1701, 5, 3, 2000, 500)
         stage2.append((config, metrics))
         write_progress(study_dir, {"stage": "stage2", "completed": index,
-                                   "total": len(promoted8),
+                                   "total": len(promoted10),
                                    "best_rmse": min(score(m) for _, m in stage2)})
     promoted3 = sorted(stage2, key=lambda item: score(item[1]))[:3]
 
@@ -174,10 +189,17 @@ def main():
             )
             config_metrics.append(metrics)
         mean_rmse = sum(score(m) for m in config_metrics) / len(config_metrics)
-        confirmations.append((config, config_metrics, mean_rmse))
+        variance = sum((score(m) - mean_rmse) ** 2 for m in config_metrics) / len(config_metrics)
+        seed_sd = variance ** 0.5
+        robust_score = mean_rmse + 0.25 * seed_sd
+        confirmations.append((config, config_metrics, mean_rmse, seed_sd, robust_score))
         write_progress(study_dir, {"stage": "confirmation", "completed": config_index,
-                                   "total": len(promoted3), "latest_mean_rmse": mean_rmse})
-    winner, winner_metrics, winner_mean = min(confirmations, key=lambda item: item[2])
+                                   "total": len(promoted3), "latest_mean_rmse": mean_rmse,
+                                   "latest_seed_sd": seed_sd,
+                                   "latest_robust_score": robust_score})
+    winner, winner_metrics, winner_mean, winner_sd, winner_score = min(
+        confirmations, key=lambda item: item[4]
+    )
 
     final_metrics = run_fit(rule, study_name, "final_model", winner, 1701,
                             15, 5, 999999, 999999, analyse=True)
@@ -186,7 +208,7 @@ def main():
         for config, metrics in collection:
             rows.append({"stage": stage_name, "seed": metrics["seed"],
                          "validation_rmse": score(metrics), **config})
-    for config, metrics_list, _ in confirmations:
+    for config, metrics_list, _, _, _ in confirmations:
         for metrics in metrics_list:
             rows.append({"stage": "confirmation", "seed": metrics["seed"],
                          "validation_rmse": score(metrics), **config})
@@ -201,15 +223,18 @@ def main():
         "elapsed_seconds": time.time() - study_started,
         "winner": winner,
         "winner_confirmation_mean_rmse": winner_mean,
+        "winner_confirmation_seed_sd": winner_sd,
+        "winner_selection_score": winner_score,
         "confirmation_seeds": list(seeds),
         "final_metrics": final_metrics,
         "blind_data_used": False,
     }
     (study_dir / "study_summary.json").write_text(json.dumps(summary, indent=2) + "\n")
     write_progress(study_dir, {"stage": "complete", "summary": summary})
-    report_python = Path(os.environ.get("SME_REPORT_PYTHON", str(PYTHON)))
-    subprocess.run([str(report_python), str(ROOT / "scripts" / "build_production_report.py"),
-                    "--study", study_name], cwd=ROOT, check=True)
+    if os.environ.get("SME_SKIP_REPORT", "0") != "1":
+        report_python = Path(os.environ.get("SME_REPORT_PYTHON", str(PYTHON)))
+        subprocess.run([str(report_python), str(ROOT / "scripts" / "build_production_report.py"),
+                        "--study", study_name], cwd=ROOT, check=True)
     print(json.dumps(summary, indent=2))
 
 
