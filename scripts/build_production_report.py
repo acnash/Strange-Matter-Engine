@@ -107,7 +107,9 @@ def main():
     fig.savefig(figures / "06_perturbations.png", dpi=200); plt.close(fig)
 
     output_dir = ROOT / "output" / "pdf"; output_dir.mkdir(parents=True, exist_ok=True)
-    pdf_path = output_dir / f"{summary['rule']}_production_report.pdf"
+    version_suffix = (f"_{summary['search_version']}"
+                      if summary.get("search_version") == "enhanced_v3" else "")
+    pdf_path = output_dir / f"{summary['rule']}{version_suffix}_production_report.pdf"
     styles = getSampleStyleSheet()
     title = ParagraphStyle("CyberTitle", parent=styles["Title"], textColor=colors.HexColor(CYAN),
                            alignment=TA_CENTER, fontSize=23, leading=27, spaceAfter=12)

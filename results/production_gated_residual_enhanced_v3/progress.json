@@ -1,0 +1,100 @@
+{
+  "stage": "complete",
+  "summary": {
+    "study": "production_gated_residual_enhanced_v3",
+    "rule": "gated_residual",
+    "search_seed": 260822,
+    "search_version": "enhanced_v3",
+    "elapsed_seconds": 1747.3735918998718,
+    "winner": {
+      "generations": 64,
+      "hidden_channels": 8,
+      "ca_lr": 0.003,
+      "ridge": 0.01,
+      "ca_l2": 0.0001,
+      "gradient_clip": 1.0,
+      "batch_molecules": 128,
+      "update_scale": 0.4,
+      "init_scale": 1.5,
+      "initial_noise": 0.0,
+      "support_fraction": 0.75,
+      "bond_temperature": 0.5,
+      "dyn_a": 0.2,
+      "dyn_b": 0.8,
+      "dyn_c": 0.5,
+      "dyn_d": 0.05
+    },
+    "winner_confirmation_mean_rmse": 0.8972957332928976,
+    "winner_confirmation_seed_sd": 0.002532155543698549,
+    "winner_selection_score": 0.8979287721788222,
+    "confirmation_seeds": [
+      1701,
+      2909,
+      4211
+    ],
+    "final_metrics": {
+      "seed": 1701,
+      "best_validation_rmse": 0.894292414188385,
+      "restored_fit_rmse": 0.8225756287574768,
+      "restored_validation_rmse": 0.8942551016807556,
+      "epochs_run": 14,
+      "fit_observations": 5216,
+      "validation_observations": 1309,
+      "rule": "gated_residual",
+      "generations": 64,
+      "hidden_channels": 8,
+      "device": "cuda",
+      "gpu": "NVIDIA GeForce RTX 5070 Ti",
+      "training_seconds": 128.83377989998553,
+      "peak_gpu_memory_bytes": 233371648,
+      "readout": "differentiable_closed_form_ridge",
+      "hyperparameters": {
+        "ca_lr": 0.003,
+        "ridge": 0.01,
+        "ca_l2": 0.0001,
+        "gradient_clip": 1.0,
+        "update_scale": 0.4,
+        "init_scale": 1.5,
+        "initial_noise": 0.0,
+        "support_fraction": 0.75,
+        "bond_temperature": 0.5,
+        "dyn_a": 0.2,
+        "dyn_b": 0.8,
+        "dyn_c": 0.5,
+        "dyn_d": 0.05,
+        "lr_schedule": "cosine_0.1x"
+      },
+      "dynamical_analysis": {
+        "validation_trajectories_screened": 1309,
+        "perturbation_cases": 0,
+        "classification_counts": {},
+        "perturbation_status": "deferred_after_native_cuda_failure"
+      },
+      "wall_seconds": 186.21181774139404,
+      "study_config": {
+        "generations": 64,
+        "hidden_channels": 8,
+        "ca_lr": 0.003,
+        "ridge": 0.01,
+        "ca_l2": 0.0001,
+        "gradient_clip": 1.0,
+        "batch_molecules": 128,
+        "update_scale": 0.4,
+        "init_scale": 1.5,
+        "initial_noise": 0.0,
+        "support_fraction": 0.75,
+        "bond_temperature": 0.5,
+        "dyn_a": 0.2,
+        "dyn_b": 0.8,
+        "dyn_c": 0.5,
+        "dyn_d": 0.05
+      },
+      "stability": {
+        "maximum_query_train_rmse": 1.096733899161419,
+        "maximum_raw_gradient_norm": 6.52407544274484,
+        "passed": true
+      }
+    },
+    "blind_data_used": false
+  }
+}
