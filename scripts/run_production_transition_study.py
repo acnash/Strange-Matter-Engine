@@ -12,9 +12,10 @@ import subprocess
 import time
 from pathlib import Path
 
+from runtime_device import python_executable, requested_device
+
 
 ROOT = Path(__file__).resolve().parents[1]
-PYTHON = Path(r"C:\Users\Anthony\anaconda3\envs\strange-matter-gpu\python.exe")
 RUNNER = ROOT / "scripts" / "run_graph_ca_visual_prototype.py"
 SEARCH_SEED = 260822
 SEARCH_VERSION = "enhanced_v3"
@@ -65,7 +66,8 @@ def metric_path(run_name):
 
 
 def run_fit(rule, study_name, label, config, seed, epochs, patience,
-            fit_limit, validation_limit, analyse=False):
+            fit_limit, validation_limit, device="auto", python_path=None,
+            analyse=False):
     run_name = f"{study_name}/runs/{label}"
     metrics_file = metric_path(run_name)
     if metrics_file.exists():
@@ -90,7 +92,7 @@ def run_fit(rule, study_name, label, config, seed, epochs, patience,
         "SME_DYN_C": str(config["dyn_c"]),
         "SME_DYN_D": str(config["dyn_d"]),
         "SME_RUN_NAME": run_name,
-        "SME_DEVICE": "cuda",
+        "SME_DEVICE": requested_device(device),
         "SME_SEED": str(seed),
         "SME_MAX_EPOCHS": str(epochs),
         "SME_PATIENCE": str(patience),
@@ -107,7 +109,8 @@ def run_fit(rule, study_name, label, config, seed, epochs, patience,
     started = time.time()
     with log_path.open("w", encoding="utf-8") as log:
         process = subprocess.run(
-            [str(PYTHON), str(RUNNER), "train"], cwd=ROOT, env=env,
+            [str(python_executable(python_path)), str(RUNNER), "train"],
+            cwd=ROOT, env=env,
             stdout=log, stderr=subprocess.STDOUT, text=True,
         )
     if process.returncode:
@@ -152,10 +155,26 @@ def write_progress(study_dir, payload):
 
 
 def main():
-    parser = argparse.ArgumentParser()
+    parser = argparse.ArgumentParser(
+        description="Run a resumable Graph-CA production search on CPU or CUDA."
+    )
     parser.add_argument("--rule", required=True, choices=RULES)
+    parser.add_argument(
+        "--device", choices=("auto", "cpu", "cuda"), default="auto",
+        help="auto selects CUDA when available and CPU otherwise (default: auto)",
+    )
+    parser.add_argument(
+        "--python", dest="python_path", default=None,
+        help="worker Python executable; defaults to SME_PYTHON or this interpreter",
+    )
+    parser.add_argument(
+        "--report-python", default=None,
+        help="report Python executable; defaults to SME_REPORT_PYTHON or worker Python",
+    )
     args = parser.parse_args()
     rule = args.rule
+    device = requested_device(args.device)
+    worker_python = python_executable(args.python_path)
     short_name = rule
     study_name = f"production_{short_name}_{SEARCH_VERSION}"
     study_dir = ROOT / "results" / study_name
@@ -171,7 +190,7 @@ def main():
     stage1 = []
     for index, config in enumerate(candidates, 1):
         metrics = run_fit(rule, study_name, f"stage1_{index:02d}", config,
-                          1701, 3, 2, 600, 200)
+                          1701, 3, 2, 600, 200, device, worker_python)
         stage1.append((config, metrics))
         write_progress(study_dir, {"stage": "stage1", "completed": index,
                                    "total": len(candidates),
@@ -181,7 +200,7 @@ def main():
     stage2 = []
     for index, (config, _) in enumerate(promoted10, 1):
         metrics = run_fit(rule, study_name, f"stage2_{index:02d}", config,
-                          1701, 5, 3, 2000, 500)
+                          1701, 5, 3, 2000, 500, device, worker_python)
         stage2.append((config, metrics))
         write_progress(study_dir, {"stage": "stage2", "completed": index,
                                    "total": len(promoted10),
@@ -195,7 +214,7 @@ def main():
         for seed in seeds:
             metrics = run_fit(
                 rule, study_name, f"confirm_{config_index:02d}_seed_{seed}",
-                config, seed, 10, 4, 999999, 999999,
+                config, seed, 10, 4, 999999, 999999, device, worker_python,
             )
             config_metrics.append(metrics)
         mean_rmse = sum(score(m) for m in config_metrics) / len(config_metrics)
@@ -212,7 +231,8 @@ def main():
     )
 
     final_metrics = run_fit(rule, study_name, "final_model", winner, 1701,
-                            15, 5, 999999, 999999, analyse=True)
+                            15, 5, 999999, 999999, device, worker_python,
+                            analyse=True)
     rows = []
     for stage_name, collection in (("stage1", stage1), ("stage2", stage2)):
         for config, metrics in collection:
@@ -236,13 +256,18 @@ def main():
         "winner_confirmation_seed_sd": winner_sd,
         "winner_selection_score": winner_score,
         "confirmation_seeds": list(seeds),
+        "requested_device": device,
+        "worker_python": str(worker_python),
         "final_metrics": final_metrics,
         "blind_data_used": False,
     }
     (study_dir / "study_summary.json").write_text(json.dumps(summary, indent=2) + "\n")
     write_progress(study_dir, {"stage": "complete", "summary": summary})
     if os.environ.get("SME_SKIP_REPORT", "0") != "1":
-        report_python = Path(os.environ.get("SME_REPORT_PYTHON", str(PYTHON)))
+        report_python = python_executable(
+            args.report_python or os.environ.get("SME_REPORT_PYTHON")
+            or str(worker_python)
+        )
         subprocess.run([str(report_python), str(ROOT / "scripts" / "build_production_report.py"),
                         "--study", study_name], cwd=ROOT, check=True)
     print(json.dumps(summary, indent=2))

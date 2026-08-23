@@ -46,6 +46,79 @@ Scientific plots may use the closely matched high-contrast plotting variants cya
 - Colours must encode a stated scientific quantity or category and must be accompanied by labels, legends, or colour bars. They must not imply molecular motion or chemical meaning that the model did not calculate.
 - When an existing project graphic is extended or regenerated, retain this palette and semantic mapping unless a scientifically necessary visual encoding is documented explicitly.
 
+## Cross-platform computation contract
+
+Strange Matter Engine uses **one scientific codebase** on both computers. The molecular preparation, grouped data split, atom and bond features, Graph-CA equations, trajectory fingerprints, ridge readout, losses, metrics, and saved parameters must remain identical across platforms. Only the device performing the tensor arithmetic changes.
+
+This contract is a persistent project requirement:
+
+| Computer | Required device | Principal work |
+|---|---|---|
+| Windows PC with NVIDIA GPU | CUDA | Production training, hyperparameter searches, multi-seed confirmation, and large batched experiments |
+| MacBook without a supported GPU | CPU | Inspecting saved results, generating reports and plots, testing code, and extended forward-only analysis of selected trajectories |
+
+Do not create separate Windows and Mac model implementations. Changes to the scientific model must be made once in the shared repository and exercised through the common runner.
+
+### Device selection
+
+The shared runtime accepts three explicit device values:
+
+- `auto`: select CUDA when PyTorch can access it; otherwise select CPU;
+- `cuda`: require an available CUDA device and stop with a clear error if none is available; and
+- `cpu`: require CPU execution even when CUDA exists.
+
+The production controller defaults to `auto`. It uses the active Python interpreter, unless `--python` or the `SME_PYTHON` environment variable explicitly names another interpreter. No user-specific Windows or macOS path is stored in the controller.
+
+Every completed training run records the operating system, machine architecture, Python version, Python executable, PyTorch version, CUDA runtime, resolved device, and GPU name in `metrics.json`. PyTorch checkpoints must always be loaded with an explicit `map_location`, allowing CUDA-trained parameters to be inspected on a CPU-only Mac.
+
+### Windows GPU environment
+
+From Anaconda Prompt or PowerShell in the repository root:
+
+```powershell
+conda env create -f environment-gpu.yml
+conda activate strange-matter-gpu
+python -c "import torch; print(torch.cuda.is_available()); print(torch.cuda.get_device_name(0))"
+```
+
+The first printed value must be `True` before beginning production training.
+
+Run one complete production transition-rule study with:
+
+```powershell
+python scripts/run_production_transition_study.py --rule coupled_map --device auto
+```
+
+Use `--device cuda` when a run must fail rather than silently fall back to the CPU. The runner batches molecular graphs on the selected device; batch size remains a hyperparameter and may be reduced if GPU memory is insufficient.
+
+### Mac CPU environment
+
+From Terminal in the repository root:
+
+```bash
+conda env create -f environment-cpu.yml
+conda activate strange-matter-cpu
+python -c "import torch; print(torch.cuda.is_available())"
+```
+
+The expected value on this CPU-only Mac is `False`.
+
+Use CPU explicitly for a production-controller invocation:
+
+```bash
+python scripts/run_production_transition_study.py --rule coupled_map --device cpu
+```
+
+A complete production search is computationally expensive on the Mac and is normally assigned to the Windows GPU. CPU execution is intended for verification and analysis, and for extended forward-only trajectories after a trained model and a small candidate set have been frozen.
+
+### Reproducibility and transfer
+
+1. Commit and push code, environments, configuration, metrics, selected checkpoints, prediction tables, and reports to `main` from the machine that produced them.
+2. Pull `main` on the other computer before inspecting or extending the work.
+3. Preserve seeds, grouped splits, hyperparameters, numerical precision, and model version when comparing CPU and CUDA results.
+4. Expect small floating-point differences between CPU and CUDA. Compare them using declared numerical tolerances rather than requiring bit-for-bit equality.
+5. Never use blinded challenge labels for training, hyperparameter selection, early stopping, or dynamical-candidate selection.
+
 ## Goal
 
 The primary goal is to build, understand, validate, and submit a complete end-to-end model that maps:

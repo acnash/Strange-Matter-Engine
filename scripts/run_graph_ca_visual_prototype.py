@@ -23,6 +23,8 @@ from pathlib import Path
 
 import numpy as np
 
+from runtime_device import resolve_torch_device, runtime_metadata
+
 
 ROOT = Path(__file__).resolve().parents[1]
 DATA = ROOT / "data" / "openadmet-cyp-challenge-2026"
@@ -251,21 +253,12 @@ def train() -> None:
     torch.set_num_threads(max(1, min(4, os.cpu_count() or 1)))
     with CACHE.open("rb") as handle:
         data = pickle.load(handle)
-    requested_device = os.environ.get("SME_DEVICE", "auto").lower()
-    if requested_device == "auto":
-        requested_device = "cuda" if torch.cuda.is_available() else "cpu"
-    if requested_device == "cuda" and not torch.cuda.is_available():
-        raise RuntimeError("SME_DEVICE=cuda was requested, but CUDA is unavailable")
-    device = torch.device(requested_device)
+    device = resolve_torch_device(torch)
     if device.type == "cuda":
         torch.cuda.manual_seed_all(SEED)
         torch.backends.cuda.matmul.allow_tf32 = True
-    print(json.dumps({
-        "device": str(device),
-        "gpu": torch.cuda.get_device_name(device) if device.type == "cuda" else None,
-        "pytorch": torch.__version__,
-        "pytorch_cuda": torch.version.cuda,
-    }), flush=True)
+    run_runtime = runtime_metadata(torch, device)
+    print(json.dumps(run_runtime), flush=True)
     chem_dim = len(data["train"][0]["x"][0])
     bond_dim = 9
     hidden = int(os.environ.get("SME_HIDDEN_CHANNELS", "8"))
@@ -674,6 +667,7 @@ def train() -> None:
         "training_seconds": training_seconds,
         "peak_gpu_memory_bytes": (torch.cuda.max_memory_allocated(device)
                                   if device.type == "cuda" else 0),
+        "runtime": run_runtime,
         "readout": "differentiable_closed_form_ridge",
         "hyperparameters": {"ca_lr": CA_LR,
         "ridge": RIDGE_STRENGTH, "ca_l2": CA_L2,
