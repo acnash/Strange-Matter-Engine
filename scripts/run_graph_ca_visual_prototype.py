@@ -61,6 +61,48 @@ SEED = int(os.environ.get("SME_SEED", "1701"))
 CYPS = ("CYP1A2", "CYP2C9", "CYP2D6", "CYP3A4")
 LABEL_COLS = tuple(f"{c}_pIC50_direct_inhibition" for c in CYPS)
 
+BASELINE_ATOM_FEATURES = (
+    "element_H", "element_C", "element_N", "element_O", "element_F",
+    "element_P", "element_S", "element_Cl", "element_Br", "element_I",
+    "element_other", "formal_charge", "aromatic", "hybrid_sp",
+    "hybrid_sp2", "hybrid_sp3", "hybrid_other", "degree", "total_hydrogens",
+    "in_ring", "hbond_donor", "hbond_acceptor", "chiral_cw", "chiral_ccw",
+    "chiral_other",
+)
+PERIODIC_ATOM_FEATURES = (
+    "atomic_number", "atomic_mass", "covalent_radius", "vdw_radius",
+    "outer_electrons",
+)
+VALENCE_ATOM_FEATURES = (
+    "total_valence", "implicit_valence", "heavy_atom_degree",
+    "radical_electrons", "absolute_formal_charge",
+)
+ELECTRONIC_ATOM_FEATURES = (
+    "electronegativity", "polarizability", "heteroatom", "halogen",
+    "conjugated_bond_fraction",
+)
+RING_GEOMETRY_ATOM_FEATURES = (
+    "ring_count", "ring_size_3", "ring_size_4", "ring_size_5", "ring_size_6",
+    "ring_size_7", "ring_size_8_plus",
+)
+ATOM_FEATURE_NAMES = (BASELINE_ATOM_FEATURES + PERIODIC_ATOM_FEATURES
+                      + VALENCE_ATOM_FEATURES + ELECTRONIC_ATOM_FEATURES
+                      + RING_GEOMETRY_ATOM_FEATURES)
+ATOM_FEATURE_PROFILES = {
+    "baseline": BASELINE_ATOM_FEATURES,
+    "periodic": BASELINE_ATOM_FEATURES + PERIODIC_ATOM_FEATURES,
+    "valence": BASELINE_ATOM_FEATURES + VALENCE_ATOM_FEATURES,
+    "electronic": BASELINE_ATOM_FEATURES + ELECTRONIC_ATOM_FEATURES,
+    "ring_geometry": BASELINE_ATOM_FEATURES + RING_GEOMETRY_ATOM_FEATURES,
+    "periodic_valence": (BASELINE_ATOM_FEATURES + PERIODIC_ATOM_FEATURES
+                         + VALENCE_ATOM_FEATURES),
+    "periodic_electronic": (BASELINE_ATOM_FEATURES + PERIODIC_ATOM_FEATURES
+                            + ELECTRONIC_ATOM_FEATURES),
+    "valence_electronic": (BASELINE_ATOM_FEATURES + VALENCE_ATOM_FEATURES
+                           + ELECTRONIC_ATOM_FEATURES),
+    "comprehensive": ATOM_FEATURE_NAMES,
+}
+
 
 def set_seeds() -> None:
     random.seed(SEED)
@@ -112,7 +154,7 @@ def differentiable_ridge_predict(features, ridge_state):
     return ridge_state["intercept"] + standardized @ ridge_state["coefficients"]
 
 
-def atom_features(atom, donor_ids: set[int], acceptor_ids: set[int]) -> list[float]:
+def atom_features(atom, donor_ids: set[int], acceptor_ids: set[int], mol) -> list[float]:
     from rdkit import Chem
 
     elements = (1, 6, 7, 8, 9, 15, 16, 17, 35, 53)
@@ -133,7 +175,7 @@ def atom_features(atom, donor_ids: set[int], acceptor_ids: set[int]) -> list[flo
                              Chem.ChiralType.CHI_TETRAHEDRAL_CW,
                              Chem.ChiralType.CHI_TETRAHEDRAL_CCW)),
     ]
-    return element + [
+    baseline = element + [
         atom.GetFormalCharge() / 3.0,
         float(atom.GetIsAromatic()),
     ] + hybrid + [
@@ -143,6 +185,51 @@ def atom_features(atom, donor_ids: set[int], acceptor_ids: set[int]) -> list[flo
         float(atom.GetIdx() in donor_ids),
         float(atom.GetIdx() in acceptor_ids),
     ] + chirality
+    periodic_table = Chem.GetPeriodicTable()
+    periodic = [
+        z / 100.0,
+        periodic_table.GetAtomicWeight(z) / 250.0,
+        periodic_table.GetRcovalent(z) / 2.5,
+        periodic_table.GetRvdw(z) / 3.0,
+        periodic_table.GetNOuterElecs(z) / 8.0,
+    ]
+    explicit_valence = atom.GetValence(Chem.ValenceType.EXPLICIT)
+    implicit_valence = atom.GetValence(Chem.ValenceType.IMPLICIT)
+    valence = [
+        (explicit_valence + implicit_valence) / 8.0,
+        implicit_valence / 4.0,
+        sum(1 for neighbour in atom.GetNeighbors() if neighbour.GetAtomicNum() > 1) / 4.0,
+        atom.GetNumRadicalElectrons() / 2.0,
+        abs(atom.GetFormalCharge()) / 3.0,
+    ]
+    # Pauling electronegativity and approximate atomic polarizability (A^3)
+    # for the elements represented explicitly by the baseline encoding.
+    electronegativity = {
+        1: 2.20, 6: 2.55, 7: 3.04, 8: 3.44, 9: 3.98, 15: 2.19,
+        16: 2.58, 17: 3.16, 35: 2.96, 53: 2.66,
+    }.get(z, 2.5)
+    polarizability = {
+        1: 0.667, 6: 1.76, 7: 1.10, 8: 0.802, 9: 0.557, 15: 3.63,
+        16: 2.90, 17: 2.18, 35: 3.05, 53: 5.35,
+    }.get(z, 2.5)
+    bonds = list(atom.GetBonds())
+    electronic = [
+        electronegativity / 4.0,
+        polarizability / 6.0,
+        float(z not in (1, 6)),
+        float(z in (9, 17, 35, 53)),
+        (sum(float(bond.GetIsConjugated()) for bond in bonds) / len(bonds)
+         if bonds else 0.0),
+    ]
+    atom_index = atom.GetIdx()
+    ring_sizes = [len(ring) for ring in mol.GetRingInfo().AtomRings()
+                  if atom_index in ring]
+    ring_geometry = [
+        min(len(ring_sizes), 4) / 4.0,
+        *[float(size in ring_sizes) for size in (3, 4, 5, 6, 7)],
+        float(any(size >= 8 for size in ring_sizes)),
+    ]
+    return baseline + periodic + valence + electronic + ring_geometry
 
 
 def bond_features(bond) -> list[float]:
@@ -192,7 +279,7 @@ def graph_record(name: str, smiles: str, labels=None) -> dict | None:
         return None
     donor_ids = {idx for match in Lipinski._HDonors(mol) for idx in match}
     acceptor_ids = {idx for match in Lipinski._HAcceptors(mol) for idx in match}
-    x = [atom_features(a, donor_ids, acceptor_ids) for a in mol.GetAtoms()]
+    x = [atom_features(a, donor_ids, acceptor_ids, mol) for a in mol.GetAtoms()]
     src, dst, edges = [], [], []
     for bond in mol.GetBonds():
         i, j = bond.GetBeginAtomIdx(), bond.GetEndAtomIdx()
@@ -238,6 +325,7 @@ def prepare() -> None:
     val_idx = [i for i, r in enumerate(train) if r["scaffold"] in validation_groups]
     payload = {"train": train, "test": test, "train_idx": train_idx,
                "val_idx": val_idx, "rejected": rejected, "seed": SEED}
+    payload["atom_feature_names"] = list(ATOM_FEATURE_NAMES)
     CACHE.parent.mkdir(parents=True, exist_ok=True)
     with CACHE.open("wb") as handle:
         pickle.dump(payload, handle, protocol=pickle.HIGHEST_PROTOCOL)
@@ -282,6 +370,27 @@ def train(extended_dynamics: bool = False) -> None:
         DYN_B = float(hyperparameters["dyn_b"])
         DYN_C = float(hyperparameters["dyn_c"])
         DYN_D = float(hyperparameters["dyn_d"])
+    feature_profile = (checkpoint.get("atom_feature_profile", "baseline")
+                       if checkpoint is not None
+                       else os.environ.get("SME_ATOM_FEATURE_PROFILE", "baseline"))
+    if feature_profile not in ATOM_FEATURE_PROFILES:
+        raise ValueError(f"Unknown atom feature profile: {feature_profile}")
+    cached_feature_names = tuple(data.get("atom_feature_names", BASELINE_ATOM_FEATURES))
+    requested_feature_names = ATOM_FEATURE_PROFILES[feature_profile]
+    missing_features = [name for name in requested_feature_names
+                        if name not in cached_feature_names]
+    if missing_features:
+        raise ValueError(
+            f"Graph cache lacks atom features required by {feature_profile}: "
+            + ", ".join(missing_features)
+        )
+    feature_indices = [cached_feature_names.index(name)
+                       for name in requested_feature_names]
+    for split in ("train", "test"):
+        for record in data.get(split, []):
+            record["x"] = [[row[index] for index in feature_indices]
+                           for row in record["x"]]
+    data["selected_atom_feature_names"] = list(requested_feature_names)
     chem_dim = len(data["train"][0]["x"][0])
     bond_dim = 9
     hidden = (int(checkpoint["state_dict"]["init.weight"].shape[0])
@@ -817,6 +926,8 @@ def train(extended_dynamics: bool = False) -> None:
     OUT.mkdir(parents=True, exist_ok=True)
     torch.save({"state_dict": best_state, "chem_dim": chem_dim, "seed": SEED,
                 "rule": RULE, "generations": GENERATIONS, "device": str(device),
+                "atom_feature_profile": feature_profile,
+                "atom_feature_names": list(requested_feature_names),
                 "gpu": torch.cuda.get_device_name(device) if device.type == "cuda" else None,
                 "training_seconds": training_seconds,
                 "ridge_state": {k: v.detach().cpu() for k, v in final_ridge_state.items()},
@@ -850,6 +961,9 @@ def train(extended_dynamics: bool = False) -> None:
         "epochs_run": len(history), "fit_observations": len(fit_pairs),
         "validation_observations": len(val_pairs), "rule": RULE,
         "generations": GENERATIONS, "hidden_channels": hidden,
+        "atom_feature_profile": feature_profile,
+        "atom_feature_count": chem_dim,
+        "atom_feature_names": list(requested_feature_names),
         "device": str(device),
         "gpu": torch.cuda.get_device_name(device) if device.type == "cuda" else None,
         "training_seconds": training_seconds,

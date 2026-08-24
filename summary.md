@@ -1,8 +1,16 @@
 # Latest production summary
 
-Updated: 23 August 2026  
-Search version: `enhanced_v3`  
+Updated: 24 August 2026  
+Latest search version: `gray_scott_atom_features_v1`  
 Hardware: NVIDIA GeForce RTX 5070 Ti, PyTorch 2.11.0 with CUDA 12.8
+
+## Latest Gray-Scott chemistry search
+
+The chemistry-augmented Gray-Scott study completed 72 broad trials, promoted 16 configurations to refinement, confirmed four finalists across three seeds, and trained the selected configuration on the full permitted training split. The restored final validation RMSE is **0.8651 pIC50**, improving the preceding Gray-Scott result of 0.8674 by 0.0023 pIC50. Across confirmation seeds 1701, 2909, and 4211, the selected configuration achieved **0.8749 ± 0.0043 RMSE**.
+
+The winning `periodic_electronic` profile contains the original 25 atom descriptors plus atomic number, atomic mass, covalent radius, van der Waals radius, outer-electron count, Pauling electronegativity, approximate polarizability, heteroatom identity, halogen identity, and incident conjugated-bond fraction, giving 35 atom properties in total. The selected cellular automaton uses 32 generations and 24 dynamical channels, with a 0.003 CA learning rate and 0.01 differentiable ridge penalty. The complete search took 115.8 minutes, while final-model training took 94.4 seconds on CUDA.
+
+The blinded set remained sealed throughout. The saved model is `results/production_gray_scott_gray_scott_atom_features_v1/runs/final_model/model.pt`, the complete study is in `results/production_gray_scott_gray_scott_atom_features_v1`, and the report is `output/pdf/gray_scott_gray_scott_atom_features_v1_production_report.pdf`. All 1,309 validation trajectories were screened for finite-time recurrence, late motion, and spectral entropy. Their continuous high-recurrence regime is scientifically interesting, although the current diagnostics do not establish a point attractor, strange attractor, or chaos.
 
 ## Outcome
 
@@ -50,6 +58,7 @@ These screens identify transient structure and candidate recurrent regimes. They
 
 ## Reports
 
+- `output/pdf/gray_scott_gray_scott_atom_features_v1_production_report.pdf`
 - `output/pdf/gated_residual_enhanced_v3_production_report.pdf`
 - `output/pdf/inertial_reaction_diffusion_enhanced_v3_production_report.pdf`
 - `output/pdf/activator_inhibitor_enhanced_v3_production_report.pdf`

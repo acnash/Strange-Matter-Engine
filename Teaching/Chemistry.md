@@ -58,6 +58,8 @@ The molecular graph may distinguish single, double, triple, and aromatic bonds, 
 
 The initial feature set will remain small and defensible. The purpose is to give the automaton useful chemical starting conditions while leaving it responsible for learning dynamics, rather than overwhelming it with a large conventional descriptor library.
 
+The Gray-Scott chemistry study treats additions as grouped hyperparameters. Periodic channels include scaled atomic number, atomic mass, covalent radius, van der Waals radius, and outer-electron count. Valence channels include total and implicit valence, heavy-atom degree, radical electrons, and absolute formal charge. Electronic channels include Pauling electronegativity, approximate atomic polarizability, heteroatom and halogen flags, and the fraction of incident conjugated bonds. Ring-geometry channels encode ring count and membership in three- through seven-membered or larger rings. The baseline and controlled combinations are compared under the same grouped validation split; the blinded set remains excluded.
+
 ## Topics to develop
 
 - valence, bonding, and resonance;

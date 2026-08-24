@@ -108,7 +108,7 @@ def main():
 
     output_dir = ROOT / "output" / "pdf"; output_dir.mkdir(parents=True, exist_ok=True)
     version_suffix = (f"_{summary['search_version']}"
-                      if summary.get("search_version") == "enhanced_v3" else "")
+                      if summary.get("search_version") else "")
     pdf_path = output_dir / f"{summary['rule']}{version_suffix}_production_report.pdf"
     styles = getSampleStyleSheet()
     title = ParagraphStyle("CyberTitle", parent=styles["Title"], textColor=colors.HexColor(CYAN),
@@ -130,6 +130,7 @@ def main():
                   ["Fit RMSE", f"{metrics['restored_fit_rmse']:.4f} pIC50"],
                   ["Generations", str(winner["generations"])],
                   ["Dynamical channels", str(winner["hidden_channels"])],
+                  ["Atom feature profile", str(winner.get("atom_feature_profile", "baseline"))],
                   ["CA learning rate", str(winner["ca_lr"])],
                   ["Ridge penalty", str(winner["ridge"])],
                   ["CA L2", str(winner["ca_l2"])],
