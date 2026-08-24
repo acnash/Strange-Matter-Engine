@@ -333,15 +333,15 @@ def main():
                     cv_fold=fold,
                 )
                 config_metrics.append(metrics)
-        mean_score = sum(score(m) for m in config_metrics) / len(config_metrics)
-        variance = sum((score(m) - mean_score) ** 2 for m in config_metrics) / len(config_metrics)
+        confirmation_mean = sum(score(m) for m in config_metrics) / len(config_metrics)
+        variance = sum((score(m) - confirmation_mean) ** 2 for m in config_metrics) / len(config_metrics)
         seed_sd = variance ** 0.5
-        robust_score = mean_score + 0.25 * seed_sd
-        confirmations.append((config, config_metrics, mean_score, seed_sd, robust_score))
+        robust_score = confirmation_mean + 0.25 * seed_sd
+        confirmations.append((config, config_metrics, confirmation_mean, seed_sd, robust_score))
         write_progress(study_dir, {"stage": "confirmation", "completed": config_index,
                                    "total": len(promoted2),
                                    "selection_metric": "MA-ST-RAE",
-                                   "latest_mean_ma_st_rae": mean_score,
+                                   "latest_mean_ma_st_rae": confirmation_mean,
                                    "latest_seed_sd": seed_sd,
                                    "latest_robust_score": robust_score})
     winner, winner_metrics, winner_mean, winner_sd, winner_score = min(
