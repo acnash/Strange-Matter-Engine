@@ -4,6 +4,7 @@ import numpy as np
 
 from scripts.challenge_metrics import (
     bootstrap_macro_soft_threshold_rae,
+    bootstrap_regression_report,
     macro_soft_threshold_rae,
     soft_threshold_rae,
 )
@@ -47,6 +48,16 @@ class ChallengeMetricTests(unittest.TestCase):
         first = bootstrap_macro_soft_threshold_rae(*args, n_bootstrap_samples=50)
         second = bootstrap_macro_soft_threshold_rae(*args, n_bootstrap_samples=50)
         self.assertEqual(first, second)
+
+    def test_complete_bootstrap_report_contains_official_secondary_metrics(self):
+        report = bootstrap_regression_report(
+            [4, 5, 4, 5], [4.1, 4.9, 4.2, 5.1],
+            [3.9, 4.9, 3.9, 4.9], [4.1, 5.1, 4.1, 5.1],
+            [0, 0, 1, 1], ["A", "B"], n_bootstrap_samples=10,
+        )
+        self.assertEqual(report["n_bootstrap_samples"], 10)
+        self.assertEqual(set(report["macro"]),
+                         {"st_rae", "mae", "r2", "spearman_rho", "kendall_tau"})
 
 
 if __name__ == "__main__":

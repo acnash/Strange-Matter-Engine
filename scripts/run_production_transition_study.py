@@ -7,6 +7,7 @@ import argparse
 import csv
 import json
 import os
+import pickle
 import random
 import subprocess
 import time
@@ -20,8 +21,14 @@ except ModuleNotFoundError:  # Imported as scripts.run_production_transition_stu
 
 ROOT = Path(__file__).resolve().parents[1]
 RUNNER = ROOT / "scripts" / "run_graph_ca_visual_prototype.py"
+GRAPH_CACHE = ROOT / "tmp" / "strange_matter_graph_ca_graphs.pkl"
 SEARCH_SEED = 260822
-SEARCH_VERSION = "ma_st_rae_v4"
+SEARCH_VERSION = "challenge_aligned_v5"
+FEATURE_PROFILES = (
+    "baseline", "periodic", "valence", "electronic", "ring_geometry",
+    "periodic_valence", "periodic_electronic", "valence_electronic",
+    "local_environment", "electronic_local", "comprehensive",
+)
 RULES = (
     "gated_residual",
     "inertial_reaction_diffusion",
@@ -36,13 +43,13 @@ RULES = (
 )
 
 
-def sampled_candidates(count=36):
+def sampled_candidates(count=40):
     default = dict(generations=64, hidden_channels=8, ca_lr=1e-3,
                    ridge=1e-1, ca_l2=1e-5, gradient_clip=1.0,
                    batch_molecules=64, update_scale=0.25, init_scale=1.0,
                    initial_noise=0.0, support_fraction=0.75,
                    bond_temperature=1.0, dyn_a=0.5, dyn_b=0.5,
-                   dyn_c=0.5, dyn_d=0.2)
+                   dyn_c=0.5, dyn_d=0.2, atom_feature_profile="baseline")
     rng = random.Random(SEARCH_SEED)
     chosen = [default]
     while len(chosen) < count:
@@ -63,6 +70,7 @@ def sampled_candidates(count=36):
             "dyn_b": rng.choice((0.2, 0.5, 0.8)),
             "dyn_c": rng.choice((0.2, 0.5, 0.8)),
             "dyn_d": rng.choice((0.05, 0.15, 0.3)),
+            "atom_feature_profile": rng.choice(FEATURE_PROFILES),
         }
         if config not in chosen:
             chosen.append(config)
@@ -73,9 +81,27 @@ def metric_path(run_name):
     return ROOT / "results" / run_name / "metrics.json"
 
 
+def ensure_graph_cache(worker_python):
+    valid = False
+    if GRAPH_CACHE.exists():
+        try:
+            with GRAPH_CACHE.open("rb") as handle:
+                payload = pickle.load(handle)
+            valid = (payload.get("challenge_metric_schema") == "challenge_aligned_v2"
+                     and not payload.get("test"))
+        except (OSError, EOFError, pickle.UnpicklingError):
+            valid = False
+    if valid:
+        return
+    env = os.environ.copy()
+    env.update({"SME_GRAPH_CACHE": str(GRAPH_CACHE), "SME_INCLUDE_BLIND": "0"})
+    subprocess.run([str(worker_python), str(RUNNER), "prepare"], cwd=ROOT,
+                   env=env, check=True)
+
+
 def run_fit(rule, study_name, label, config, seed, epochs, patience,
             fit_limit, validation_limit, device="auto", python_path=None,
-            analyse=False):
+            analyse=False, cv_fold=None, cv_folds=5):
     run_name = f"{study_name}/runs/{label}"
     metrics_file = metric_path(run_name)
     if metrics_file.exists():
@@ -112,6 +138,9 @@ def run_fit(rule, study_name, label, config, seed, epochs, patience,
         "SME_ANALYSE_VALIDATION": "1" if analyse else "0",
         "SME_PERTURBATION_CASES": "0" if analyse else "20",
     })
+    if cv_fold is not None:
+        env["SME_CV_FOLD"] = str(cv_fold)
+        env["SME_CV_FOLDS"] = str(cv_folds)
     run_dir = metrics_file.parent
     run_dir.mkdir(parents=True, exist_ok=True)
     log_path = run_dir / "console.log"
@@ -161,8 +190,62 @@ def score(metrics):
     return value if value == value else float("inf")
 
 
+def screening_score(metrics):
+    if not metrics.get("stability", {}).get("passed", True):
+        return float("inf")
+    value = metrics.get("restored_validation_point_ma_st_rae", float("inf"))
+    return value if value == value else float("inf")
+
+
 def write_progress(study_dir, payload):
     (study_dir / "progress.json").write_text(json.dumps(payload, indent=2) + "\n")
+
+
+def mean_score(metrics_list, screening=False):
+    metric = screening_score if screening else score
+    values = [metric(metrics) for metrics in metrics_list]
+    return sum(values) / len(values)
+
+
+def surrogate_candidates(completed, count=16):
+    """Select exploitation and exploration trials from a larger discrete pool."""
+    import numpy as np
+
+    observed = [config for config, _ in completed]
+    pool = [config for config in sampled_candidates(400) if config not in observed]
+    numeric_keys = [key for key in observed[0] if key != "atom_feature_profile"]
+
+    def encode(configs):
+        numeric = np.asarray([[float(config[key]) for key in numeric_keys]
+                              for config in configs])
+        profiles = np.zeros((len(configs), len(FEATURE_PROFILES)))
+        for row, config in enumerate(configs):
+            profiles[row, FEATURE_PROFILES.index(config["atom_feature_profile"])] = 1.0
+        return numeric, profiles
+
+    observed_numeric, observed_profiles = encode(observed)
+    pool_numeric, pool_profiles = encode(pool)
+    scale = np.ptp(observed_numeric, axis=0)
+    scale[scale == 0] = 1.0
+    observed_x = np.concatenate((
+        (observed_numeric - observed_numeric.mean(0)) / scale, observed_profiles
+    ), axis=1)
+    pool_x = np.concatenate((
+        (pool_numeric - observed_numeric.mean(0)) / scale, pool_profiles
+    ), axis=1)
+    train_y = np.asarray([mean_score(metrics, screening=True)
+                          for _, metrics in completed])
+    distances = np.linalg.norm(pool_x[:, None, :] - observed_x[None, :, :], axis=2)
+    neighbours = np.argsort(distances, axis=1)[:, :8]
+    neighbour_distances = np.take_along_axis(distances, neighbours, axis=1)
+    weights = 1.0 / np.maximum(neighbour_distances, 1e-6)
+    predictions = np.sum(weights * train_y[neighbours], axis=1) / weights.sum(axis=1)
+    exploit_count = max(1, count - 4)
+    selected_indices = list(predictions.argsort()[:exploit_count])
+    remaining = [i for i in range(len(pool)) if i not in selected_indices]
+    rng = random.Random(SEARCH_SEED + 17)
+    selected_indices.extend(rng.sample(remaining, min(4, len(remaining))))
+    return [pool[i] for i in selected_indices]
 
 
 def main():
@@ -186,6 +269,7 @@ def main():
     rule = args.rule
     device = requested_device(args.device)
     worker_python = python_executable(args.python_path)
+    ensure_graph_cache(worker_python)
     short_name = rule
     study_name = f"production_{short_name}_{SEARCH_VERSION}"
     study_dir = ROOT / "results" / study_name
@@ -201,42 +285,61 @@ def main():
     stage1 = []
     for index, config in enumerate(candidates, 1):
         metrics = run_fit(rule, study_name, f"stage1_{index:02d}", config,
-                          1701, 3, 2, 600, 200, device, worker_python)
-        stage1.append((config, metrics))
+                          1701, 3, 2, 600, 200, device, worker_python,
+                          cv_fold=0)
+        stage1.append((config, [metrics]))
         write_progress(study_dir, {"stage": "stage1", "completed": index,
                                    "total": len(candidates),
                                    "selection_metric": "MA-ST-RAE",
-                                   "best_ma_st_rae": min(score(m) for _, m in stage1)})
-    promoted10 = sorted(stage1, key=lambda item: score(item[1]))[:10]
+                                   "best_ma_st_rae": min(mean_score(m, screening=True) for _, m in stage1)})
+    adaptive = surrogate_candidates(stage1)
+    for offset, config in enumerate(adaptive, 1):
+        index = len(candidates) + offset
+        metrics = run_fit(rule, study_name, f"stage1_{index:02d}", config,
+                          1701, 3, 2, 600, 200, device, worker_python,
+                          cv_fold=0)
+        stage1.append((config, [metrics]))
+        write_progress(study_dir, {"stage": "stage1_surrogate", "completed": offset,
+                                   "total": len(adaptive),
+                                   "selection_metric": "MA-ST-RAE",
+                                   "best_ma_st_rae": min(mean_score(m, screening=True) for _, m in stage1)})
+    promoted = sorted(stage1, key=lambda item: mean_score(item[1], screening=True))[:8]
 
     stage2 = []
-    for index, (config, _) in enumerate(promoted10, 1):
-        metrics = run_fit(rule, study_name, f"stage2_{index:02d}", config,
-                          1701, 5, 3, 2000, 500, device, worker_python)
-        stage2.append((config, metrics))
+    for index, (config, _) in enumerate(promoted, 1):
+        fold_metrics = []
+        for fold in range(3):
+            fold_metrics.append(run_fit(
+                rule, study_name, f"stage2_{index:02d}_fold_{fold}", config,
+                1701, 5, 3, 2000, 500, device, worker_python, cv_fold=fold,
+            ))
+        stage2.append((config, fold_metrics))
         write_progress(study_dir, {"stage": "stage2", "completed": index,
-                                   "total": len(promoted10),
+                                   "total": len(promoted),
                                    "selection_metric": "MA-ST-RAE",
-                                   "best_ma_st_rae": min(score(m) for _, m in stage2)})
-    promoted3 = sorted(stage2, key=lambda item: score(item[1]))[:3]
+                                   "best_ma_st_rae": min(mean_score(m, screening=True) for _, m in stage2)})
+    promoted2 = sorted(stage2, key=lambda item: mean_score(item[1], screening=True))[:2]
 
     confirmations = []
     seeds = (1701, 2909, 4211)
-    for config_index, (config, _) in enumerate(promoted3, 1):
+    for config_index, (config, _) in enumerate(promoted2, 1):
         config_metrics = []
         for seed in seeds:
-            metrics = run_fit(
-                rule, study_name, f"confirm_{config_index:02d}_seed_{seed}",
-                config, seed, 10, 4, 999999, 999999, device, worker_python,
-            )
-            config_metrics.append(metrics)
+            for fold in range(5):
+                metrics = run_fit(
+                    rule, study_name,
+                    f"confirm_{config_index:02d}_seed_{seed}_fold_{fold}",
+                    config, seed, 8, 3, 999999, 999999, device, worker_python,
+                    cv_fold=fold,
+                )
+                config_metrics.append(metrics)
         mean_score = sum(score(m) for m in config_metrics) / len(config_metrics)
         variance = sum((score(m) - mean_score) ** 2 for m in config_metrics) / len(config_metrics)
         seed_sd = variance ** 0.5
         robust_score = mean_score + 0.25 * seed_sd
         confirmations.append((config, config_metrics, mean_score, seed_sd, robust_score))
         write_progress(study_dir, {"stage": "confirmation", "completed": config_index,
-                                   "total": len(promoted3),
+                                   "total": len(promoted2),
                                    "selection_metric": "MA-ST-RAE",
                                    "latest_mean_ma_st_rae": mean_score,
                                    "latest_seed_sd": seed_sd,
@@ -250,14 +353,20 @@ def main():
                             analyse=True)
     rows = []
     for stage_name, collection in (("stage1", stage1), ("stage2", stage2)):
-        for config, metrics in collection:
-            rows.append({"stage": stage_name, "seed": metrics["seed"],
-                         "validation_ma_st_rae": score(metrics),
-                         "validation_rmse": metrics.get("restored_validation_rmse"), **config})
+        for config, metrics_list in collection:
+            for metrics in metrics_list:
+                protocol = metrics.get("validation_protocol", {})
+                rows.append({"stage": stage_name, "seed": metrics["seed"],
+                             "fold": protocol.get("fold"),
+                             "validation_ma_st_rae": score(metrics),
+                             "validation_point_ma_st_rae": screening_score(metrics),
+                             "validation_rmse": metrics.get("restored_validation_rmse"), **config})
     for config, metrics_list, _, _, _ in confirmations:
         for metrics in metrics_list:
             rows.append({"stage": "confirmation", "seed": metrics["seed"],
+                         "fold": metrics.get("validation_protocol", {}).get("fold"),
                          "validation_ma_st_rae": score(metrics),
+                         "validation_point_ma_st_rae": screening_score(metrics),
                          "validation_rmse": metrics.get("restored_validation_rmse"), **config})
     with (study_dir / "all_trials.csv").open("w", newline="") as handle:
         writer = csv.DictWriter(handle, fieldnames=rows[0].keys())
@@ -274,6 +383,9 @@ def main():
         "winner_confirmation_ma_st_rae_seed_sd": winner_sd,
         "winner_selection_score": winner_score,
         "confirmation_seeds": list(seeds),
+        "cross_validation_folds": 5,
+        "reserved_holdout_used_during_search": False,
+        "feature_profiles": list(FEATURE_PROFILES),
         "requested_device": device,
         "worker_python": str(worker_python),
         "final_metrics": final_metrics,

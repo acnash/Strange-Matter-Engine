@@ -1,5 +1,9 @@
 # Latest production summary
 
+## Challenge-aligned v5 production campaign started
+
+The ten-rule rerun now uses scaffold cross-validation inside the fitting pool, a sealed scaffold holdout, point MA-ST-RAE for efficient screening, and the official 1,000-resample bootstrap for finalists. The common search includes expanded chemical feature groups, rule-specific dynamics, surrogate-guided refinement, successive halving, five-fold and three-seed confirmation, secondary challenge metrics, and visually verified PDF pagination. No challenge-blinded molecules enter model development.
+
 Updated: 24 August 2026  
 Latest search version: `coupled_map_atom_features_v1`  
 Hardware: NVIDIA GeForce RTX 5070 Ti, PyTorch 2.11.0 with CUDA 12.8

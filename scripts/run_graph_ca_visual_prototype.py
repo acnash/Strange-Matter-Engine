@@ -25,10 +25,14 @@ import numpy as np
 
 try:
     from runtime_device import load_checkpoint, resolve_torch_device, runtime_metadata
-    from challenge_metrics import bootstrap_macro_soft_threshold_rae
+    from challenge_metrics import (bootstrap_macro_soft_threshold_rae,
+                                   bootstrap_regression_report,
+                                   macro_soft_threshold_rae)
 except ModuleNotFoundError:  # Imported as scripts.run_graph_ca_visual_prototype.
     from scripts.runtime_device import load_checkpoint, resolve_torch_device, runtime_metadata
-    from scripts.challenge_metrics import bootstrap_macro_soft_threshold_rae
+    from scripts.challenge_metrics import (bootstrap_macro_soft_threshold_rae,
+                                           bootstrap_regression_report,
+                                           macro_soft_threshold_rae)
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -75,7 +79,7 @@ BASELINE_ATOM_FEATURES = (
 )
 PERIODIC_ATOM_FEATURES = (
     "atomic_number", "atomic_mass", "covalent_radius", "vdw_radius",
-    "outer_electrons",
+    "outer_electrons", "period", "periodic_group", "atomic_volume",
 )
 VALENCE_ATOM_FEATURES = (
     "total_valence", "implicit_valence", "heavy_atom_degree",
@@ -83,7 +87,12 @@ VALENCE_ATOM_FEATURES = (
 )
 ELECTRONIC_ATOM_FEATURES = (
     "electronegativity", "polarizability", "heteroatom", "halogen",
-    "conjugated_bond_fraction",
+    "conjugated_bond_fraction", "first_ionization_energy", "electron_affinity",
+    "electronic_property_missing",
+)
+LOCAL_ENVIRONMENT_ATOM_FEATURES = (
+    "mean_neighbour_electronegativity", "electronegativity_difference",
+    "mean_neighbour_atomic_number", "neighbour_formal_charge",
 )
 RING_GEOMETRY_ATOM_FEATURES = (
     "ring_count", "ring_size_3", "ring_size_4", "ring_size_5", "ring_size_6",
@@ -91,19 +100,23 @@ RING_GEOMETRY_ATOM_FEATURES = (
 )
 ATOM_FEATURE_NAMES = (BASELINE_ATOM_FEATURES + PERIODIC_ATOM_FEATURES
                       + VALENCE_ATOM_FEATURES + ELECTRONIC_ATOM_FEATURES
-                      + RING_GEOMETRY_ATOM_FEATURES)
+                      + RING_GEOMETRY_ATOM_FEATURES
+                      + LOCAL_ENVIRONMENT_ATOM_FEATURES)
 ATOM_FEATURE_PROFILES = {
     "baseline": BASELINE_ATOM_FEATURES,
     "periodic": BASELINE_ATOM_FEATURES + PERIODIC_ATOM_FEATURES,
     "valence": BASELINE_ATOM_FEATURES + VALENCE_ATOM_FEATURES,
     "electronic": BASELINE_ATOM_FEATURES + ELECTRONIC_ATOM_FEATURES,
     "ring_geometry": BASELINE_ATOM_FEATURES + RING_GEOMETRY_ATOM_FEATURES,
+    "local_environment": BASELINE_ATOM_FEATURES + LOCAL_ENVIRONMENT_ATOM_FEATURES,
     "periodic_valence": (BASELINE_ATOM_FEATURES + PERIODIC_ATOM_FEATURES
                          + VALENCE_ATOM_FEATURES),
     "periodic_electronic": (BASELINE_ATOM_FEATURES + PERIODIC_ATOM_FEATURES
                             + ELECTRONIC_ATOM_FEATURES),
     "valence_electronic": (BASELINE_ATOM_FEATURES + VALENCE_ATOM_FEATURES
                            + ELECTRONIC_ATOM_FEATURES),
+    "electronic_local": (BASELINE_ATOM_FEATURES + ELECTRONIC_ATOM_FEATURES
+                          + LOCAL_ENVIRONMENT_ATOM_FEATURES),
     "comprehensive": ATOM_FEATURE_NAMES,
 }
 
@@ -190,12 +203,22 @@ def atom_features(atom, donor_ids: set[int], acceptor_ids: set[int], mol) -> lis
         float(atom.GetIdx() in acceptor_ids),
     ] + chirality
     periodic_table = Chem.GetPeriodicTable()
+    period_group_volume = {
+        1: (1, 1, 14.1), 6: (2, 14, 16.5), 7: (2, 15, 17.3),
+        8: (2, 16, 14.0), 9: (2, 17, 17.1), 15: (3, 15, 24.4),
+        16: (3, 16, 24.4), 17: (3, 17, 22.7), 35: (4, 17, 27.1),
+        53: (5, 17, 32.5),
+    }
+    period, group, atomic_volume = period_group_volume.get(z, (0, 0, 0.0))
     periodic = [
         z / 100.0,
         periodic_table.GetAtomicWeight(z) / 250.0,
         periodic_table.GetRcovalent(z) / 2.5,
         periodic_table.GetRvdw(z) / 3.0,
         periodic_table.GetNOuterElecs(z) / 8.0,
+        period / 7.0,
+        group / 18.0,
+        atomic_volume / 40.0,
     ]
     explicit_valence = atom.GetValence(Chem.ValenceType.EXPLICIT)
     implicit_valence = atom.GetValence(Chem.ValenceType.IMPLICIT)
@@ -216,6 +239,11 @@ def atom_features(atom, donor_ids: set[int], acceptor_ids: set[int], mol) -> lis
         1: 0.667, 6: 1.76, 7: 1.10, 8: 0.802, 9: 0.557, 15: 3.63,
         16: 2.90, 17: 2.18, 35: 3.05, 53: 5.35,
     }.get(z, 2.5)
+    ionization = {1: 13.60, 6: 11.26, 7: 14.53, 8: 13.62, 9: 17.42,
+                  15: 10.49, 16: 10.36, 17: 12.97, 35: 11.81, 53: 10.45}
+    affinity = {1: 0.75, 6: 1.26, 7: -0.07, 8: 1.46, 9: 3.40,
+                15: 0.75, 16: 2.08, 17: 3.61, 35: 3.36, 53: 3.06}
+    electronic_missing = float(z not in ionization)
     bonds = list(atom.GetBonds())
     electronic = [
         electronegativity / 4.0,
@@ -224,6 +252,9 @@ def atom_features(atom, donor_ids: set[int], acceptor_ids: set[int], mol) -> lis
         float(z in (9, 17, 35, 53)),
         (sum(float(bond.GetIsConjugated()) for bond in bonds) / len(bonds)
          if bonds else 0.0),
+        ionization.get(z, 0.0) / 20.0,
+        affinity.get(z, 0.0) / 4.0,
+        electronic_missing,
     ]
     atom_index = atom.GetIdx()
     ring_sizes = [len(ring) for ring in mol.GetRingInfo().AtomRings()
@@ -233,7 +264,20 @@ def atom_features(atom, donor_ids: set[int], acceptor_ids: set[int], mol) -> lis
         *[float(size in ring_sizes) for size in (3, 4, 5, 6, 7)],
         float(any(size >= 8 for size in ring_sizes)),
     ]
-    return baseline + periodic + valence + electronic + ring_geometry
+    neighbours = list(atom.GetNeighbors())
+    neighbour_en = [{1: 2.20, 6: 2.55, 7: 3.04, 8: 3.44, 9: 3.98,
+                     15: 2.19, 16: 2.58, 17: 3.16, 35: 2.96, 53: 2.66}.get(
+                         neighbour.GetAtomicNum(), 2.5) for neighbour in neighbours]
+    mean_neighbour_en = float(np.mean(neighbour_en)) if neighbour_en else electronegativity
+    local_environment = [
+        mean_neighbour_en / 4.0,
+        (electronegativity - mean_neighbour_en) / 4.0,
+        (float(np.mean([n.GetAtomicNum() for n in neighbours])) / 100.0
+         if neighbours else z / 100.0),
+        (float(np.mean([n.GetFormalCharge() for n in neighbours])) / 3.0
+         if neighbours else 0.0),
+    ]
+    return baseline + periodic + valence + electronic + ring_geometry + local_environment
 
 
 def bond_features(bond) -> list[float]:
@@ -337,7 +381,7 @@ def prepare() -> None:
     val_idx = [i for i, r in enumerate(train) if r["scaffold"] in validation_groups]
     payload = {"train": train, "test": test, "train_idx": train_idx,
                "val_idx": val_idx, "rejected": rejected, "seed": SEED}
-    payload["challenge_metric_schema"] = "ma_st_rae_v1"
+    payload["challenge_metric_schema"] = "challenge_aligned_v2"
     payload["atom_feature_names"] = list(ATOM_FEATURE_NAMES)
     CACHE.parent.mkdir(parents=True, exist_ok=True)
     with CACHE.open("wb") as handle:
@@ -828,6 +872,21 @@ def train(extended_dynamics: bool = False) -> None:
 
     fit_indices = list(data["train_idx"])
     validation_indices = list(data["val_idx"])
+    cv_fold_text = os.environ.get("SME_CV_FOLD")
+    cv_folds = int(os.environ.get("SME_CV_FOLDS", "5"))
+    if cv_fold_text is not None:
+        cv_fold = int(cv_fold_text)
+        if not 0 <= cv_fold < cv_folds:
+            raise ValueError("SME_CV_FOLD must lie in [0, SME_CV_FOLDS)")
+        fitting_scaffolds = sorted({data["train"][i]["scaffold"] for i in fit_indices})
+        fold_rng = random.Random(260822)
+        fold_rng.shuffle(fitting_scaffolds)
+        validation_scaffolds = set(fitting_scaffolds[cv_fold::cv_folds])
+        pool = fit_indices
+        fit_indices = [i for i in pool
+                       if data["train"][i]["scaffold"] not in validation_scaffolds]
+        validation_indices = [i for i in pool
+                              if data["train"][i]["scaffold"] in validation_scaffolds]
     if TUNING_ONLY:
         subset_rng = random.Random(SEED + 991)
         subset_rng.shuffle(fit_indices); subset_rng.shuffle(validation_indices)
@@ -868,16 +927,16 @@ def train(extended_dynamics: bool = False) -> None:
         features, targets = fingerprints_and_targets(fit_pairs)
         return differentiable_ridge_fit(features, targets, RIDGE_STRENGTH)
 
-    def evaluate(pairs, ridge_state):
+    def evaluate(pairs, ridge_state, bootstrap=False):
         model.eval(); ys, ps = [], []
         features, targets = fingerprints_and_targets(pairs)
         with torch.no_grad():
             predictions = differentiable_ridge_predict(features, ridge_state)
         ys = targets.cpu().numpy(); ps = predictions.cpu().numpy()
         lows, highs, endpoints = credible_bounds(pairs)
-        ma_st_rae, per_cyp = bootstrap_macro_soft_threshold_rae(
-            ys, ps, lows, highs, endpoints, CYPS
-        )
+        metric = (bootstrap_macro_soft_threshold_rae if bootstrap
+                  else macro_soft_threshold_rae)
+        ma_st_rae, per_cyp = metric(ys, ps, lows, highs, endpoints, CYPS)
         return (float(np.sqrt(np.mean((ys - ps) ** 2))), ma_st_rae,
                 per_cyp, ys, ps)
 
@@ -980,10 +1039,17 @@ def train(extended_dynamics: bool = False) -> None:
         writer = csv.DictWriter(handle, fieldnames=history[0].keys()); writer.writeheader(); writer.writerows(history)
 
     train_rmse, train_ma_st_rae, train_per_cyp, train_y, train_p = evaluate(
-        fit_pairs, final_ridge_state
+        fit_pairs, final_ridge_state, bootstrap=True
     )
     val_rmse, val_ma_st_rae, val_per_cyp, val_y, val_p = evaluate(
-        val_pairs, final_ridge_state
+        val_pairs, final_ridge_state, bootstrap=True
+    )
+    val_lows, val_highs, val_endpoints = credible_bounds(val_pairs)
+    val_point_ma_st_rae, val_point_per_cyp = macro_soft_threshold_rae(
+        val_y, val_p, val_lows, val_highs, val_endpoints, CYPS
+    )
+    challenge_report = bootstrap_regression_report(
+        val_y, val_p, val_lows, val_highs, val_endpoints, CYPS
     )
     pair_rows = []
     for split, pairs, ys, ps in (("fit", fit_pairs, train_y, train_p),
@@ -1006,8 +1072,11 @@ def train(extended_dynamics: bool = False) -> None:
         "restored_fit_rmse": train_rmse, "restored_validation_rmse": val_rmse,
         "restored_fit_ma_st_rae": train_ma_st_rae,
         "restored_validation_ma_st_rae": val_ma_st_rae,
+        "restored_validation_point_ma_st_rae": val_point_ma_st_rae,
+        "restored_validation_point_st_rae_by_cyp": val_point_per_cyp,
         "restored_fit_st_rae_by_cyp": train_per_cyp,
         "restored_validation_st_rae_by_cyp": val_per_cyp,
+        "validation_bootstrap_metrics": challenge_report,
         "epochs_run": len(history), "fit_observations": len(fit_pairs),
         "validation_observations": len(val_pairs), "rule": RULE,
         "generations": GENERATIONS, "hidden_channels": hidden,
@@ -1020,6 +1089,10 @@ def train(extended_dynamics: bool = False) -> None:
         "peak_gpu_memory_bytes": (torch.cuda.max_memory_allocated(device)
                                   if device.type == "cuda" else 0),
         "runtime": run_runtime,
+        "validation_protocol": ({"kind": "scaffold_cross_validation",
+                                  "fold": int(cv_fold_text), "folds": cv_folds}
+                                 if cv_fold_text is not None else
+                                 {"kind": "reserved_scaffold_holdout"}),
         "readout": "differentiable_closed_form_ridge",
         "hyperparameters": {"ca_lr": CA_LR,
         "ridge": RIDGE_STRENGTH, "ca_l2": CA_L2,
@@ -1036,7 +1109,7 @@ def train(extended_dynamics: bool = False) -> None:
         def trajectory_scores(trajectory):
             mean_state = trajectory.mean(axis=1)
             steps = np.linalg.norm(np.diff(mean_state, axis=0), axis=1)
-            late_start = max(10, len(mean_state) // 2)
+            late_start = min(max(2, len(mean_state) // 2), len(mean_state) - 2)
             late = mean_state[late_start:]
             late_steps = np.linalg.norm(np.diff(late, axis=0), axis=1)
             mean_step = float(np.mean(late_steps)) + 1e-12
@@ -1044,7 +1117,11 @@ def train(extended_dynamics: bool = False) -> None:
             for lag in range(2, min(64, max(2, len(late) // 3)) + 1):
                 distance = float(np.mean(np.linalg.norm(late[lag:] - late[:-lag], axis=1)))
                 recurrence.append((distance / (lag * mean_step + 1e-12), lag, distance))
-            recurrence_ratio, recurrence_lag, recurrence_distance = min(recurrence)
+            if recurrence:
+                recurrence_ratio, recurrence_lag, recurrence_distance = min(recurrence)
+            else:
+                recurrence_ratio, recurrence_lag = float("inf"), 0
+                recurrence_distance = float("inf")
             centered = late - late.mean(axis=0, keepdims=True)
             power = np.abs(np.fft.rfft(centered, axis=0)) ** 2
             power = power[1:]
@@ -1102,6 +1179,10 @@ def train(extended_dynamics: bool = False) -> None:
             ),
             reverse=True,
         )[:perturbation_case_limit]
+        perturbation_deferred_reason = None
+        if ranked and device.type == "cuda" and os.name == "nt":
+            perturbation_deferred_reason = "windows_cuda_native_stability_guard"
+            ranked = []
         selected_dir = OUT / "selected_validation_trajectories"
         selected_dir.mkdir(parents=True, exist_ok=True)
         perturbation_rows = []
@@ -1110,9 +1191,6 @@ def train(extended_dynamics: bool = False) -> None:
           with torch.no_grad():
             print(json.dumps({"dynamics_phase": "perturbation_start",
                               "selected": len(ranked)}), flush=True)
-            selected_examples = []
-            reference_perturbations = []
-            perturbed_perturbations = []
             for rank, score_index in enumerate(ranked, start=1):
                 row = score_rows[score_index]
                 rec = data["train"][row["training_index"]]
@@ -1121,22 +1199,13 @@ def train(extended_dynamics: bool = False) -> None:
                 direction = torch.randn(shape, generator=generator,
                                         device=device)
                 direction = epsilon * direction / torch.linalg.vector_norm(direction)
-                selected_examples.append((rec, row["cyp_index"]))
-                reference_perturbations.append(torch.zeros_like(direction))
-                perturbed_perturbations.append(direction)
-            paired_examples = selected_examples + selected_examples
-            paired_perturbations = reference_perturbations + perturbed_perturbations
-            _, paired_states, _, atom_counts = model.forward_batch(
-                paired_examples, initial_perturbations=paired_perturbations,
-                return_node_trajectory=True,
-            )
-            offsets = np.cumsum([0] + atom_counts)
-            selected_count = len(selected_examples)
-            for rank, score_index in enumerate(ranked, start=1):
-                row = score_rows[score_index]
-                reference_tensor = paired_states[:, offsets[rank - 1]:offsets[rank]]
-                paired_index = selected_count + rank - 1
-                perturbed_tensor = paired_states[:, offsets[paired_index]:offsets[paired_index + 1]]
+                _, reference_tensor = model.forward_one(
+                    rec, row["cyp_index"], return_trajectory=True,
+                )
+                _, perturbed_tensor = model.forward_one(
+                    rec, row["cyp_index"], return_trajectory=True,
+                    initial_perturbation=direction,
+                )
                 distances = torch.linalg.vector_norm(
                     perturbed_tensor - reference_tensor, dim=(1, 2)
                 ).cpu().numpy()
@@ -1195,7 +1264,8 @@ def train(extended_dynamics: bool = False) -> None:
                 for label in sorted({r["classification"] for r in perturbation_rows})
             },
             "perturbation_status": ("complete" if perturbation_rows else
-                                    "deferred_after_native_cuda_failure"),
+                                    perturbation_deferred_reason or
+                                    "not_requested"),
         }
     if TUNING_ONLY:
         (OUT / "metrics.json").write_text(json.dumps(common_metrics, indent=2) + "\n")

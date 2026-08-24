@@ -119,7 +119,10 @@ def main():
         ax.bar(np.arange(len(perturbations)), perturbations.finite_time_lyapunov, color=colours)
         ax.axhline(0, c=WHITE, lw=1)
     else:
-        ax.text(.5, .5, "Perturbation confirmation deferred\nafter native CUDA failure",
+        status = summary.get("final_metrics", {}).get("dynamical_analysis", {}).get(
+            "perturbation_status", "not requested"
+        ).replace("_", " ")
+        ax.text(.5, .5, f"Perturbation confirmation deferred\n{status}",
                 ha="center", va="center", transform=ax.transAxes, color=MAGENTA, fontsize=14)
     ax.set(xlabel="Selected validation case",
         ylabel="Finite-time divergence slope", title="Perturbation-response screening")
@@ -141,6 +144,8 @@ def main():
                             topMargin=14*mm, bottomMargin=14*mm,
                             title=f"{summary['rule']} production study")
     winner = summary["winner"]; metrics = summary["final_metrics"]
+    bootstrap_metrics = metrics.get("validation_bootstrap_metrics", {})
+    macro_metrics = bootstrap_metrics.get("macro", {})
     story = [Paragraph("Strange Matter Engine", title),
              Paragraph(f"Production study: {summary['rule']}", heading),
              Paragraph("Direct-inhibition pIC50 | grouped validation | blinded set excluded", body),
@@ -160,6 +165,14 @@ def main():
                   ["Gradient clip", str(winner["gradient_clip"])],
                   ["Confirmation mean", f"{summary.get('winner_confirmation_mean_ma_st_rae', summary.get('winner_confirmation_mean_rmse')):.4f}"],
                   ["Confirmation seed SD", f"{summary.get('winner_confirmation_ma_st_rae_seed_sd', summary.get('winner_confirmation_seed_sd', 0.0)):.4f}"]]
+    for metric_name, label in (("mae", "Bootstrap MA-MAE"),
+                               ("r2", "Bootstrap MA-R2"),
+                               ("spearman_rho", "Bootstrap MA-Spearman rho"),
+                               ("kendall_tau", "Bootstrap MA-Kendall tau")):
+        result = macro_metrics.get(metric_name)
+        if result:
+            table_data.append([label, (f"{result['mean']:.4f} "
+                                      f"[{result['ci_low']:.4f}, {result['ci_high']:.4f}]")])
     table = Table(table_data, colWidths=(70*mm, 85*mm))
     table.setStyle(TableStyle([("BACKGROUND", (0,0), (-1,0), colors.HexColor(PANEL)),
                                ("TEXTCOLOR", (0,0), (-1,0), colors.HexColor(WHITE)),
@@ -182,11 +195,14 @@ def main():
               Image(str(figures / "02_validation.png"), width=124*mm, height=124*mm),
               Image(str(figures / "03_per_cyp.png"), width=170*mm, height=96*mm),
               PageBreak(), Paragraph("Optimization", heading),
-              Paragraph("Ridge coefficients and the unpenalized intercept were solved from permitted fitting fingerprints. Query error differentiated through the solve into the graph CA; Adam updated only CA parameters. Bond-conditioned messages, cosine learning-rate decay, and multitime trajectory statistics were shared across all five rules.", body),
+              Paragraph("Ridge coefficients and the unpenalized intercept were solved from permitted fitting fingerprints. Query error differentiated through the solve into the graph CA; Adam updated only CA parameters. Bond-conditioned messages, cosine learning-rate decay, and multitime trajectory statistics were shared across all ten rules.", body),
               Image(str(figures / "04_learning.png"), width=170*mm, height=96*mm),
               PageBreak(), Paragraph("Emergent dynamics", heading),
               Paragraph("The validation trajectories were screened for convergence, recurrence, persistent motion, spectral complexity, and perturbation sensitivity. Labels ending in candidate require longer, renormalized and seed-repeated confirmation before any attractor or chaos claim.", body),
               Image(str(figures / "05_dynamics.png"), width=170*mm, height=106*mm),
+              PageBreak(), Paragraph("Permutation and perturbation screening", heading),
+              Paragraph("This figure tests whether small state perturbations separate or contract over the observed finite trajectory. It is placed on a dedicated page to preserve its axes, labels, and complete plotting area.", body),
+              Spacer(1, 3*mm),
               Image(str(figures / "06_perturbations.png"), width=170*mm, height=96*mm),
               Paragraph("Scientific limitations", heading),
               Paragraph("This report describes one transition-rule study under the declared grouped split. Hyperparameter selection and early stopping used labelled training data only. The blinded challenge set was not loaded or predicted. Finite-time positive slopes are screening signals rather than proof of a strange attractor or sustained chaos.", body)]
