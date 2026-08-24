@@ -6,6 +6,7 @@ from __future__ import annotations
 import argparse
 import csv
 import json
+import math
 import os
 import pickle
 import random
@@ -333,8 +334,22 @@ def main():
                     cv_fold=fold,
                 )
                 config_metrics.append(metrics)
-        confirmation_mean = sum(score(m) for m in config_metrics) / len(config_metrics)
-        variance = sum((score(m) - confirmation_mean) ** 2 for m in config_metrics) / len(config_metrics)
+        # Confirmation runs have already completed and may carry a conservative
+        # stability warning despite producing a finite official metric.  Avoid
+        # inf-inf arithmetic, which previously yielded a NaN robust score and
+        # corrupted the report.  Retain the warning separately while aggregating
+        # every finite observed MA-ST-RAE.
+        confirmation_scores = [
+            float(m.get("restored_validation_ma_st_rae", float("inf")))
+            for m in config_metrics
+        ]
+        confirmation_scores = [v for v in confirmation_scores if math.isfinite(v)]
+        if not confirmation_scores:
+            confirmation_mean = seed_sd = robust_score = float("inf")
+            confirmations.append((config, config_metrics, confirmation_mean, seed_sd, robust_score))
+            continue
+        confirmation_mean = sum(confirmation_scores) / len(confirmation_scores)
+        variance = sum((v - confirmation_mean) ** 2 for v in confirmation_scores) / len(confirmation_scores)
         seed_sd = variance ** 0.5
         robust_score = confirmation_mean + 0.25 * seed_sd
         confirmations.append((config, config_metrics, confirmation_mean, seed_sd, robust_score))

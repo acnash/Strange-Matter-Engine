@@ -12,6 +12,10 @@ Gated residual completed in 61.8 minutes. Its sealed-holdout bootstrapped MA-ST-
 
 Inertial reaction diffusion completed in 69.0 minutes. Its sealed-holdout bootstrapped MA-ST-RAE is **0.8241** (95% CI 0.7763 to 0.8681), with point MA-ST-RAE 0.8210 and RMSE 0.8892. Endpoint ST-RAE values are CYP1A2 0.8328, CYP2C9 0.7803, CYP2D6 1.0391, and CYP3A4 0.6443. The winner uses 32 generations, 16 dynamical channels, the electronic atom profile, CA learning rate 0.003, and ridge penalty 1.0. Confirmation across five scaffold folds and three seeds gave MA-ST-RAE 0.8526 with seed SD 0.0298. All 1,309 holdout trajectories were screened; recurrence is approximately 0.992 to 0.997 with persistent low-amplitude late motion and spectral entropy approximately 0.575 to 0.633. These are finite-time recurrent-transient candidates rather than confirmed attractors or chaos. The blinded set remained sealed.
 
+### 3 of 10: activator inhibitor complete
+
+Activator inhibitor completed in 93.0 minutes. Its sealed-holdout bootstrapped MA-ST-RAE is **0.8366** (95% CI 0.7936 to 0.8817), with RMSE 0.8987. Endpoint behaviour remains weakest for CYP2D6 and strongest for CYP3A4. The winner uses 64 generations, 16 dynamical channels, the valence-electronic atom profile, CA learning rate 0.001, and ridge penalty 1.0. Confirmation across five scaffold folds and three seeds gave MA-ST-RAE 0.8807 with seed SD 0.0023. Dynamical screening shows several recurrence-motion branches, including a lower-motion branch around recurrence 0.9 to 0.95, but no attractor or chaos claim is made. The blinded set remained sealed. PDF verification also identified and corrected an infinity/NaN confirmation-report aggregation defect before publication.
+
 Updated: 24 August 2026  
 Latest search version: `coupled_map_atom_features_v1`  
 Hardware: NVIDIA GeForce RTX 5070 Ti, PyTorch 2.11.0 with CUDA 12.8
