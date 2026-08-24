@@ -157,6 +157,56 @@ Success means:
 
 Leaderboard victory is welcome, but learning, scientific defensibility, completion, and insight are the principal measures of success.
 
+## Official challenge contract
+
+The authoritative rules, submission form, and live leaderboard are hosted in the [OpenADMET CYP Inhibition Blind Challenge Space](https://huggingface.co/spaces/openadmet/cyp-challenge). The two tracks are independent: a team may enter either or both, each through a separate file and leaderboard.
+
+### Evaluation
+
+| Track | Targets | Primary metric | Secondary metrics |
+|---|---|---|---|
+| Direct inhibition (regression) | `pIC50` for CYP1A2, CYP2C9, CYP2D6, and CYP3A4 | Macro-Averaged Soft-Threshold Relative Absolute Error (MA-ST-RAE) across the four isoforms | MAE, R², Spearman ρ, and Kendall's τ |
+| Time-dependent inhibition (classification) | Boolean `is_TDI` for CYP2D6 and CYP3A4 | Matthews Correlation Coefficient (MCC) | Accuracy, precision, recall, and F1 |
+
+All reported metrics use 1,000 bootstrap resamples. For direct inhibition, values below `pIC50 = 4` lie outside the assay's reliable dynamic range. ST-RAE measures error from the nearest bound of the fitted dose-response credible interval, with zero error for predictions inside that interval.
+
+The TDI label represents an IC50 shift after preincubation. For compounds with direct-inhibition `pIC50 > 4`, a shift greater than two-fold (`log10(2) = 0.301`) is positive and a smaller shift is negative. When direct-inhibition `pIC50 < 4`, a TDI-arm `pIC50 > 4.301` is an inferred positive, while a TDI-arm `pIC50 < 4` is assigned negative. Predictions are required for every test compound, although only confidently assigned labels contribute to the classification score.
+
+### Submission files
+
+Each submission must be a `.parquet` file (preferred by the organisers) or `.csv` file with exactly 750 rows, one for each blinded test compound. Column names are case-sensitive. Every prediction cell must be populated; regression values must be finite floats with no `NaN`, `inf`, or `-inf`, and classification values must be Boolean (`True`/`False` or `1`/`0`). Run the official tutorial repository's validation script before uploading.
+
+The regression file must contain exactly these six columns:
+
+```text
+SMILES
+Molecule_Name
+CYP1A2_pIC50_direct_inhibition
+CYP2C9_pIC50_direct_inhibition
+CYP2D6_pIC50_direct_inhibition
+CYP3A4_pIC50_direct_inhibition
+```
+
+The classification file must contain exactly these four columns:
+
+```text
+SMILES
+Molecule_Name
+CYP2D6_is_TDI
+CYP3A4_is_TDI
+```
+
+### Participation rules and dates
+
+- Submit under one Hugging Face account for the collaborating team or laboratory. Cooperating members may not enter separately.
+- Submissions are limited to one every 12 hours. Only the latest valid submission determines the live leaderboard standing.
+- External data and pretrained models are permitted. Use of proprietary training data must be disclosed during submission.
+- Public source code is encouraged and is required for consideration for the Innovation in ML Award. Select the open-source disclosure and supply a publicly accessible repository link when submitting.
+- The intermediate-submission deadline is September 24, 2026 at 23:59 UTC. The intermediate leaderboard is released September 25 using the full test set, without revealing ground-truth labels.
+- Final submissions close November 3, 2026 at 23:59 UTC. Final results and challenge wrap-up begin November 4.
+
+The blinded test labels must remain excluded from training, hyperparameter optimisation, early stopping, threshold selection, and model selection. The intermediate leaderboard is for reporting progress and must not become a tuning target.
+
 ## Schematic
 
 ```text
@@ -219,4 +269,4 @@ All rules share tunable update scale, initial-state scale and training noise, su
 
 Production selection uses grouped validation only. Stable finalists are repeated across three seeds and ranked by mean RMSE plus one quarter of the seed standard deviation. Dynamical measurements remain descriptive secondary outputs and never influence predictive promotion. The blinded challenge set remains outside tuning, selection, and report generation.
 
-For the chemistry-augmented Gray-Scott study, atom feature profiles are also tuned. Every profile retains the original 25 atom channels and may add periodic properties, valence descriptors, electronic descriptors, ring geometry, or controlled combinations of those groups. Run the resumable CUDA/CPU search with `python scripts/run_gray_scott_feature_search.py --device auto`; its dedicated graph cache is prepared with the blinded set excluded.
+For the chemistry-augmented Gray-Scott and coupled-map studies, atom feature profiles are also tuned. Every profile retains the original 25 atom channels and may add periodic properties, valence descriptors, electronic descriptors, ring geometry, or controlled combinations of those groups. Run the resumable CUDA/CPU searches with `python scripts/run_gray_scott_feature_search.py --device auto` or `python scripts/run_coupled_map_feature_search.py --device auto`; each dedicated graph cache is prepared with the blinded set excluded.

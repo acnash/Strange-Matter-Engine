@@ -1,8 +1,16 @@
 # Latest production summary
 
 Updated: 24 August 2026  
-Latest search version: `gray_scott_atom_features_v1`  
+Latest search version: `coupled_map_atom_features_v1`  
 Hardware: NVIDIA GeForce RTX 5070 Ti, PyTorch 2.11.0 with CUDA 12.8
+
+## Latest coupled-map chemistry search
+
+The chemistry-augmented coupled-map study completed the same 72 broad trials, 16 refinements, four three-seed confirmations, final training, and dynamical screening protocol used for Gray-Scott. The final restored grouped-validation RMSE is **0.8839 pIC50**. The selected configuration confirmed at **0.8806 ± 0.0021 RMSE** across seeds 1701, 2909, and 4211. Its confirmation variability is lower than the preceding coupled-map study, while its final seed is 0.0051 pIC50 worse than the preceding final RMSE of 0.8788.
+
+The winning `valence_electronic` profile contains 35 atom properties: the original 25 descriptors plus total and implicit valence, heavy-atom degree, radical-electron count, absolute formal charge, Pauling electronegativity, approximate polarizability, heteroatom and halogen indicators, and incident conjugated-bond fraction. The selected graph cellular automaton uses 250 generations and 24 dynamical channels. The complete search took 105.3 minutes, and final-model training took 742.0 seconds on CUDA.
+
+The blinded set remained sealed. The saved model is `results/production_coupled_map_coupled_map_atom_features_v1/runs/final_model/model.pt`, and the report is `output/pdf/coupled_map_coupled_map_atom_features_v1_production_report.pdf`. Among 1,309 screened validation trajectories, median recurrence was zero, median late motion was 3.78e-6, and median spectral entropy was effectively zero. A small tail reached recurrence 0.0111 and spectral entropy 0.4577. This pattern is consistent with a largely strongly contracting regime plus a small set of more complex transients; it is not proof of point attractors, strange attractors, or chaos.
 
 ## Latest Gray-Scott chemistry search
 
@@ -58,6 +66,7 @@ These screens identify transient structure and candidate recurrent regimes. They
 
 ## Reports
 
+- `output/pdf/coupled_map_coupled_map_atom_features_v1_production_report.pdf`
 - `output/pdf/gray_scott_gray_scott_atom_features_v1_production_report.pdf`
 - `output/pdf/gated_residual_enhanced_v3_production_report.pdf`
 - `output/pdf/inertial_reaction_diffusion_enhanced_v3_production_report.pdf`
