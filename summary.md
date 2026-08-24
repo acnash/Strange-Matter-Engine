@@ -4,6 +4,10 @@
 
 The ten-rule rerun now uses scaffold cross-validation inside the fitting pool, a sealed scaffold holdout, point MA-ST-RAE for efficient screening, and the official 1,000-resample bootstrap for finalists. The common search includes expanded chemical feature groups, rule-specific dynamics, surrogate-guided refinement, successive halving, five-fold and three-seed confirmation, secondary challenge metrics, and visually verified PDF pagination. No challenge-blinded molecules enter model development.
 
+### 1 of 10: gated residual complete
+
+Gated residual completed in 61.8 minutes. Its sealed-holdout bootstrapped MA-ST-RAE is **0.8073** (95% CI 0.7610 to 0.8531), with point MA-ST-RAE 0.8030 and RMSE 0.8774. Endpoint ST-RAE values are CYP1A2 0.8257, CYP2C9 0.8028, CYP2D6 0.9767, and CYP3A4 0.6239. The winner uses 64 generations, 16 dynamical channels, and the local-environment atom profile. All 1,309 holdout trajectories were screened; the recurrence-motion distribution forms several continuous bands, while Windows CUDA perturbation propagation remains guarded against a native runtime failure and no attractor or chaos claim is made.
+
 Updated: 24 August 2026  
 Latest search version: `coupled_map_atom_features_v1`  
 Hardware: NVIDIA GeForce RTX 5070 Ti, PyTorch 2.11.0 with CUDA 12.8
