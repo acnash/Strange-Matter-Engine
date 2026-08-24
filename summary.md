@@ -8,6 +8,10 @@ The ten-rule rerun now uses scaffold cross-validation inside the fitting pool, a
 
 Gated residual completed in 61.8 minutes. Its sealed-holdout bootstrapped MA-ST-RAE is **0.8073** (95% CI 0.7610 to 0.8531), with point MA-ST-RAE 0.8030 and RMSE 0.8774. Endpoint ST-RAE values are CYP1A2 0.8257, CYP2C9 0.8028, CYP2D6 0.9767, and CYP3A4 0.6239. The winner uses 64 generations, 16 dynamical channels, and the local-environment atom profile. All 1,309 holdout trajectories were screened; the recurrence-motion distribution forms several continuous bands, while Windows CUDA perturbation propagation remains guarded against a native runtime failure and no attractor or chaos claim is made.
 
+### 2 of 10: inertial reaction diffusion complete
+
+Inertial reaction diffusion completed in 69.0 minutes. Its sealed-holdout bootstrapped MA-ST-RAE is **0.8241** (95% CI 0.7763 to 0.8681), with point MA-ST-RAE 0.8210 and RMSE 0.8892. Endpoint ST-RAE values are CYP1A2 0.8328, CYP2C9 0.7803, CYP2D6 1.0391, and CYP3A4 0.6443. The winner uses 32 generations, 16 dynamical channels, the electronic atom profile, CA learning rate 0.003, and ridge penalty 1.0. Confirmation across five scaffold folds and three seeds gave MA-ST-RAE 0.8526 with seed SD 0.0298. All 1,309 holdout trajectories were screened; recurrence is approximately 0.992 to 0.997 with persistent low-amplitude late motion and spectral entropy approximately 0.575 to 0.633. These are finite-time recurrent-transient candidates rather than confirmed attractors or chaos. The blinded set remained sealed.
+
 Updated: 24 August 2026  
 Latest search version: `coupled_map_atom_features_v1`  
 Hardware: NVIDIA GeForce RTX 5070 Ti, PyTorch 2.11.0 with CUDA 12.8
