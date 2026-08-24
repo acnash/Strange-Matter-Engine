@@ -170,6 +170,8 @@ The authoritative rules, submission form, and live leaderboard are hosted in the
 
 All reported metrics use 1,000 bootstrap resamples. For direct inhibition, values below `pIC50 = 4` lie outside the assay's reliable dynamic range. ST-RAE measures error from the nearest bound of the fitted dose-response credible interval, with zero error for predictions inside that interval.
 
+Production hyperparameter promotion, early stopping, seed confirmation, and final model selection use grouped-validation **MA-ST-RAE**, with the four CYP isoforms weighted equally. The differentiable training objective remains mean squared error because the interval-based challenge metric contains flat and non-smooth regions; RMSE remains a secondary diagnostic and no longer determines which configuration advances. Credible-interval columns are stored in the prepared graph cache and written beside every labelled prediction for auditability.
+
 The TDI label represents an IC50 shift after preincubation. For compounds with direct-inhibition `pIC50 > 4`, a shift greater than two-fold (`log10(2) = 0.301`) is positive and a smaller shift is negative. When direct-inhibition `pIC50 < 4`, a TDI-arm `pIC50 > 4.301` is an inferred positive, while a TDI-arm `pIC50 < 4` is assigned negative. Predictions are required for every test compound, although only confidently assigned labels contribute to the classification score.
 
 ### Submission files

@@ -47,12 +47,15 @@ def main():
     perturbations = pd.read_csv(final_dir / "validation_perturbations.csv")
     figures = study_dir / "figures"; figures.mkdir(exist_ok=True)
     figure_style()
+    official_selection = "validation_ma_st_rae" in trials.columns
+    selection_column = "validation_ma_st_rae" if official_selection else "validation_rmse"
+    selection_label = "Validation MA-ST-RAE" if official_selection else "Validation RMSE (pIC50)"
 
     fig, ax = plt.subplots(figsize=(8, 5))
     for stage, colour in (("stage1", CYAN), ("stage2", MAGENTA), ("confirmation", LIME)):
         q = trials[trials.stage == stage]
-        ax.scatter(q.generations, q.validation_rmse, c=colour, alpha=.7, label=stage)
-    ax.set(xscale="log", xlabel="CA generations", ylabel="Validation RMSE (pIC50)",
+        ax.scatter(q.generations, q[selection_column], c=colour, alpha=.7, label=stage)
+    ax.set(xscale="log", xlabel="CA generations", ylabel=selection_label,
            title="Hyperparameter search by trajectory length")
     ax.grid(alpha=.18); ax.legend(); fig.subplots_adjust(left=.12, right=.97, bottom=.13, top=.90)
     fig.savefig(figures / "01_search.png", dpi=200); plt.close(fig)
@@ -67,20 +70,37 @@ def main():
            title="Grouped-validation predictions"); ax.grid(alpha=.18)
     fig.subplots_adjust(left=.14, right=.97, bottom=.12, top=.91); fig.savefig(figures / "02_validation.png", dpi=200); plt.close(fig)
 
-    per_cyp = q.groupby("cyp_target").apply(
-        lambda x: np.sqrt(np.mean((x.predicted_pic50 - x.experimental_pic50) ** 2)),
-        include_groups=False,
-    )
+    if {"credible_interval_low", "credible_interval_high"}.issubset(q.columns):
+        def endpoint_st_rae(frame):
+            error = np.maximum(frame.predicted_pic50 - frame.credible_interval_high, 0)
+            error += np.maximum(frame.credible_interval_low - frame.predicted_pic50, 0)
+            baseline = frame.experimental_pic50.mean()
+            baseline_error = np.maximum(baseline - frame.credible_interval_high, 0)
+            baseline_error += np.maximum(frame.credible_interval_low - baseline, 0)
+            return error.sum() / baseline_error.sum()
+        per_cyp = q.groupby("cyp_target").apply(endpoint_st_rae, include_groups=False)
+        per_cyp_label = "Validation ST-RAE"
+    else:
+        per_cyp = q.groupby("cyp_target").apply(
+            lambda x: np.sqrt(np.mean((x.predicted_pic50 - x.experimental_pic50) ** 2)),
+            include_groups=False,
+        )
+        per_cyp_label = "Validation RMSE (pIC50)"
     fig, ax = plt.subplots(figsize=(8, 4.5))
     ax.bar(per_cyp.index, per_cyp.values, color=(CYAN, MAGENTA, LIME, "#7A5CFA"))
-    ax.set(ylabel="Validation RMSE (pIC50)", title="Per-CYP predictive performance")
+    ax.set(ylabel=per_cyp_label, title="Per-CYP predictive performance")
     ax.grid(axis="y", alpha=.18); fig.subplots_adjust(left=.12, right=.97, bottom=.14, top=.88)
     fig.savefig(figures / "03_per_cyp.png", dpi=200); plt.close(fig)
 
     fig, ax = plt.subplots(figsize=(8, 4.5))
-    ax.plot(history.epoch, history.train_rmse, c=CYAN, label="query training")
-    ax.plot(history.epoch, history.validation_rmse, c=MAGENTA, label="validation")
-    ax.set(xlabel="Epoch", ylabel="RMSE (pIC50)", title="Final-model learning curve")
+    if "validation_ma_st_rae" in history.columns:
+        ax.plot(history.epoch, history.validation_ma_st_rae, c=MAGENTA,
+                label="validation MA-ST-RAE")
+        learning_label = "MA-ST-RAE"
+    else:
+        ax.plot(history.epoch, history.validation_rmse, c=MAGENTA, label="validation")
+        learning_label = "RMSE (pIC50)"
+    ax.set(xlabel="Epoch", ylabel=learning_label, title="Final-model selection curve")
     ax.grid(alpha=.18); ax.legend(); fig.subplots_adjust(left=.12, right=.97, bottom=.14, top=.88)
     fig.savefig(figures / "04_learning.png", dpi=200); plt.close(fig)
 
@@ -126,6 +146,9 @@ def main():
              Paragraph("Direct-inhibition pIC50 | grouped validation | blinded set excluded", body),
              Spacer(1, 5*mm)]
     table_data = [["Quantity", "Result"],
+                  *([["Validation MA-ST-RAE", f"{metrics['restored_validation_ma_st_rae']:.4f}"],
+                     ["Fit MA-ST-RAE", f"{metrics['restored_fit_ma_st_rae']:.4f}"]]
+                    if "restored_validation_ma_st_rae" in metrics else []),
                   ["Validation RMSE", f"{metrics['restored_validation_rmse']:.4f} pIC50"],
                   ["Fit RMSE", f"{metrics['restored_fit_rmse']:.4f} pIC50"],
                   ["Generations", str(winner["generations"])],
@@ -135,8 +158,8 @@ def main():
                   ["Ridge penalty", str(winner["ridge"])],
                   ["CA L2", str(winner["ca_l2"])],
                   ["Gradient clip", str(winner["gradient_clip"])],
-                  ["Confirmation mean RMSE", f"{summary['winner_confirmation_mean_rmse']:.4f}"],
-                  ["Confirmation seed SD", f"{summary.get('winner_confirmation_seed_sd', 0.0):.4f}"]]
+                  ["Confirmation mean", f"{summary.get('winner_confirmation_mean_ma_st_rae', summary.get('winner_confirmation_mean_rmse')):.4f}"],
+                  ["Confirmation seed SD", f"{summary.get('winner_confirmation_ma_st_rae_seed_sd', summary.get('winner_confirmation_seed_sd', 0.0)):.4f}"]]
     table = Table(table_data, colWidths=(70*mm, 85*mm))
     table.setStyle(TableStyle([("BACKGROUND", (0,0), (-1,0), colors.HexColor(PANEL)),
                                ("TEXTCOLOR", (0,0), (-1,0), colors.HexColor(WHITE)),
@@ -153,7 +176,9 @@ def main():
     story += [table, Spacer(1, 2*mm), Paragraph(enhanced, body), Spacer(1, 3*mm),
               Image(str(figures / "01_search.png"), width=170*mm, height=106*mm),
               PageBreak(), Paragraph("Predictive validation", heading),
-              Paragraph("Model selection used grouped-validation RMSE only. Dynamical-interest scores did not influence promotion.", body),
+              Paragraph(("Model selection used grouped-validation MA-ST-RAE, the challenge primary metric. "
+                         if official_selection else "Model selection used grouped-validation RMSE. ")
+                        + "Dynamical-interest scores did not influence promotion.", body),
               Image(str(figures / "02_validation.png"), width=124*mm, height=124*mm),
               Image(str(figures / "03_per_cyp.png"), width=170*mm, height=96*mm),
               PageBreak(), Paragraph("Optimization", heading),

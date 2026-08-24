@@ -8,6 +8,7 @@ import csv
 import json
 import math
 import os
+import pickle
 import random
 import statistics
 import subprocess
@@ -25,7 +26,7 @@ except ModuleNotFoundError:
 ROOT = Path(__file__).resolve().parents[1]
 RUNNER = ROOT / "scripts" / "run_graph_ca_visual_prototype.py"
 SEARCH_SEED = 240826
-SEARCH_VERSION = "gray_scott_atom_features_v1"
+SEARCH_VERSION = "gray_scott_atom_features_ma_st_rae_v2"
 STUDY_NAME = f"production_gray_scott_{SEARCH_VERSION}"
 FEATURE_PROFILES = (
     "baseline", "periodic", "valence", "electronic", "ring_geometry",
@@ -81,7 +82,10 @@ def write_progress(study_dir: Path, payload: dict) -> None:
 
 def prepare_cache(worker_python: Path, cache: Path) -> None:
     if cache.exists():
-        return
+        with cache.open("rb") as handle:
+            payload = pickle.load(handle)
+        if payload.get("challenge_metric_schema") == "ma_st_rae_v1":
+            return
     env = os.environ.copy()
     env.update({"SME_GRAPH_CACHE": str(cache), "SME_INCLUDE_BLIND": "0"})
     subprocess.run([str(worker_python), str(RUNNER), "prepare"], cwd=ROOT,
@@ -114,7 +118,8 @@ def main() -> None:
                           config, 1701, 4, 2, 800, 250, device, worker_python)
         stage1.append((config, metrics))
         write_progress(study_dir, {"stage": "stage1", "completed": index,
-            "total": len(design), "best_rmse": min(score(m) for _, m in stage1),
+            "total": len(design), "selection_metric": "MA-ST-RAE",
+            "best_ma_st_rae": min(score(m) for _, m in stage1),
             "best_feature_profile": min(stage1, key=lambda x: score(x[1]))[0]["atom_feature_profile"]})
     promoted = sorted(stage1, key=lambda item: score(item[1]))[:16]
 
@@ -124,7 +129,8 @@ def main() -> None:
                           config, 1701, 8, 4, 2000, 500, device, worker_python)
         stage2.append((config, metrics))
         write_progress(study_dir, {"stage": "stage2", "completed": index,
-            "total": len(promoted), "best_rmse": min(score(m) for _, m in stage2),
+            "total": len(promoted), "selection_metric": "MA-ST-RAE",
+            "best_ma_st_rae": min(score(m) for _, m in stage2),
             "best_feature_profile": min(stage2, key=lambda x: score(x[1]))[0]["atom_feature_profile"]})
     finalists = sorted(stage2, key=lambda item: score(item[1]))[:4]
 
@@ -141,8 +147,9 @@ def main() -> None:
         robust_score = mean_rmse + 0.25 * seed_sd
         confirmations.append((config, metrics_list, mean_rmse, seed_sd, robust_score))
         write_progress(study_dir, {"stage": "confirmation", "completed": config_index,
-            "total": len(finalists), "latest_mean_rmse": mean_rmse,
-            "latest_seed_sd": seed_sd, "latest_robust_score": robust_score,
+            "total": len(finalists), "selection_metric": "MA-ST-RAE",
+            "latest_mean_ma_st_rae": mean_rmse,
+            "latest_ma_st_rae_seed_sd": seed_sd, "latest_robust_score": robust_score,
             "latest_feature_profile": config["atom_feature_profile"]})
     viable = [item for item in confirmations if math.isfinite(item[4])]
     if not viable:
@@ -158,11 +165,13 @@ def main() -> None:
     for stage, collection in (("stage1", stage1), ("stage2", stage2)):
         for config, metrics in collection:
             rows.append({"stage": stage, "seed": metrics["seed"],
-                         "validation_rmse": score(metrics), **config})
+                         "validation_ma_st_rae": score(metrics),
+                         "validation_rmse": metrics.get("restored_validation_rmse"), **config})
     for config, metrics_list, _, _, _ in confirmations:
         for metrics in metrics_list:
             rows.append({"stage": "confirmation", "seed": metrics["seed"],
-                         "validation_rmse": score(metrics), **config})
+                         "validation_ma_st_rae": score(metrics),
+                         "validation_rmse": metrics.get("restored_validation_rmse"), **config})
     with (study_dir / "all_trials.csv").open("w", newline="") as handle:
         writer = csv.DictWriter(handle, fieldnames=rows[0].keys())
         writer.writeheader(); writer.writerows(rows)
@@ -170,8 +179,9 @@ def main() -> None:
         "study": STUDY_NAME, "rule": "gray_scott",
         "search_seed": SEARCH_SEED, "search_version": SEARCH_VERSION,
         "elapsed_seconds": time.time() - started, "winner": winner,
-        "winner_confirmation_mean_rmse": winner_mean,
-        "winner_confirmation_seed_sd": winner_sd,
+        "selection_metric": "MA-ST-RAE",
+        "winner_confirmation_mean_ma_st_rae": winner_mean,
+        "winner_confirmation_ma_st_rae_seed_sd": winner_sd,
         "winner_selection_score": winner_score,
         "confirmation_seeds": list(seeds), "requested_device": device,
         "worker_python": str(worker_python), "final_metrics": final_metrics,

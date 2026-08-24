@@ -4,6 +4,10 @@ Updated: 24 August 2026
 Latest search version: `coupled_map_atom_features_v1`  
 Hardware: NVIDIA GeForce RTX 5070 Ti, PyTorch 2.11.0 with CUDA 12.8
 
+## Challenge-metric alignment
+
+Production code now uses the official direct-inhibition **MA-ST-RAE** for checkpoint selection, early stopping, hyperparameter promotion, and three-seed finalist selection. The implementation matches the OpenADMET tutorial reference function exactly and weights CYP1A2, CYP2C9, CYP2D6, and CYP3A4 equally. Differentiable MSE remains the optimization loss, while RMSE remains a secondary diagnostic. Existing production results below were selected under the earlier RMSE protocol and remain historical comparisons; subsequent studies use the `ma_st_rae` search versions and regenerated caches containing the assay credible intervals.
+
 ## Latest coupled-map chemistry search
 
 The chemistry-augmented coupled-map study completed the same 72 broad trials, 16 refinements, four three-seed confirmations, final training, and dynamical screening protocol used for Gray-Scott. The final restored grouped-validation RMSE is **0.8839 pIC50**. The selected configuration confirmed at **0.8806 ± 0.0021 RMSE** across seeds 1701, 2909, and 4211. Its confirmation variability is lower than the preceding coupled-map study, while its final seed is 0.0051 pIC50 worse than the preceding final RMSE of 0.8788.

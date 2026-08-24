@@ -25,8 +25,10 @@ import numpy as np
 
 try:
     from runtime_device import load_checkpoint, resolve_torch_device, runtime_metadata
+    from challenge_metrics import bootstrap_macro_soft_threshold_rae
 except ModuleNotFoundError:  # Imported as scripts.run_graph_ca_visual_prototype.
     from scripts.runtime_device import load_checkpoint, resolve_torch_device, runtime_metadata
+    from scripts.challenge_metrics import bootstrap_macro_soft_threshold_rae
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -60,6 +62,8 @@ TUNING_ONLY = os.environ.get("SME_TUNING_ONLY", "0") == "1"
 SEED = int(os.environ.get("SME_SEED", "1701"))
 CYPS = ("CYP1A2", "CYP2C9", "CYP2D6", "CYP3A4")
 LABEL_COLS = tuple(f"{c}_pIC50_direct_inhibition" for c in CYPS)
+LABEL_HIGH_COLS = tuple(f"{col}_conf_high" for col in LABEL_COLS)
+LABEL_LOW_COLS = tuple(f"{col}_conf_low" for col in LABEL_COLS)
 
 BASELINE_ATOM_FEATURES = (
     "element_H", "element_C", "element_N", "element_O", "element_F",
@@ -270,7 +274,8 @@ def standardise(smiles: str):
     return mol, canonical
 
 
-def graph_record(name: str, smiles: str, labels=None) -> dict | None:
+def graph_record(name: str, smiles: str, labels=None, label_lows=None,
+                 label_highs=None) -> dict | None:
     from rdkit.Chem import Lipinski
     from rdkit.Chem.Scaffolds import MurckoScaffold
 
@@ -295,6 +300,10 @@ def graph_record(name: str, smiles: str, labels=None) -> dict | None:
         "scaffold": scaffold, "x": x, "src": src,
         "dst": dst, "edge": edges,
         "labels": None if labels is None else [float(v) for v in labels],
+        "label_conf_low": (None if label_lows is None
+                           else [float(v) for v in label_lows]),
+        "label_conf_high": (None if label_highs is None
+                            else [float(v) for v in label_highs]),
     }
 
 
@@ -308,7 +317,10 @@ def prepare() -> None:
     train, test, rejected = [], [], []
     for row in train_df.itertuples(index=False):
         labels = [getattr(row, col) for col in LABEL_COLS]
-        rec = graph_record(row.Molecule_Name, row.SMILES, labels)
+        label_lows = [getattr(row, col) for col in LABEL_LOW_COLS]
+        label_highs = [getattr(row, col) for col in LABEL_HIGH_COLS]
+        rec = graph_record(row.Molecule_Name, row.SMILES, labels,
+                           label_lows, label_highs)
         (train if rec is not None else rejected).append(rec if rec is not None else row.Molecule_Name)
     if test_df is not None:
         for row in test_df.itertuples(index=False):
@@ -325,6 +337,7 @@ def prepare() -> None:
     val_idx = [i for i, r in enumerate(train) if r["scaffold"] in validation_groups]
     payload = {"train": train, "test": test, "train_idx": train_idx,
                "val_idx": val_idx, "rejected": rejected, "seed": SEED}
+    payload["challenge_metric_schema"] = "ma_st_rae_v1"
     payload["atom_feature_names"] = list(ATOM_FEATURE_NAMES)
     CACHE.parent.mkdir(parents=True, exist_ok=True)
     with CACHE.open("wb") as handle:
@@ -825,6 +838,20 @@ def train(extended_dynamics: bool = False) -> None:
     fit_pairs = observed_pairs(fit_indices)
     val_pairs = observed_pairs(validation_indices)
 
+    def credible_bounds(pairs):
+        lows, highs, endpoints = [], [], []
+        for i, c, _ in pairs:
+            record = data["train"][i]
+            if (record.get("label_conf_low") is None
+                    or record.get("label_conf_high") is None):
+                raise ValueError(
+                    "Graph cache lacks challenge credible intervals; rerun prepare"
+                )
+            lows.append(record["label_conf_low"][c])
+            highs.append(record["label_conf_high"][c])
+            endpoints.append(c)
+        return np.asarray(lows), np.asarray(highs), np.asarray(endpoints)
+
     def fingerprints_and_targets(pairs):
         fingerprints, targets = [], []
         with torch.no_grad():
@@ -847,9 +874,14 @@ def train(extended_dynamics: bool = False) -> None:
         with torch.no_grad():
             predictions = differentiable_ridge_predict(features, ridge_state)
         ys = targets.cpu().numpy(); ps = predictions.cpu().numpy()
-        return float(np.sqrt(np.mean((ys - ps) ** 2))), ys, ps
+        lows, highs, endpoints = credible_bounds(pairs)
+        ma_st_rae, per_cyp = bootstrap_macro_soft_threshold_rae(
+            ys, ps, lows, highs, endpoints, CYPS
+        )
+        return (float(np.sqrt(np.mean((ys - ps) ** 2))), ma_st_rae,
+                per_cyp, ys, ps)
 
-    history, best, best_state, patience = [], math.inf, None, 0
+    history, best, best_rmse, best_state, patience = [], math.inf, math.inf, None, 0
     rng = random.Random(SEED)
     max_epochs = int(os.environ.get("SME_MAX_EPOCHS", "200"))
     scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(
@@ -904,15 +936,19 @@ def train(extended_dynamics: bool = False) -> None:
             total_n += len(query_batch); raw_norms.append(raw); clipped_norms.append(clipped)
         train_rmse = math.sqrt(total_sq / total_n)
         epoch_ridge_state = fitted_ridge_state()
-        val_rmse, _, _ = evaluate(val_pairs, epoch_ridge_state)
+        val_rmse, val_ma_st_rae, per_cyp_st_rae, _, _ = evaluate(
+            val_pairs, epoch_ridge_state
+        )
         row = {"epoch": epoch, "train_rmse": train_rmse, "validation_rmse": val_rmse,
+               "validation_ma_st_rae": val_ma_st_rae,
+               **{f"validation_{cyp}_st_rae": per_cyp_st_rae[cyp] for cyp in CYPS},
                "mean_raw_gradient_norm": float(np.mean(raw_norms)),
                "fraction_gradients_clipped": float(np.mean(np.asarray(raw_norms) > GRAD_CLIP))}
         history.append(row)
         scheduler.step()
         print(json.dumps(row), flush=True)
-        if val_rmse < best - MIN_DELTA:
-            best, patience = val_rmse, 0
+        if val_ma_st_rae < best - MIN_DELTA:
+            best, best_rmse, patience = val_ma_st_rae, val_rmse, 0
             best_state = {k: v.detach().cpu().clone() for k, v in model.state_dict().items()}
         else:
             patience += 1
@@ -943,21 +979,35 @@ def train(extended_dynamics: bool = False) -> None:
     with (OUT / "training_history.csv").open("w", newline="") as handle:
         writer = csv.DictWriter(handle, fieldnames=history[0].keys()); writer.writeheader(); writer.writerows(history)
 
-    train_rmse, train_y, train_p = evaluate(fit_pairs, final_ridge_state)
-    val_rmse, val_y, val_p = evaluate(val_pairs, final_ridge_state)
+    train_rmse, train_ma_st_rae, train_per_cyp, train_y, train_p = evaluate(
+        fit_pairs, final_ridge_state
+    )
+    val_rmse, val_ma_st_rae, val_per_cyp, val_y, val_p = evaluate(
+        val_pairs, final_ridge_state
+    )
     pair_rows = []
     for split, pairs, ys, ps in (("fit", fit_pairs, train_y, train_p),
                                 ("validation", val_pairs, val_y, val_p)):
         for (i, c, y), pred in zip(pairs, ps):
             r = data["train"][i]
+            low, high = r["label_conf_low"][c], r["label_conf_high"][c]
             pair_rows.append({"split": split, "molecule_id": r["name"], "cyp_target": CYPS[c],
                               "experimental_pic50": y, "predicted_pic50": pred,
+                              "credible_interval_low": low,
+                              "credible_interval_high": high,
+                              "soft_threshold_absolute_error": max(low - pred, pred - high, 0.0),
                               "residual": pred - y})
     with (OUT / "validation_predictions.csv").open("w", newline="") as handle:
         writer = csv.DictWriter(handle, fieldnames=pair_rows[0].keys()); writer.writeheader(); writer.writerows(pair_rows)
 
-    common_metrics = {"seed": SEED, "best_validation_rmse": best,
+    common_metrics = {"seed": SEED, "selection_metric": "validation_ma_st_rae",
+        "best_validation_ma_st_rae": best,
+        "best_validation_rmse": best_rmse,
         "restored_fit_rmse": train_rmse, "restored_validation_rmse": val_rmse,
+        "restored_fit_ma_st_rae": train_ma_st_rae,
+        "restored_validation_ma_st_rae": val_ma_st_rae,
+        "restored_fit_st_rae_by_cyp": train_per_cyp,
+        "restored_validation_st_rae_by_cyp": val_per_cyp,
         "epochs_run": len(history), "fit_observations": len(fit_pairs),
         "validation_observations": len(val_pairs), "rule": RULE,
         "generations": GENERATIONS, "hidden_channels": hidden,

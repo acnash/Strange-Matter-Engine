@@ -21,7 +21,7 @@ except ModuleNotFoundError:  # Imported as scripts.run_production_transition_stu
 ROOT = Path(__file__).resolve().parents[1]
 RUNNER = ROOT / "scripts" / "run_graph_ca_visual_prototype.py"
 SEARCH_SEED = 260822
-SEARCH_VERSION = "enhanced_v3"
+SEARCH_VERSION = "ma_st_rae_v4"
 RULES = (
     "gated_residual",
     "inertial_reaction_diffusion",
@@ -127,6 +127,7 @@ def run_fit(rule, study_name, label, config, seed, epochs, patience,
             "rule": rule,
             "seed": seed,
             "restored_validation_rmse": float("inf"),
+            "restored_validation_ma_st_rae": float("inf"),
             "wall_seconds": time.time() - started,
             "study_config": config,
             "stability": {"passed": False},
@@ -153,9 +154,10 @@ def run_fit(rule, study_name, label, config, seed, epochs, patience,
 
 
 def score(metrics):
+    """Return the official challenge selection metric; lower is better."""
     if not metrics.get("stability", {}).get("passed", True):
         return float("inf")
-    value = metrics.get("restored_validation_rmse", float("inf"))
+    value = metrics.get("restored_validation_ma_st_rae", float("inf"))
     return value if value == value else float("inf")
 
 
@@ -203,7 +205,8 @@ def main():
         stage1.append((config, metrics))
         write_progress(study_dir, {"stage": "stage1", "completed": index,
                                    "total": len(candidates),
-                                   "best_rmse": min(score(m) for _, m in stage1)})
+                                   "selection_metric": "MA-ST-RAE",
+                                   "best_ma_st_rae": min(score(m) for _, m in stage1)})
     promoted10 = sorted(stage1, key=lambda item: score(item[1]))[:10]
 
     stage2 = []
@@ -213,7 +216,8 @@ def main():
         stage2.append((config, metrics))
         write_progress(study_dir, {"stage": "stage2", "completed": index,
                                    "total": len(promoted10),
-                                   "best_rmse": min(score(m) for _, m in stage2)})
+                                   "selection_metric": "MA-ST-RAE",
+                                   "best_ma_st_rae": min(score(m) for _, m in stage2)})
     promoted3 = sorted(stage2, key=lambda item: score(item[1]))[:3]
 
     confirmations = []
@@ -226,13 +230,15 @@ def main():
                 config, seed, 10, 4, 999999, 999999, device, worker_python,
             )
             config_metrics.append(metrics)
-        mean_rmse = sum(score(m) for m in config_metrics) / len(config_metrics)
-        variance = sum((score(m) - mean_rmse) ** 2 for m in config_metrics) / len(config_metrics)
+        mean_score = sum(score(m) for m in config_metrics) / len(config_metrics)
+        variance = sum((score(m) - mean_score) ** 2 for m in config_metrics) / len(config_metrics)
         seed_sd = variance ** 0.5
-        robust_score = mean_rmse + 0.25 * seed_sd
-        confirmations.append((config, config_metrics, mean_rmse, seed_sd, robust_score))
+        robust_score = mean_score + 0.25 * seed_sd
+        confirmations.append((config, config_metrics, mean_score, seed_sd, robust_score))
         write_progress(study_dir, {"stage": "confirmation", "completed": config_index,
-                                   "total": len(promoted3), "latest_mean_rmse": mean_rmse,
+                                   "total": len(promoted3),
+                                   "selection_metric": "MA-ST-RAE",
+                                   "latest_mean_ma_st_rae": mean_score,
                                    "latest_seed_sd": seed_sd,
                                    "latest_robust_score": robust_score})
     winner, winner_metrics, winner_mean, winner_sd, winner_score = min(
@@ -246,11 +252,13 @@ def main():
     for stage_name, collection in (("stage1", stage1), ("stage2", stage2)):
         for config, metrics in collection:
             rows.append({"stage": stage_name, "seed": metrics["seed"],
-                         "validation_rmse": score(metrics), **config})
+                         "validation_ma_st_rae": score(metrics),
+                         "validation_rmse": metrics.get("restored_validation_rmse"), **config})
     for config, metrics_list, _, _, _ in confirmations:
         for metrics in metrics_list:
             rows.append({"stage": "confirmation", "seed": metrics["seed"],
-                         "validation_rmse": score(metrics), **config})
+                         "validation_ma_st_rae": score(metrics),
+                         "validation_rmse": metrics.get("restored_validation_rmse"), **config})
     with (study_dir / "all_trials.csv").open("w", newline="") as handle:
         writer = csv.DictWriter(handle, fieldnames=rows[0].keys())
         writer.writeheader(); writer.writerows(rows)
@@ -261,8 +269,9 @@ def main():
         "search_version": SEARCH_VERSION,
         "elapsed_seconds": time.time() - study_started,
         "winner": winner,
-        "winner_confirmation_mean_rmse": winner_mean,
-        "winner_confirmation_seed_sd": winner_sd,
+        "selection_metric": "MA-ST-RAE",
+        "winner_confirmation_mean_ma_st_rae": winner_mean,
+        "winner_confirmation_ma_st_rae_seed_sd": winner_sd,
         "winner_selection_score": winner_score,
         "confirmation_seeds": list(seeds),
         "requested_device": device,
