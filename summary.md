@@ -1,8 +1,27 @@
 # Latest production summary
 
-## Challenge-aligned v5 production campaign started
+## Challenge-aligned v5 production campaign complete
 
 The ten-rule rerun now uses scaffold cross-validation inside the fitting pool, a sealed scaffold holdout, point MA-ST-RAE for efficient screening, and the official 1,000-resample bootstrap for finalists. The common search includes expanded chemical feature groups, rule-specific dynamics, surrogate-guided refinement, successive halving, five-fold and three-seed confirmation, secondary challenge metrics, and visually verified PDF pagination. No challenge-blinded molecules enter model development.
+
+All ten transition-rule studies completed on the NVIDIA GeForce RTX 5070 Ti. Every six-page PDF was rendered and visually inspected, including the dedicated perturbation page. Lower MA-ST-RAE is better.
+
+| Rank | Transition rule | MA-ST-RAE | 95% bootstrap CI | RMSE | Generations | Channels | Atom feature profile |
+|---:|---|---:|---:|---:|---:|---:|---|
+| 1 | gated residual | **0.8073** | 0.7610 to 0.8531 | 0.8774 | 64 | 16 | local environment |
+| 2 | delayed memory | **0.8075** | 0.7643 to 0.8506 | 0.8748 | 125 | 16 | electronic local |
+| 3 | inertial reaction diffusion | **0.8186** | 0.7743 to 0.8641 | 0.8865 | 32 | 16 | electronic |
+| 4 | Kuramoto-Sakaguchi | **0.8211** | 0.7788 to 0.8677 | 0.8844 | 32 | 16 | periodic |
+| 5 | FitzHugh-Nagumo | **0.8272** | 0.7797 to 0.8757 | 0.8847 | 16 | 16 | electronic |
+| 6 | activator inhibitor | **0.8366** | 0.7936 to 0.8817 | 0.8987 | 64 | 16 | valence electronic |
+| 7 | coupled map | **0.8387** | 0.7936 to 0.8820 | 0.9019 | 32 | 16 | electronic local |
+| 8 | damped symplectic | **0.8396** | 0.7969 to 0.8816 | 0.9011 | 16 | 16 | local environment |
+| 9 | Gray-Scott | **0.8475** | 0.8037 to 0.8925 | 0.9135 | 125 | 16 | periodic electronic |
+| 10 | conservative graph flux | **0.9090** | 0.8588 to 0.9611 | 0.9502 | 250 | 16 | comprehensive |
+
+Gated residual and delayed memory are statistically indistinguishable on this holdout: their point estimates differ by only 0.0002 and their bootstrap intervals overlap almost completely. Delayed memory has the lowest RMSE, while gated residual has the marginally lower primary metric. The blind challenge set remained sealed for every study.
+
+The dynamical screens contain structured transient and recurrent regimes, including separated branches for delayed memory, Kuramoto-Sakaguchi, damped symplectic, activator inhibitor, and coupled map. These finite-time patterns are candidates for longer dynamical analysis rather than evidence of strange attractors or sustained chaos. Perturbation confirmation remained deferred because the Windows CUDA perturbation path was guarded after a native runtime failure, and dynamical-interest measures never influenced model selection.
 
 ### 1 of 10: gated residual complete
 
@@ -10,7 +29,7 @@ Gated residual completed in 61.8 minutes. Its sealed-holdout bootstrapped MA-ST-
 
 ### 2 of 10: inertial reaction diffusion complete
 
-Inertial reaction diffusion completed in 69.0 minutes. Its sealed-holdout bootstrapped MA-ST-RAE is **0.8241** (95% CI 0.7763 to 0.8681), with point MA-ST-RAE 0.8210 and RMSE 0.8892. Endpoint ST-RAE values are CYP1A2 0.8328, CYP2C9 0.7803, CYP2D6 1.0391, and CYP3A4 0.6443. The winner uses 32 generations, 16 dynamical channels, the electronic atom profile, CA learning rate 0.003, and ridge penalty 1.0. Confirmation across five scaffold folds and three seeds gave MA-ST-RAE 0.8526 with seed SD 0.0298. All 1,309 holdout trajectories were screened; recurrence is approximately 0.992 to 0.997 with persistent low-amplitude late motion and spectral entropy approximately 0.575 to 0.633. These are finite-time recurrent-transient candidates rather than confirmed attractors or chaos. The blinded set remained sealed.
+Inertial reaction diffusion completed in 103.4 minutes including resumed work. Its sealed-holdout bootstrapped MA-ST-RAE is **0.8186** (95% CI 0.7743 to 0.8641), with RMSE 0.8865. The winner uses 32 generations, 16 dynamical channels, the electronic atom profile, CA learning rate 0.003, and ridge penalty 1.0. Confirmation across five scaffold folds and three seeds gave MA-ST-RAE 0.8533. All 1,309 holdout trajectories were screened; recurrence is approximately 0.992 to 0.997 with persistent low-amplitude late motion and spectral entropy approximately 0.575 to 0.633. These are finite-time recurrent-transient candidates rather than confirmed attractors or chaos. The blinded set remained sealed.
 
 ### 3 of 10: activator inhibitor complete
 

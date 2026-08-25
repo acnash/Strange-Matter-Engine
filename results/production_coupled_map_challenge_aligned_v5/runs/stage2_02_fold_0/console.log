@@ -1,0 +1,263 @@
+{"operating_system": "Windows-10-10.0.26200-SP0", "machine": "AMD64", "python": "3.11.16", "python_executable": "C:\\Users\\Anthony\\anaconda3\\envs\\strange-matter-gpu\\python.exe", "pytorch": "2.11.0+cu128", "pytorch_cuda": "12.8", "device": "cuda", "gpu": "NVIDIA GeForce RTX 5070 Ti"}
+{"epoch": 1, "train_rmse": 0.9821306693413924, "validation_rmse": 0.797037661075592, "validation_ma_st_rae": 0.8563661535294186, "validation_CYP1A2_st_rae": 0.8938273115621467, "validation_CYP2C9_st_rae": 0.6970172313747898, "validation_CYP2D6_st_rae": 1.077083776287779, "validation_CYP3A4_st_rae": 0.757536294892959, "mean_raw_gradient_norm": 3.796995297074318, "fraction_gradients_clipped": 1.0}
+{"epoch": 2, "train_rmse": 1.0347338580156282, "validation_rmse": 0.7998876571655273, "validation_ma_st_rae": 0.8601773956344834, "validation_CYP1A2_st_rae": 0.8836562386499356, "validation_CYP2C9_st_rae": 0.68822094155343, "validation_CYP2D6_st_rae": 1.1027886067301689, "validation_CYP3A4_st_rae": 0.766043795604399, "mean_raw_gradient_norm": 5.254303552210331, "fraction_gradients_clipped": 1.0}
+{"epoch": 3, "train_rmse": 1.0240469471995672, "validation_rmse": 0.7949991822242737, "validation_ma_st_rae": 0.8545339248480744, "validation_CYP1A2_st_rae": 0.8739603460448507, "validation_CYP2C9_st_rae": 0.6757303551619572, "validation_CYP2D6_st_rae": 1.1032268331457875, "validation_CYP3A4_st_rae": 0.7652181650397024, "mean_raw_gradient_norm": 3.006683848798275, "fraction_gradients_clipped": 1.0}
+{"epoch": 4, "train_rmse": 0.9649150416395419, "validation_rmse": 0.7937474846839905, "validation_ma_st_rae": 0.8457295720376176, "validation_CYP1A2_st_rae": 0.882998066543271, "validation_CYP2C9_st_rae": 0.6436264382770479, "validation_CYP2D6_st_rae": 1.1061061406402488, "validation_CYP3A4_st_rae": 0.7501876426899026, "mean_raw_gradient_norm": 2.7059246301651, "fraction_gradients_clipped": 1.0}
+{"epoch": 5, "train_rmse": 1.029963055207983, "validation_rmse": 0.7909767627716064, "validation_ma_st_rae": 0.8409690563188145, "validation_CYP1A2_st_rae": 0.8826010935671855, "validation_CYP2C9_st_rae": 0.629943428550497, "validation_CYP2D6_st_rae": 1.101866792508457, "validation_CYP3A4_st_rae": 0.749464910649118, "mean_raw_gradient_norm": 2.482307329773903, "fraction_gradients_clipped": 1.0}
+{
+  "seed": 1701,
+  "selection_metric": "validation_ma_st_rae",
+  "best_validation_ma_st_rae": 0.8409690563188145,
+  "best_validation_rmse": 0.7909767627716064,
+  "restored_fit_rmse": 0.8401965498924255,
+  "restored_validation_rmse": 0.7948151230812073,
+  "restored_fit_ma_st_rae": 0.8341246775357365,
+  "restored_validation_ma_st_rae": 0.8524184718724443,
+  "restored_validation_point_ma_st_rae": 0.8481021641295088,
+  "restored_validation_point_st_rae_by_cyp": {
+    "CYP1A2": 0.8994713500853087,
+    "CYP2C9": 0.6349307907861003,
+    "CYP2D6": 1.1097192346452966,
+    "CYP3A4": 0.7482872810013298
+  },
+  "restored_fit_st_rae_by_cyp": {
+    "CYP1A2": 0.8321294237210127,
+    "CYP2C9": 0.759576418346713,
+    "CYP2D6": 1.0531731591129003,
+    "CYP3A4": 0.6916197089623202
+  },
+  "restored_validation_st_rae_by_cyp": {
+    "CYP1A2": 0.901314435241901,
+    "CYP2C9": 0.6395255237414922,
+    "CYP2D6": 1.1176029958519234,
+    "CYP3A4": 0.751230932654461
+  },
+  "validation_bootstrap_metrics": {
+    "n_bootstrap_samples": 1000,
+    "seed": 0,
+    "macro": {
+      "st_rae": {
+        "mean": 0.8524184718724443,
+        "ci_low": 0.7837118518791562,
+        "ci_high": 0.9213128233220359
+      },
+      "mae": {
+        "mean": 0.5840452325117393,
+        "ci_low": 0.5450516577004159,
+        "ci_high": 0.626485838291652
+      },
+      "r2": {
+        "mean": 0.20692783517465488,
+        "ci_low": 0.13847695304658672,
+        "ci_high": 0.27015899294811807
+      },
+      "spearman_rho": {
+        "mean": 0.48621167952922945,
+        "ci_low": 0.42301634690044665,
+        "ci_high": 0.5474795772904547
+      },
+      "kendall_tau": {
+        "mean": 0.3481839223126533,
+        "ci_low": 0.30093089013481594,
+        "ci_high": 0.3953742277889033
+      }
+    },
+    "per_endpoint": {
+      "CYP1A2": {
+        "st_rae": {
+          "mean": 0.901314435241901,
+          "ci_low": 0.7616458309111266,
+          "ci_high": 1.066488495466278
+        },
+        "mae": {
+          "mean": 0.6227701905436919,
+          "ci_low": 0.5179781353389713,
+          "ci_high": 0.7413751885294914
+        },
+        "r2": {
+          "mean": 0.15012082311826552,
+          "ci_low": 0.0024798525918624525,
+          "ci_high": 0.27600923978262915
+        },
+        "spearman_rho": {
+          "mean": 0.49101016010145226,
+          "ci_low": 0.3487356795048153,
+          "ci_high": 0.612217234308603
+        },
+        "kendall_tau": {
+          "mean": 0.34924553214746756,
+          "ci_low": 0.24474986654001887,
+          "ci_high": 0.44153670824953284
+        }
+      },
+      "CYP2C9": {
+        "st_rae": {
+          "mean": 0.6395255237414922,
+          "ci_low": 0.5065687839998192,
+          "ci_high": 0.7987838590482801
+        },
+        "mae": {
+          "mean": 0.4752669370818312,
+          "ci_low": 0.40896218584401767,
+          "ci_high": 0.546933516142142
+        },
+        "r2": {
+          "mean": 0.36866693890139635,
+          "ci_low": 0.2519084964998512,
+          "ci_high": 0.4762221006697432
+        },
+        "spearman_rho": {
+          "mean": 0.5737217503746488,
+          "ci_low": 0.42525868612046475,
+          "ci_high": 0.7004592846796924
+        },
+        "kendall_tau": {
+          "mean": 0.42108949174564336,
+          "ci_low": 0.30087788484379396,
+          "ci_high": 0.5245388595383911
+        }
+      },
+      "CYP2D6": {
+        "st_rae": {
+          "mean": 1.1176029958519234,
+          "ci_low": 0.9791923632547299,
+          "ci_high": 1.2770254318662908
+        },
+        "mae": {
+          "mean": 0.5875761828617478,
+          "ci_low": 0.5097530106703441,
+          "ci_high": 0.6665885572913307
+        },
+        "r2": {
+          "mean": -0.07266846144262747,
+          "ci_low": -0.28909940836704145,
+          "ci_high": 0.08497599638798732
+        },
+        "spearman_rho": {
+          "mean": 0.27394538666483836,
+          "ci_low": 0.12241164345402858,
+          "ci_high": 0.4154150961118658
+        },
+        "kendall_tau": {
+          "mean": 0.18228333577799546,
+          "ci_low": 0.0794271791129186,
+          "ci_high": 0.27947535893045544
+        }
+      },
+      "CYP3A4": {
+        "st_rae": {
+          "mean": 0.751230932654461,
+          "ci_low": 0.6440489363014072,
+          "ci_high": 0.8615728496352358
+        },
+        "mae": {
+          "mean": 0.650567619559686,
+          "ci_low": 0.5891278019621353,
+          "ci_high": 0.7164698688698209
+        },
+        "r2": {
+          "mean": 0.38159204012158515,
+          "ci_low": 0.268117513366719,
+          "ci_high": 0.4823614020957702
+        },
+        "spearman_rho": {
+          "mean": 0.6061694209759785,
+          "ci_low": 0.51595261230837,
+          "ci_high": 0.69104309551978
+        },
+        "kendall_tau": {
+          "mean": 0.44011732957950694,
+          "ci_low": 0.3680449423960211,
+          "ci_high": 0.5080598961956487
+        }
+      }
+    }
+  },
+  "epochs_run": 5,
+  "fit_observations": 2652,
+  "validation_observations": 680,
+  "rule": "coupled_map",
+  "generations": 125,
+  "hidden_channels": 16,
+  "atom_feature_profile": "periodic_electronic",
+  "atom_feature_count": 41,
+  "atom_feature_names": [
+    "element_H",
+    "element_C",
+    "element_N",
+    "element_O",
+    "element_F",
+    "element_P",
+    "element_S",
+    "element_Cl",
+    "element_Br",
+    "element_I",
+    "element_other",
+    "formal_charge",
+    "aromatic",
+    "hybrid_sp",
+    "hybrid_sp2",
+    "hybrid_sp3",
+    "hybrid_other",
+    "degree",
+    "total_hydrogens",
+    "in_ring",
+    "hbond_donor",
+    "hbond_acceptor",
+    "chiral_cw",
+    "chiral_ccw",
+    "chiral_other",
+    "atomic_number",
+    "atomic_mass",
+    "covalent_radius",
+    "vdw_radius",
+    "outer_electrons",
+    "period",
+    "periodic_group",
+    "atomic_volume",
+    "electronegativity",
+    "polarizability",
+    "heteroatom",
+    "halogen",
+    "conjugated_bond_fraction",
+    "first_ionization_energy",
+    "electron_affinity",
+    "electronic_property_missing"
+  ],
+  "device": "cuda",
+  "gpu": "NVIDIA GeForce RTX 5070 Ti",
+  "training_seconds": 44.36310139996931,
+  "peak_gpu_memory_bytes": 782281216,
+  "runtime": {
+    "operating_system": "Windows-10-10.0.26200-SP0",
+    "machine": "AMD64",
+    "python": "3.11.16",
+    "python_executable": "C:\\Users\\Anthony\\anaconda3\\envs\\strange-matter-gpu\\python.exe",
+    "pytorch": "2.11.0+cu128",
+    "pytorch_cuda": "12.8",
+    "device": "cuda",
+    "gpu": "NVIDIA GeForce RTX 5070 Ti"
+  },
+  "validation_protocol": {
+    "kind": "scaffold_cross_validation",
+    "fold": 0,
+    "folds": 5
+  },
+  "readout": "differentiable_closed_form_ridge",
+  "hyperparameters": {
+    "ca_lr": 0.003,
+    "ridge": 1.0,
+    "ca_l2": 1e-06,
+    "gradient_clip": 1.0,
+    "update_scale": 0.4,
+    "init_scale": 0.5,
+    "initial_noise": 0.0,
+    "support_fraction": 0.75,
+    "bond_temperature": 2.0,
+    "dyn_a": 0.5,
+    "dyn_b": 0.5,
+    "dyn_c": 0.2,
+    "dyn_d": 0.3,
+    "lr_schedule": "cosine_0.1x"
+  }
+}
