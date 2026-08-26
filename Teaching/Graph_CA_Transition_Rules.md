@@ -129,7 +129,7 @@ For a fair comparison:
 - every rule receives a comparable tuning budget;
 - rule-specific stability parameters are tuned within declared ranges;
 - common parameters such as learning rates, regularisation, clipping, batch size, and generation count are tuned;
-- the selection metric is grouped-validation RMSE inside the tuning loop;
+- the selection metric is grouped-validation MA-ST-RAE inside the tuning loop, with the official 1,000-resample bootstrap reserved for finalists;
 - dynamical-interest scores never select a model using protected experimental labels;
 - finalists are confirmed across multiple seeds; and
 - final comparisons use protected outer folds or the accepted grouped nested-cross-validation design.
@@ -155,3 +155,8 @@ Predictive performance and dynamical richness will be reported separately. A fas
 - [Rule 3: Activator–Inhibitor CA](Transition_Rule_3_Activator_Inhibitor_CA.md)
 - [Rule 4: Coupled-Map CA](Transition_Rule_4_Coupled_Map_CA.md)
 - [Rule 5: Damped Symplectic CA](Transition_Rule_5_Damped_Symplectic_CA.md)
+- [Rule 6: FitzHugh–Nagumo CA](Transition_Rule_6_FitzHugh_Nagumo_CA.md)
+- [Rule 7: Gray–Scott CA](Transition_Rule_7_Gray_Scott_CA.md)
+- [Rule 8: Kuramoto–Sakaguchi CA](Transition_Rule_8_Kuramoto_Sakaguchi_CA.md)
+- [Rule 9: Conservative Graph-Flux CA](Transition_Rule_9_Conservative_Graph_Flux_CA.md)
+- [Rule 10: Delayed-Memory CA](Transition_Rule_10_Delayed_Memory_CA.md)
