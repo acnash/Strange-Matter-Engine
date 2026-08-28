@@ -1,4 +1,6 @@
-# Publication
+# Molecule Space-Time: Predicting Cytochrome P450 Inhibition with a Nonlinear Graph Cellular Automaton
+
+**Anthony Nash**
 
 ## Abstract
 
