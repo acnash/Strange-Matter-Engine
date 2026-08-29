@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import argparse
 import csv
+import gzip
 import json
 import os
 import pickle
@@ -201,7 +202,6 @@ def build_pymol(generations: int) -> None:
     embedded_values = {}
     pml = [
         "reinitialize",
-        f'cd "{OUT.as_posix()}"',
         "bg_color black",
         "set antialias, 2",
         "set ray_opaque_background, off",
@@ -229,7 +229,7 @@ def build_pymol(generations: int) -> None:
         embedded_values[obj] = values.round(3).tolist()
         relative_pdb = pdb_path.relative_to(OUT).as_posix()
         pml.extend([
-            f'load "{relative_pdb}", {obj}',
+            f'load "{pdb_path.as_posix()}", {obj}',
             f"hide everything, {obj}",
             f"show sticks, {obj}",
             f"show spheres, {obj} and not elem H",
@@ -257,10 +257,16 @@ def build_pymol(generations: int) -> None:
             "pdb_file": relative_pdb,
         })
     controller_template = (ROOT / "scripts" / "pymol_gca_controller.py").read_text(encoding="utf-8")
+    values_path = OUT / "display_values.json.gz"
+    with gzip.open(values_path, "wt", encoding="utf-8", compresslevel=9) as handle:
+        json.dump(embedded_values, handle, separators=(",", ":"))
     controller = (
+        "import gzip\n"
+        "import json\n"
         f"GCA_STATE_COUNT = {generations + 1}\n"
         "GCA_HYDROGEN_CODA_STATE = None\n"
-        f"GCA_DISPLAY_VALUES = {repr(embedded_values)}\n"
+        f"with gzip.open(r'{values_path}', 'rt', encoding='utf-8') as _handle:\n"
+        "    GCA_DISPLAY_VALUES = json.load(_handle)\n"
         + controller_template
     )
     controller_path = OUT / "ds_gcae_trajectory_controls.py"
@@ -270,7 +276,7 @@ def build_pymol(generations: int) -> None:
         f"enable {first_obj}",
         f"orient {first_obj}",
         "python",
-        controller,
+        f"exec(compile(open(r'{controller_path}', encoding='utf-8').read(), r'{controller_path}', 'exec'))",
         "python end",
         "gca_state 1",
         "refresh",
