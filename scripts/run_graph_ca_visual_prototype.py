@@ -1002,6 +1002,7 @@ def train(extended_dynamics: bool = False) -> None:
 
     fit_indices = list(data["train_idx"])
     validation_indices = list(data["val_idx"])
+    reserved_validation_indices = list(validation_indices)
     cv_fold_text = os.environ.get("SME_CV_FOLD")
     cv_folds = int(os.environ.get("SME_CV_FOLDS", "5"))
     if cv_fold_text is not None:
@@ -1009,7 +1010,8 @@ def train(extended_dynamics: bool = False) -> None:
         if not 0 <= cv_fold < cv_folds:
             raise ValueError("SME_CV_FOLD must lie in [0, SME_CV_FOLDS)")
         fitting_scaffolds = sorted({data["train"][i]["scaffold"] for i in fit_indices})
-        fold_rng = random.Random(260822)
+        cv_split_seed = int(os.environ.get("SME_CV_SPLIT_SEED", "260822"))
+        fold_rng = random.Random(cv_split_seed)
         fold_rng.shuffle(fitting_scaffolds)
         validation_scaffolds = set(fitting_scaffolds[cv_fold::cv_folds])
         pool = fit_indices
@@ -1238,6 +1240,15 @@ def train(extended_dynamics: bool = False) -> None:
     val_rmse, val_ma_st_rae, val_per_cyp, val_y, val_p = evaluate(
         val_pairs, final_ridge_state, bootstrap=True
     )
+    reserved_pairs = (observed_pairs(reserved_validation_indices)
+                      if os.environ.get("SME_EVALUATE_RESERVED_HOLDOUT", "0") == "1"
+                      and cv_fold_text is not None else [])
+    if reserved_pairs:
+        _, _, _, reserved_y, reserved_p = evaluate(
+            reserved_pairs, final_ridge_state, bootstrap=False
+        )
+    else:
+        reserved_y, reserved_p = np.asarray([]), np.asarray([])
     val_lows, val_highs, val_endpoints = credible_bounds(val_pairs)
     val_point_ma_st_rae, val_point_per_cyp = macro_soft_threshold_rae(
         val_y, val_p, val_lows, val_highs, val_endpoints, CYPS
@@ -1247,7 +1258,9 @@ def train(extended_dynamics: bool = False) -> None:
     )
     pair_rows = []
     for split, pairs, ys, ps in (("fit", fit_pairs, train_y, train_p),
-                                ("validation", val_pairs, val_y, val_p)):
+                                ("validation", val_pairs, val_y, val_p),
+                                ("reserved_holdout", reserved_pairs,
+                                 reserved_y, reserved_p)):
         for (i, c, _), experimental, pred in zip(pairs, ys, ps):
             r = data["train"][i]
             low, high = r["label_conf_low"][c], r["label_conf_high"][c]
@@ -1281,6 +1294,7 @@ def train(extended_dynamics: bool = False) -> None:
         "restored_fit_st_rae_by_cyp": train_per_cyp,
         "restored_validation_st_rae_by_cyp": val_per_cyp,
         "validation_bootstrap_metrics": challenge_report,
+        "reserved_holdout_observations": len(reserved_pairs),
         "epochs_run": len(history), "fit_observations": len(fit_pairs),
         "validation_observations": len(val_pairs), "rule": RULE,
         "generations": GENERATIONS, "hidden_channels": hidden,
@@ -1294,7 +1308,9 @@ def train(extended_dynamics: bool = False) -> None:
                                   if device.type == "cuda" else 0),
         "runtime": run_runtime,
         "validation_protocol": ({"kind": "scaffold_cross_validation",
-                                  "fold": int(cv_fold_text), "folds": cv_folds}
+                                  "fold": int(cv_fold_text), "folds": cv_folds,
+                                  "split_seed": int(os.environ.get(
+                                      "SME_CV_SPLIT_SEED", "260822"))}
                                  if cv_fold_text is not None else
                                  {"kind": "reserved_scaffold_holdout"}),
         "readout": "differentiable_closed_form_ridge",
