@@ -10,6 +10,14 @@ The project is both a predictive experiment and a study of molecular dynamical b
 
 The work is designed for a personal workstation, with an emphasis on compact models, scientific interpretability, honest benchmarking, and visualisations grounded in quantities genuinely produced or analysed by the model.
 
+<p align="center">
+  <a href="results/ds_gcae_1000_generation_pymol/trajectories_05_06_07_08_four_column_atom_cascade.mp4">
+    <img src="assets/readme/graph-ca-four-trajectory-cascade.gif" width="800" alt="Four descending and spiralling graph cellular automata molecular trajectories over 1,000 generations">
+  </a>
+</p>
+
+<p align="center"><em>Four bond-free molecular graph-CA trajectories cascading through 1,000 generations. Each colour records an evolving atomic state. Select the animation to open the full-resolution video.</em></p>
+
 The evolving [Teaching curriculum](Teaching/README.md) records the scientific and mathematical background behind every component so that implementation and understanding advance together.
 
 The [Visual Laboratory](notebooks/README.md) provides interactive, code-hidden Jupyter experiences with clean RDKit molecular depictions, a restrained cyberpunk visual system, graph views, atom and bond inspectors, encoding heatmaps, and a transparent first graph cellular automaton. The permanent [challenge method report](METHOD_REPORT.md) always describes the model currently submitted to the leaderboard and retains the same URL when the leading model changes.
