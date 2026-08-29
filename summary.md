@@ -1,29 +1,29 @@
 # Latest production summary
 
-## Current submission model: DS-GCAE v1
+## Current production candidate: CFTC-GCAE v1
 
 Updated: 29 August 2026  
 Hardware: NVIDIA GeForce RTX 5070 Ti, CUDA  
 Primary selection metric: MA-ST-RAE, lower is better
 
-The current frozen direct-inhibition model is the **Dual-Scale Graph Cellular Automata Ensemble (DS-GCAE v1)**. It combines the five-rule original ensemble with a three-seed multiscale ensemble while preserving a complete bonded-graph cellular-automata trajectory inside every member.
+The current candidate is the **Cross-Fitted Target-Calibrated Graph Cellular Automata Ensemble (CFTC-GCAE v1)**. It preserves all recurrent bonded-graph cellular-automata members and uses a separate nested cross-fitted ridge stack for each CYP endpoint. The preceding DS-GCAE submission ranked 80th of 89 on the blind leaderboard, with MA-ST-RAE 1.0132, revealing a substantial local-to-blind generalisation gap.
 
 | Validation result | Value |
 |---|---:|
-| Point MA-ST-RAE | **0.7842** |
-| Bootstrap MA-ST-RAE mean | **0.7850** |
-| 95% bootstrap interval | 0.7464 to 0.8274 |
-| RMSE | 0.8678 pIC50 |
-| CYP1A2 ST-RAE | 0.8228 |
-| CYP2C9 ST-RAE | 0.7461 |
-| CYP2D6 ST-RAE | 0.9556 |
-| CYP3A4 ST-RAE | 0.6122 |
+| Point MA-ST-RAE | **0.7739** |
+| Bootstrap MA-ST-RAE mean | **0.7749** |
+| 95% bootstrap interval | 0.7356 to 0.8193 |
+| RMSE | 0.8586 pIC50 |
+| CYP1A2 ST-RAE | 0.8172 |
+| CYP2C9 ST-RAE | 0.7611 |
+| CYP2D6 ST-RAE | 0.9409 |
+| CYP3A4 ST-RAE | 0.5764 |
 
-The final blend assigns 42.5% to the original equal-weight ensemble and 57.5% to the multiscale ensemble. The multiscale rule weights are gated residual 0.1036, delayed memory 0.1999, inertial reaction diffusion 0.1966, Kuramoto-Sakaguchi 0.2447, and FitzHugh-Nagumo 0.2552. Each multiscale rule averages seeds 1701, 2909, and 4211.
+The final meta-model has ten inputs per endpoint: five original graph-CA predictions and five multiscale predictions, with three seeds averaged inside every multiscale rule. Ridge penalties are 1000 for CYP1A2 and CYP2D6 and 100 for CYP2C9 and CYP3A4. Optional affine calibration was evaluated leakage-safely and identity calibration was selected for all four endpoints.
 
-Blind inference completed on all 750 challenge molecules using 20 frozen checkpoints, producing 3,000 finite pIC50 predictions. Test labels were not loaded. The validated submission is `results/production_dual_scale_graph_ca_ensemble_v1/ds_gcae_submission.csv`; it contains exactly 750 rows and six columns in the official order, has no duplicate molecule identifiers, and has no missing or non-finite predictions.
+Blind inference completed on all 750 challenge molecules using the 20 previously frozen checkpoint predictions, producing 3,000 finite pIC50 predictions. Test labels were not loaded. The candidate submission is `results/production_cross_fitted_target_calibrated_gcae_v1/cftc_gcae_submission.csv`; it contains exactly 750 rows and six columns in the official order and has no missing or non-finite predictions.
 
-The original equal-weight five-rule ensemble remains a useful reference, with point MA-ST-RAE 0.7865 and RMSE 0.8688. DS-GCAE improves the point primary metric by 0.0023, which is a modest change rather than a statistically resolved separation.
+CFTC-GCAE improves over DS-GCAE by 0.0103 point MA-ST-RAE and 0.0091 pIC50 RMSE on the sealed validation set. The bootstrap intervals overlap, so this remains a modest candidate improvement rather than a guaranteed blind-set gain.
 
 ## Challenge-aligned v5 production campaign complete
 
