@@ -30,6 +30,8 @@ FEATURE_PROFILES = (
     "periodic_valence", "periodic_electronic", "valence_electronic",
     "local_environment", "electronic_local", "comprehensive",
 )
+ENHANCED_TRAJECTORY_SEARCH = os.environ.get("SME_ENHANCED_TRAJECTORY_SEARCH", "0") == "1"
+INTERVAL_LOSS_SEARCH = os.environ.get("SME_INTERVAL_LOSS_SEARCH", "0") == "1"
 RULES = (
     "gated_residual",
     "inertial_reaction_diffusion",
@@ -53,6 +55,11 @@ def sampled_candidates(count=40):
                    dyn_c=0.5, dyn_d=0.2, atom_feature_profile="baseline")
     rng = random.Random(SEARCH_SEED)
     chosen = [default]
+    if ENHANCED_TRAJECTORY_SEARCH:
+        default.update(trajectory_pooling="multiscale", ridge_mode="shared")
+    if INTERVAL_LOSS_SEARCH:
+        default.update(loss_mode="mse", interval_loss_beta=0.0,
+                       interval_temperature=0.05)
     while len(chosen) < count:
         config = {
             "generations": rng.choice((16, 32, 64, 125, 250, 500)),
@@ -73,6 +80,18 @@ def sampled_candidates(count=40):
             "dyn_d": rng.choice((0.05, 0.15, 0.3)),
             "atom_feature_profile": rng.choice(FEATURE_PROFILES),
         }
+        if ENHANCED_TRAJECTORY_SEARCH:
+            config.update(
+                trajectory_pooling="multiscale",
+                ridge_mode=rng.choice(("shared", "per_endpoint")),
+            )
+        if INTERVAL_LOSS_SEARCH:
+            beta = rng.choice((0.0, 0.25, 0.5, 0.75, 1.0))
+            config.update(
+                loss_mode="mse" if beta == 0.0 else "hybrid_interval",
+                interval_loss_beta=beta,
+                interval_temperature=rng.choice((0.02, 0.05, 0.1)),
+            )
         if config not in chosen:
             chosen.append(config)
     return chosen
@@ -127,6 +146,11 @@ def run_fit(rule, study_name, label, config, seed, epochs, patience,
         "SME_DYN_C": str(config["dyn_c"]),
         "SME_DYN_D": str(config["dyn_d"]),
         "SME_ATOM_FEATURE_PROFILE": str(config.get("atom_feature_profile", "baseline")),
+        "SME_TRAJECTORY_POOLING": str(config.get("trajectory_pooling", "legacy")),
+        "SME_RIDGE_MODE": str(config.get("ridge_mode", "shared")),
+        "SME_LOSS_MODE": str(config.get("loss_mode", "mse")),
+        "SME_INTERVAL_LOSS_BETA": str(config.get("interval_loss_beta", 0.0)),
+        "SME_INTERVAL_TEMPERATURE": str(config.get("interval_temperature", 0.05)),
         "SME_RUN_NAME": run_name,
         "SME_DEVICE": requested_device(device),
         "SME_SEED": str(seed),
@@ -139,6 +163,10 @@ def run_fit(rule, study_name, label, config, seed, epochs, patience,
         "SME_ANALYSE_VALIDATION": "1" if analyse else "0",
         "SME_PERTURBATION_CASES": "0" if analyse else "20",
     })
+    if "residual_alpha" in config:
+        env["SME_RESIDUAL_ALPHA"] = str(config["residual_alpha"])
+    if analyse and os.environ.get("SME_SAVE_TRAJECTORY_CASES"):
+        env["SME_SAVE_TRAJECTORY_CASES"] = os.environ["SME_SAVE_TRAJECTORY_CASES"]
     if cv_fold is not None:
         env["SME_CV_FOLD"] = str(cv_fold)
         env["SME_CV_FOLDS"] = str(cv_folds)
@@ -208,20 +236,42 @@ def mean_score(metrics_list, screening=False):
     return sum(values) / len(values)
 
 
+def mean_rmse(metrics_list):
+    values = [float(metrics.get("restored_validation_rmse", float("inf")))
+              for metrics in metrics_list]
+    finite = [value for value in values if math.isfinite(value)]
+    return sum(finite) / len(finite) if finite else float("inf")
+
+
 def surrogate_candidates(completed, count=16):
     """Select exploitation and exploration trials from a larger discrete pool."""
     import numpy as np
 
     observed = [config for config, _ in completed]
     pool = [config for config in sampled_candidates(400) if config not in observed]
-    numeric_keys = [key for key in observed[0] if key != "atom_feature_profile"]
+    categorical_keys = [key for key in
+                        ("atom_feature_profile", "trajectory_pooling", "ridge_mode",
+                         "loss_mode")
+                        if key in observed[0]]
+    numeric_keys = [key for key in observed[0] if key not in categorical_keys]
 
     def encode(configs):
         numeric = np.asarray([[float(config[key]) for key in numeric_keys]
                               for config in configs])
-        profiles = np.zeros((len(configs), len(FEATURE_PROFILES)))
+        category_values = {
+            "atom_feature_profile": FEATURE_PROFILES,
+            "trajectory_pooling": ("legacy", "multiscale"),
+            "ridge_mode": ("shared", "per_endpoint"),
+            "loss_mode": ("mse", "hybrid_interval"),
+        }
+        category_width = sum(len(category_values[key]) for key in categorical_keys)
+        profiles = np.zeros((len(configs), category_width))
         for row, config in enumerate(configs):
-            profiles[row, FEATURE_PROFILES.index(config["atom_feature_profile"])] = 1.0
+            offset = 0
+            for key in categorical_keys:
+                values = category_values[key]
+                profiles[row, offset + values.index(config[key])] = 1.0
+                offset += len(values)
         return numeric, profiles
 
     observed_numeric, observed_profiles = encode(observed)
@@ -250,6 +300,7 @@ def surrogate_candidates(completed, count=16):
 
 
 def main():
+    global SEARCH_SEED, SEARCH_VERSION
     parser = argparse.ArgumentParser(
         description="Run a resumable Graph-CA production search on CPU or CUDA."
     )
@@ -266,7 +317,12 @@ def main():
         "--report-python", default=None,
         help="report Python executable; defaults to SME_REPORT_PYTHON or worker Python",
     )
+    parser.add_argument("--search-version", default=SEARCH_VERSION,
+                        help="isolated result namespace for this search")
+    parser.add_argument("--search-seed", type=int, default=SEARCH_SEED)
     args = parser.parse_args()
+    SEARCH_VERSION = args.search_version
+    SEARCH_SEED = args.search_seed
     rule = args.rule
     device = requested_device(args.device)
     worker_python = python_executable(args.python_path)
@@ -292,7 +348,8 @@ def main():
         write_progress(study_dir, {"stage": "stage1", "completed": index,
                                    "total": len(candidates),
                                    "selection_metric": "MA-ST-RAE",
-                                   "best_ma_st_rae": min(mean_score(m, screening=True) for _, m in stage1)})
+                                   "best_ma_st_rae": min(mean_score(m, screening=True) for _, m in stage1),
+                                   "best_rmse": min(mean_rmse(m) for _, m in stage1)})
     adaptive = surrogate_candidates(stage1)
     for offset, config in enumerate(adaptive, 1):
         index = len(candidates) + offset
@@ -303,7 +360,8 @@ def main():
         write_progress(study_dir, {"stage": "stage1_surrogate", "completed": offset,
                                    "total": len(adaptive),
                                    "selection_metric": "MA-ST-RAE",
-                                   "best_ma_st_rae": min(mean_score(m, screening=True) for _, m in stage1)})
+                                   "best_ma_st_rae": min(mean_score(m, screening=True) for _, m in stage1),
+                                   "best_rmse": min(mean_rmse(m) for _, m in stage1)})
     promoted = sorted(stage1, key=lambda item: mean_score(item[1], screening=True))[:8]
 
     stage2 = []
@@ -318,7 +376,8 @@ def main():
         write_progress(study_dir, {"stage": "stage2", "completed": index,
                                    "total": len(promoted),
                                    "selection_metric": "MA-ST-RAE",
-                                   "best_ma_st_rae": min(mean_score(m, screening=True) for _, m in stage2)})
+                                   "best_ma_st_rae": min(mean_score(m, screening=True) for _, m in stage2),
+                                   "best_rmse": min(mean_rmse(m) for _, m in stage2)})
     promoted2 = sorted(stage2, key=lambda item: mean_score(item[1], screening=True))[:2]
 
     confirmations = []
@@ -357,6 +416,7 @@ def main():
                                    "total": len(promoted2),
                                    "selection_metric": "MA-ST-RAE",
                                    "latest_mean_ma_st_rae": confirmation_mean,
+                                   "latest_mean_rmse": mean_rmse(config_metrics),
                                    "latest_seed_sd": seed_sd,
                                    "latest_robust_score": robust_score})
     winner, winner_metrics, winner_mean, winner_sd, winner_score = min(

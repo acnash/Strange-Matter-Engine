@@ -1,5 +1,30 @@
 # Latest production summary
 
+## Current submission model: DS-GCAE v1
+
+Updated: 29 August 2026  
+Hardware: NVIDIA GeForce RTX 5070 Ti, CUDA  
+Primary selection metric: MA-ST-RAE, lower is better
+
+The current frozen direct-inhibition model is the **Dual-Scale Graph Cellular Automata Ensemble (DS-GCAE v1)**. It combines the five-rule original ensemble with a three-seed multiscale ensemble while preserving a complete bonded-graph cellular-automata trajectory inside every member.
+
+| Validation result | Value |
+|---|---:|
+| Point MA-ST-RAE | **0.7842** |
+| Bootstrap MA-ST-RAE mean | **0.7850** |
+| 95% bootstrap interval | 0.7464 to 0.8274 |
+| RMSE | 0.8678 pIC50 |
+| CYP1A2 ST-RAE | 0.8228 |
+| CYP2C9 ST-RAE | 0.7461 |
+| CYP2D6 ST-RAE | 0.9556 |
+| CYP3A4 ST-RAE | 0.6122 |
+
+The final blend assigns 42.5% to the original equal-weight ensemble and 57.5% to the multiscale ensemble. The multiscale rule weights are gated residual 0.1036, delayed memory 0.1999, inertial reaction diffusion 0.1966, Kuramoto-Sakaguchi 0.2447, and FitzHugh-Nagumo 0.2552. Each multiscale rule averages seeds 1701, 2909, and 4211.
+
+Blind inference completed on all 750 challenge molecules using 20 frozen checkpoints, producing 3,000 finite pIC50 predictions. Test labels were not loaded. The validated submission is `results/production_dual_scale_graph_ca_ensemble_v1/ds_gcae_submission.csv`; it contains exactly 750 rows and six columns in the official order, has no duplicate molecule identifiers, and has no missing or non-finite predictions.
+
+The original equal-weight five-rule ensemble remains a useful reference, with point MA-ST-RAE 0.7865 and RMSE 0.8688. DS-GCAE improves the point primary metric by 0.0023, which is a modest change rather than a statistically resolved separation.
+
 ## Challenge-aligned v5 production campaign complete
 
 The ten-rule rerun now uses scaffold cross-validation inside the fitting pool, a sealed scaffold holdout, point MA-ST-RAE for efficient screening, and the official 1,000-resample bootstrap for finalists. The common search includes expanded chemical feature groups, rule-specific dynamics, surrogate-guided refinement, successive halving, five-fold and three-seed confirmation, secondary challenge metrics, and visually verified PDF pagination. No challenge-blinded molecules enter model development.

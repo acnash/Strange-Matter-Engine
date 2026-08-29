@@ -6,13 +6,23 @@ Strange Matter Engine is an experimental molecular machine-learning project for 
 
 Each molecule will be represented as a graph: atoms are cells, chemical bonds define their neighbourhoods, and a small shared local rule evolves every atom's state through time. The model will preserve and analyse the complete trajectory of this evolution—from the chemically initialised state through every subsequent generation—rather than reducing the molecule to its final state.
 
-The project is both a predictive experiment and a study of molecular dynamical behaviour. It will investigate convergence, oscillations, attractor families, perturbation sensitivity, complex transients, and possible relationships between dynamical regimes and activity cliffs. Any claim of chaotic behaviour will require mathematical evidence.
+The project is both a predictive experiment and a study of molecular dynamical behaviour. It investigates convergence, oscillations, attractor families, perturbation sensitivity, complex transients, and possible relationships between dynamical regimes and activity cliffs. Any claim of chaotic behaviour requires mathematical evidence.
 
 The work is designed for a personal workstation, with an emphasis on compact models, scientific interpretability, honest benchmarking, and visualisations grounded in quantities genuinely produced or analysed by the model.
 
 The evolving [Teaching curriculum](Teaching/README.md) records the scientific and mathematical background behind every component so that implementation and understanding advance together.
 
 The [Visual Laboratory](notebooks/README.md) provides interactive, code-hidden Jupyter experiences with clean RDKit molecular depictions, a restrained cyberpunk visual system, graph views, atom and bond inspectors, encoding heatmaps, and a transparent first graph cellular automaton.
+
+## Current production model
+
+The frozen direct-inhibition submission model is the **Dual-Scale Graph Cellular Automata Ensemble (DS-GCAE v1)**. It combines two independently validated five-rule graph-CA ensembles built from gated residual, delayed memory, inertial reaction diffusion, Kuramoto-Sakaguchi, and FitzHugh-Nagumo transition rules.
+
+The first component contributes 42.5% of the final prediction and averages one seed from each rule equally. The second contributes 57.5%, averages seeds 1701, 2909, and 4211 within each rule, and blends the rules with validation-selected weights of 0.1036, 0.1999, 0.1966, 0.2447, and 0.2552 in the order listed above. The global two-scale mixing coefficient was selected using cross-fitted validation predictions and MA-ST-RAE, while the final sealed holdout remained outside member training and blend selection.
+
+On the final validation set, DS-GCAE achieved point MA-ST-RAE **0.7842**, bootstrap mean **0.7850** with a 95% interval of **0.7464 to 0.8274**, and RMSE **0.8678 pIC50**. This is a small improvement over the original equal-weight five-rule ensemble, whose point MA-ST-RAE was 0.7865. The difference is modest and should be interpreted with the overlapping uncertainty intervals in mind.
+
+Frozen CUDA inference produced 3,000 direct-inhibition predictions for the 750 blinded molecules without loading test labels. The challenge-ready file is [`results/production_dual_scale_graph_ca_ensemble_v1/ds_gcae_submission.csv`](results/production_dual_scale_graph_ca_ensemble_v1/ds_gcae_submission.csv), with the official column order beginning `SMILES,Molecule_Name`. Reproducibility details and all 20 member checkpoints are recorded in [`inference_manifest.json`](results/production_dual_scale_graph_ca_ensemble_v1/inference_manifest.json).
 
 ## Project visual standard
 

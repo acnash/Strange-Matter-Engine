@@ -40,6 +40,14 @@ The notes are divided into subjects as they might be taught at a university:
 34. [Rule 9: Conservative Graph-Flux CA](Transition_Rule_9_Conservative_Graph_Flux_CA.md) — antisymmetric bond flux and exact latent-channel conservation.
 35. [Rule 10: Delayed-Memory CA](Transition_Rule_10_Delayed_Memory_CA.md) — explicit state delay, feedback, damping, oscillation, and long transients.
 
+## Current production architecture: DS-GCAE
+
+The current direct-inhibition model is the **Dual-Scale Graph Cellular Automata Ensemble (DS-GCAE v1)**. It retains the same scientific unit throughout: atoms are cells, bonds define neighbourhoods, a shared local transition rule evolves atom states for multiple generations, multitime trajectory statistics form the molecular fingerprint, and a differentiable closed-form ridge layer maps that fingerprint and CYP context to pIC50.
+
+Five complementary rules are retained as ensemble members: gated residual, delayed memory, inertial reaction diffusion, Kuramoto-Sakaguchi, and FitzHugh-Nagumo. The original scale uses one trained seed per rule and equal weights. The multiscale component averages three independently trained seeds per rule and then applies validation-selected rule weights. A final scalar blend combines 42.5% of the original component with 57.5% of the multiscale component. Ensemble averaging occurs only after every member has completed its own bonded-graph cellular-automata trajectory and ridge prediction, so the ensemble does not replace or bypass the CA dynamics.
+
+The current validation result is point MA-ST-RAE 0.7842, bootstrap mean 0.7850 with a 95% interval from 0.7464 to 0.8274, and RMSE 0.8678 pIC50. The blinded submission contains predictions only. Its labels were never loaded, and its 750 molecules did not participate in training, hyperparameter selection, seed selection, ensemble weighting, or trajectory-regime selection.
+
 ## Learning rule
 
 Nothing enters the final model merely because it is conventional or available in a software library. Before a component is adopted, we will understand:

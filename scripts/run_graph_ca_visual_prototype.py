@@ -63,6 +63,11 @@ DYN_D = float(os.environ.get("SME_DYN_D", "0.5"))
 PATIENCE_LIMIT = int(os.environ.get("SME_PATIENCE", "20"))
 MIN_DELTA = float(os.environ.get("SME_MIN_DELTA", "0.005"))
 TUNING_ONLY = os.environ.get("SME_TUNING_ONLY", "0") == "1"
+TRAJECTORY_POOLING = os.environ.get("SME_TRAJECTORY_POOLING", "legacy")
+RIDGE_MODE = os.environ.get("SME_RIDGE_MODE", "shared")
+LOSS_MODE = os.environ.get("SME_LOSS_MODE", "mse")
+INTERVAL_LOSS_BETA = float(os.environ.get("SME_INTERVAL_LOSS_BETA", "0.5"))
+INTERVAL_TEMPERATURE = float(os.environ.get("SME_INTERVAL_TEMPERATURE", "0.05"))
 SEED = int(os.environ.get("SME_SEED", "1701"))
 CYPS = ("CYP1A2", "CYP2C9", "CYP2D6", "CYP3A4")
 LABEL_COLS = tuple(f"{c}_pIC50_direct_inhibition" for c in CYPS)
@@ -395,6 +400,7 @@ def prepare() -> None:
 def train(extended_dynamics: bool = False) -> None:
     global RULE, GENERATIONS, UPDATE_SCALE, INIT_SCALE, INITIAL_NOISE
     global SUPPORT_FRACTION, BOND_TEMPERATURE, DYN_A, DYN_B, DYN_C, DYN_D
+    global TRAJECTORY_POOLING, RIDGE_MODE
     import torch
     from torch import nn
 
@@ -403,6 +409,42 @@ def train(extended_dynamics: bool = False) -> None:
     torch.set_num_threads(max(1, min(4, os.cpu_count() or 1)))
     with CACHE.open("rb") as handle:
         data = pickle.load(handle)
+    residual_targets_path = os.environ.get("SME_RESIDUAL_TARGETS")
+    residual_mode = bool(residual_targets_path)
+    residual_alpha = float(os.environ.get("SME_RESIDUAL_ALPHA", "1.0"))
+    if residual_mode:
+        with Path(residual_targets_path).open(newline="", encoding="utf-8") as handle:
+            residual_rows = list(csv.DictReader(handle))
+        residual_lookup = {
+            (row["molecule_id"], row["cyp_target"]): row
+            for row in residual_rows
+        }
+        missing_targets = []
+        for record in data["train"]:
+            original_labels = list(record["labels"])
+            record["original_labels"] = original_labels
+            record["base_predictions"] = [float("nan")] * len(CYPS)
+            residual_labels = list(original_labels)
+            for cyp_index, cyp in enumerate(CYPS):
+                if not np.isfinite(original_labels[cyp_index]):
+                    continue
+                row = residual_lookup.get((record["name"], cyp))
+                if row is None:
+                    missing_targets.append((record["name"], cyp))
+                    residual_labels[cyp_index] = float("nan")
+                    continue
+                base_prediction = float(row["base_prediction"])
+                record["base_predictions"][cyp_index] = base_prediction
+                residual_labels[cyp_index] = float(row.get(
+                    "residual_target",
+                    float(original_labels[cyp_index]) - base_prediction,
+                ))
+            record["labels"] = residual_labels
+        if missing_targets:
+            raise ValueError(
+                f"Residual target table is missing {len(missing_targets)} observed rows; "
+                f"first missing key is {missing_targets[0]}"
+            )
     device = resolve_torch_device(torch)
     if device.type == "cuda":
         torch.cuda.manual_seed_all(SEED)
@@ -410,14 +452,16 @@ def train(extended_dynamics: bool = False) -> None:
     run_runtime = runtime_metadata(torch, device)
     print(json.dumps(run_runtime), flush=True)
     checkpoint = None
-    if extended_dynamics:
+    inference_only = os.environ.get("SME_INFERENCE_ONLY", "0") == "1"
+    if extended_dynamics or inference_only:
         checkpoint_path = os.environ.get("SME_CHECKPOINT")
         if not checkpoint_path:
-            raise ValueError("SME_CHECKPOINT is required for extended-dynamics mode")
+            raise ValueError("SME_CHECKPOINT is required for checkpoint inference")
         checkpoint = load_checkpoint(torch, checkpoint_path, device)
         hyperparameters = checkpoint["hyperparameters"]
         RULE = checkpoint["rule"]
-        GENERATIONS = int(os.environ.get("SME_EXTENDED_GENERATIONS", "5000"))
+        GENERATIONS = (int(os.environ.get("SME_EXTENDED_GENERATIONS", "5000"))
+                       if extended_dynamics else int(checkpoint["generations"]))
         UPDATE_SCALE = float(hyperparameters["update_scale"])
         INIT_SCALE = float(hyperparameters["init_scale"])
         INITIAL_NOISE = 0.0
@@ -427,6 +471,8 @@ def train(extended_dynamics: bool = False) -> None:
         DYN_B = float(hyperparameters["dyn_b"])
         DYN_C = float(hyperparameters["dyn_c"])
         DYN_D = float(hyperparameters["dyn_d"])
+        TRAJECTORY_POOLING = checkpoint.get("trajectory_pooling", "legacy")
+        RIDGE_MODE = checkpoint.get("ridge_mode", "shared")
     feature_profile = (checkpoint.get("atom_feature_profile", "baseline")
                        if checkpoint is not None
                        else os.environ.get("SME_ATOM_FEATURE_PROFILE", "baseline"))
@@ -508,6 +554,21 @@ def train(extended_dynamics: bool = False) -> None:
             pooled.index_add_(0, graph_index, values)
             return pooled / atom_counts[:, None]
 
+        @staticmethod
+        def _readout_features(fingerprint, endpoint_indices):
+            if RIDGE_MODE == "shared":
+                return fingerprint
+            if RIDGE_MODE != "per_endpoint":
+                raise ValueError(f"Unknown ridge mode: {RIDGE_MODE}")
+            endpoint_indices = torch.as_tensor(
+                endpoint_indices, dtype=torch.long, device=fingerprint.device
+            )
+            one_hot = torch.nn.functional.one_hot(
+                endpoint_indices, num_classes=len(CYPS)
+            ).to(fingerprint.dtype)
+            blocks = fingerprint[:, None, :] * one_hot[:, :, None]
+            return torch.cat((one_hot, blocks.flatten(1)), dim=1)
+
         def forward_batch(self, examples, initial_perturbations=None,
                           return_node_trajectory=False):
             """Evaluate independent molecule-CYP graphs as one disconnected graph."""
@@ -549,8 +610,11 @@ def train(extended_dynamics: bool = False) -> None:
             graph_mean = self._graph_mean(h, graph_index, graph_count, atom_counts_tensor)
             graph_mean_sum = graph_mean.clone()
             graph_mean_sq_sum = graph_mean.square()
+            checkpoint_steps = tuple(max(1, round(GENERATIONS * fraction))
+                                     for fraction in (0.125, 0.25, 0.5, 0.75, 1.0))
+            checkpoint_summaries = []
             step_energy = torch.zeros_like(h)
-            for _ in range(GENERATIONS):
+            for step_index in range(1, GENERATIONS + 1):
                 agg = torch.zeros_like(h)
                 neighbour_mean = torch.zeros_like(h)
                 degree = torch.zeros((h.shape[0], 1), device=device)
@@ -678,6 +742,8 @@ def train(extended_dynamics: bool = False) -> None:
                 graph_mean = self._graph_mean(h, graph_index, graph_count, atom_counts_tensor)
                 graph_mean_sum += graph_mean
                 graph_mean_sq_sum += graph_mean.square()
+                if TRAJECTORY_POOLING == "multiscale" and step_index in checkpoint_steps:
+                    checkpoint_summaries.append(graph_mean)
 
             final_mean = self._graph_mean(h, graph_index, graph_count, atom_counts_tensor)
             final_second = self._graph_mean(h.square(), graph_index, graph_count, atom_counts_tensor)
@@ -690,6 +756,13 @@ def train(extended_dynamics: bool = False) -> None:
             series_var = (graph_mean_sq_sum / float(GENERATIONS + 1) - series_mean.square()).clamp_min(0.0)
             energy_mean = self._graph_mean(step_energy, graph_index, graph_count, atom_counts_tensor)
             fingerprint = torch.cat((final_mean, final_var, temporal_mean, series_var, energy_mean), dim=1)
+            if TRAJECTORY_POOLING == "multiscale":
+                if len(checkpoint_summaries) != 5:
+                    raise RuntimeError("Multiscale checkpoint collection is incomplete")
+                fingerprint = torch.cat((fingerprint, *checkpoint_summaries), dim=1)
+            fingerprint = self._readout_features(
+                fingerprint, [cyp for _, cyp in examples]
+            )
             if return_node_trajectory:
                 return fingerprint, torch.stack(node_states), graph_index, atom_counts
             return fingerprint
@@ -708,8 +781,11 @@ def train(extended_dynamics: bool = False) -> None:
             state_history = [h]
             states = [h]
             means = [h.mean(0)]
+            checkpoint_steps = tuple(max(1, round(GENERATIONS * fraction))
+                                     for fraction in (0.125, 0.25, 0.5, 0.75, 1.0))
+            checkpoint_summaries = []
             step_energy = torch.zeros(hidden, device=device)
-            for _ in range(GENERATIONS):
+            for step_index in range(1, GENERATIONS + 1):
                 agg = torch.zeros_like(h)
                 neighbour_mean = torch.zeros_like(h)
                 degree = torch.zeros((h.shape[0], 1), device=device)
@@ -826,18 +902,72 @@ def train(extended_dynamics: bool = False) -> None:
                 h = new_h
                 state_history.append(h)
                 states.append(h); means.append(h.mean(0))
+                if TRAJECTORY_POOLING == "multiscale" and step_index in checkpoint_steps:
+                    checkpoint_summaries.append(h.mean(0))
             mean_series = torch.stack(means)
             fingerprint = torch.cat((
                 h.mean(0), h.var(0, unbiased=False),
                 torch.stack(states).mean((0, 1)),
                 mean_series.var(0, unbiased=False), step_energy,
             ))
+            if TRAJECTORY_POOLING == "multiscale":
+                if len(checkpoint_summaries) != 5:
+                    raise RuntimeError("Multiscale checkpoint collection is incomplete")
+                fingerprint = torch.cat((fingerprint, *checkpoint_summaries))
+            fingerprint = self._readout_features(
+                fingerprint.unsqueeze(0), [cyp]
+            ).squeeze(0)
             pred = fingerprint
             if return_trajectory:
                 return pred, torch.stack(states)
             return pred
 
     model = GraphCA().to(device)
+    if inference_only:
+        model.load_state_dict(checkpoint["state_dict"])
+        model.eval()
+        ridge_state = {
+            key: value.to(device) for key, value in checkpoint["ridge_state"].items()
+        }
+        prediction_rows = []
+        examples = [(record, cyp_index)
+                    for record in data.get("test", [])
+                    for cyp_index in range(len(CYPS))]
+        if not examples:
+            raise ValueError("Inference cache contains no blinded test molecules")
+        with torch.no_grad():
+            for start in range(0, len(examples), 128):
+                chunk = examples[start:start + 128]
+                fingerprints = model.forward_batch(chunk)
+                predictions = differentiable_ridge_predict(fingerprints, ridge_state)
+                for (record, cyp_index), prediction in zip(chunk, predictions):
+                    prediction_rows.append({
+                        "molecule_id": record["name"],
+                        "smiles": record["smiles"],
+                        "canonical_smiles": record["canonical_smiles"],
+                        "cyp_target": CYPS[cyp_index],
+                        "predicted_pic50": float(prediction),
+                    })
+        OUT.mkdir(parents=True, exist_ok=True)
+        with (OUT / "blinded_test_predictions.csv").open("w", newline="") as handle:
+            writer = csv.DictWriter(handle, fieldnames=prediction_rows[0].keys())
+            writer.writeheader(); writer.writerows(prediction_rows)
+        inference_manifest = {
+            "checkpoint": str(Path(os.environ["SME_CHECKPOINT"]).resolve()),
+            "rule": RULE,
+            "generations": GENERATIONS,
+            "trajectory_pooling": TRAJECTORY_POOLING,
+            "ridge_mode": RIDGE_MODE,
+            "test_molecules": len(data["test"]),
+            "predictions": len(prediction_rows),
+            "labels_loaded": False,
+            "runtime": run_runtime,
+        }
+        (OUT / "inference_manifest.json").write_text(
+            json.dumps(inference_manifest, indent=2) + "\n"
+        )
+        print(json.dumps(inference_manifest, indent=2))
+        return
     if extended_dynamics:
         model.load_state_dict(checkpoint["state_dict"])
         model.eval()
@@ -897,6 +1027,19 @@ def train(extended_dynamics: bool = False) -> None:
     fit_pairs = observed_pairs(fit_indices)
     val_pairs = observed_pairs(validation_indices)
 
+    interval_normalizers = {}
+    for cyp_index in range(len(CYPS)):
+        endpoint_pairs = [(i, y) for i, c, y in fit_pairs if c == cyp_index]
+        endpoint_targets = np.asarray([y for _, y in endpoint_pairs], dtype=float)
+        baseline = float(endpoint_targets.mean())
+        endpoint_errors = []
+        for i, _ in endpoint_pairs:
+            record = data["train"][i]
+            low = float(record["label_conf_low"][cyp_index])
+            high = float(record["label_conf_high"][cyp_index])
+            endpoint_errors.append(max(low - baseline, baseline - high, 0.0))
+        interval_normalizers[cyp_index] = max(float(np.mean(endpoint_errors)), 1e-3)
+
     def credible_bounds(pairs):
         lows, highs, endpoints = [], [], []
         for i, c, _ in pairs:
@@ -932,7 +1075,18 @@ def train(extended_dynamics: bool = False) -> None:
         features, targets = fingerprints_and_targets(pairs)
         with torch.no_grad():
             predictions = differentiable_ridge_predict(features, ridge_state)
-        ys = targets.cpu().numpy(); ps = predictions.cpu().numpy()
+        residual_ys = targets.cpu().numpy()
+        residual_ps = predictions.cpu().numpy()
+        if residual_mode:
+            ys = np.asarray([
+                data["train"][i]["original_labels"][c] for i, c, _ in pairs
+            ], dtype=float)
+            base = np.asarray([
+                data["train"][i]["base_predictions"][c] for i, c, _ in pairs
+            ], dtype=float)
+            ps = base + residual_alpha * residual_ps
+        else:
+            ys, ps = residual_ys, residual_ps
         lows, highs, endpoints = credible_bounds(pairs)
         metric = (bootstrap_macro_soft_threshold_rae if bootstrap
                   else macro_soft_threshold_rae)
@@ -982,9 +1136,42 @@ def train(extended_dynamics: bool = False) -> None:
             preds = differentiable_ridge_predict(
                 fingerprints[len(support_batch):], ridge_state
             )
-            mse = ((preds - targets) ** 2).mean()
+            if LOSS_MODE == "mse":
+                prediction_loss = ((preds - targets) ** 2).mean()
+            elif LOSS_MODE == "hybrid_interval":
+                endpoint_losses = []
+                endpoint_mse = []
+                query_endpoints = torch.tensor(
+                    [c for _, c, _ in query_batch], dtype=torch.long, device=device
+                )
+                query_lows = torch.tensor([
+                    data["train"][i]["label_conf_low"][c]
+                    for i, c, _ in query_batch
+                ], dtype=preds.dtype, device=device)
+                query_highs = torch.tensor([
+                    data["train"][i]["label_conf_high"][c]
+                    for i, c, _ in query_batch
+                ], dtype=preds.dtype, device=device)
+                temperature = max(INTERVAL_TEMPERATURE, 1e-4)
+                outside = temperature * (
+                    torch.nn.functional.softplus((query_lows - preds) / temperature)
+                    + torch.nn.functional.softplus((preds - query_highs) / temperature)
+                )
+                for cyp_index in range(len(CYPS)):
+                    selected = query_endpoints == cyp_index
+                    if selected.any():
+                        endpoint_losses.append(
+                            outside[selected].mean() / interval_normalizers[cyp_index]
+                        )
+                        endpoint_mse.append(((preds[selected] - targets[selected]) ** 2).mean())
+                balanced_interval = torch.stack(endpoint_losses).mean()
+                balanced_mse = torch.stack(endpoint_mse).mean()
+                prediction_loss = ((1.0 - INTERVAL_LOSS_BETA) * balanced_mse
+                                   + INTERVAL_LOSS_BETA * balanced_interval)
+            else:
+                raise ValueError(f"Unknown loss mode: {LOSS_MODE}")
             ca_penalty = CA_L2 * sum((p ** 2).sum() for p in ca_params)
-            loss = mse + ca_penalty
+            loss = prediction_loss + ca_penalty
             loss.backward()
             raw = float(torch.sqrt(sum((p.grad.detach() ** 2).sum() for p in model.parameters()
                                        if p.grad is not None)))
@@ -1025,6 +1212,13 @@ def train(extended_dynamics: bool = False) -> None:
                 "atom_feature_names": list(requested_feature_names),
                 "gpu": torch.cuda.get_device_name(device) if device.type == "cuda" else None,
                 "training_seconds": training_seconds,
+                "prediction_mode": "residual_ca" if residual_mode else "direct",
+                "residual_alpha": residual_alpha if residual_mode else None,
+                "trajectory_pooling": TRAJECTORY_POOLING,
+                "ridge_mode": RIDGE_MODE,
+                "loss_mode": LOSS_MODE,
+                "interval_loss_beta": INTERVAL_LOSS_BETA,
+                "interval_temperature": INTERVAL_TEMPERATURE,
                 "ridge_state": {k: v.detach().cpu() for k, v in final_ridge_state.items()},
                 "hyperparameters": {"ca_lr": CA_LR,
                     "ridge": RIDGE_STRENGTH, "ca_l2": CA_L2,
@@ -1054,15 +1248,25 @@ def train(extended_dynamics: bool = False) -> None:
     pair_rows = []
     for split, pairs, ys, ps in (("fit", fit_pairs, train_y, train_p),
                                 ("validation", val_pairs, val_y, val_p)):
-        for (i, c, y), pred in zip(pairs, ps):
+        for (i, c, _), experimental, pred in zip(pairs, ys, ps):
             r = data["train"][i]
             low, high = r["label_conf_low"][c], r["label_conf_high"][c]
-            pair_rows.append({"split": split, "molecule_id": r["name"], "cyp_target": CYPS[c],
-                              "experimental_pic50": y, "predicted_pic50": pred,
+            row = {"split": split, "molecule_id": r["name"], "cyp_target": CYPS[c],
+                              "experimental_pic50": experimental, "predicted_pic50": pred,
                               "credible_interval_low": low,
                               "credible_interval_high": high,
                               "soft_threshold_absolute_error": max(low - pred, pred - high, 0.0),
-                              "residual": pred - y})
+                              "residual": pred - experimental}
+            if residual_mode:
+                base = r["base_predictions"][c]
+                row.update({
+                    "base_prediction": base,
+                    "residual_target": experimental - base,
+                    "predicted_residual": (pred - base) / residual_alpha
+                    if residual_alpha else 0.0,
+                    "residual_alpha": residual_alpha,
+                })
+            pair_rows.append(row)
     with (OUT / "validation_predictions.csv").open("w", newline="") as handle:
         writer = csv.DictWriter(handle, fieldnames=pair_rows[0].keys()); writer.writeheader(); writer.writerows(pair_rows)
 
@@ -1094,6 +1298,13 @@ def train(extended_dynamics: bool = False) -> None:
                                  if cv_fold_text is not None else
                                  {"kind": "reserved_scaffold_holdout"}),
         "readout": "differentiable_closed_form_ridge",
+        "prediction_mode": "residual_ca" if residual_mode else "direct",
+        "residual_alpha": residual_alpha if residual_mode else None,
+        "trajectory_pooling": TRAJECTORY_POOLING,
+        "ridge_mode": RIDGE_MODE,
+        "loss_mode": LOSS_MODE,
+        "interval_loss_beta": INTERVAL_LOSS_BETA,
+        "interval_temperature": INTERVAL_TEMPERATURE,
         "hyperparameters": {"ca_lr": CA_LR,
         "ridge": RIDGE_STRENGTH, "ca_l2": CA_L2,
         "gradient_clip": GRAD_CLIP, "update_scale": UPDATE_SCALE,
@@ -1179,6 +1390,59 @@ def train(extended_dynamics: bool = False) -> None:
             ),
             reverse=True,
         )[:perturbation_case_limit]
+        trajectory_case_limit = int(os.environ.get("SME_SAVE_TRAJECTORY_CASES", "0"))
+        trajectory_ranked = sorted(
+            range(len(score_rows)),
+            key=lambda j: (
+                score_rows[j]["late_motion"] *
+                (1.0 + score_rows[j]["spectral_entropy"]) /
+                max(score_rows[j]["recurrence_ratio"], 1e-6)
+            ),
+            reverse=True,
+        )[:trajectory_case_limit]
+        trajectory_archive = OUT / "trajectory_archive"
+        trajectory_manifest = []
+        if trajectory_ranked:
+            trajectory_archive.mkdir(parents=True, exist_ok=True)
+            with torch.no_grad():
+                for archive_rank, score_index in enumerate(trajectory_ranked, start=1):
+                    row = score_rows[score_index]
+                    rec = data["train"][row["training_index"]]
+                    _, trajectory_tensor = model.forward_one(
+                        rec, row["cyp_index"], return_trajectory=True,
+                    )
+                    archive_name = (
+                        f"{archive_rank:03d}_{row['molecule_id']}_"
+                        f"{row['cyp_target']}.npz"
+                    )
+                    np.savez_compressed(
+                        trajectory_archive / archive_name,
+                        trajectory=trajectory_tensor.cpu().numpy().astype(np.float32),
+                        atom_features=np.asarray(rec["x"], dtype=np.float32),
+                        source_indices=np.asarray(rec["src"], dtype=np.int32),
+                        destination_indices=np.asarray(rec["dst"], dtype=np.int32),
+                        bond_features=np.asarray(rec["edge"], dtype=np.float32),
+                        molecule_id=np.asarray(rec["name"]),
+                        smiles=np.asarray(rec["smiles"]),
+                        cyp_target=np.asarray(row["cyp_target"]),
+                        prediction_generations=np.asarray(GENERATIONS),
+                        atom_feature_names=np.asarray(requested_feature_names),
+                    )
+                    trajectory_manifest.append({
+                        "archive_rank": archive_rank,
+                        "file": archive_name,
+                        **{key: value for key, value in row.items()
+                           if key != "training_index"},
+                        "atoms": len(rec["x"]),
+                        "directed_edges": len(rec["src"]),
+                        "saved_generations": GENERATIONS + 1,
+                        "hidden_channels": hidden,
+                    })
+            with (trajectory_archive / "manifest.csv").open("w", newline="") as handle:
+                writer = csv.DictWriter(
+                    handle, fieldnames=trajectory_manifest[0].keys()
+                )
+                writer.writeheader(); writer.writerows(trajectory_manifest)
         perturbation_deferred_reason = None
         if ranked and device.type == "cuda" and os.name == "nt":
             perturbation_deferred_reason = "windows_cuda_native_stability_guard"
@@ -1258,6 +1522,9 @@ def train(extended_dynamics: bool = False) -> None:
             writer.writeheader(); writer.writerows(perturbation_rows)
         common_metrics["dynamical_analysis"] = {
             "validation_trajectories_screened": len(score_rows),
+            "full_atom_trajectories_archived": len(trajectory_manifest),
+            "trajectory_archive": (str(trajectory_archive.relative_to(OUT))
+                                   if trajectory_manifest else None),
             "perturbation_cases": len(perturbation_rows),
             "classification_counts": {
                 label: sum(r["classification"] == label for r in perturbation_rows)
@@ -1589,8 +1856,12 @@ The PDB B-factor column stores scaled eight-channel atom-state magnitude. It is 
 
 def main() -> None:
     parser = argparse.ArgumentParser()
-    parser.add_argument("phase", choices=("prepare", "train", "render", "extended-dynamics"))
+    parser.add_argument("phase", choices=("prepare", "train", "predict", "render", "extended-dynamics"))
     args = parser.parse_args()
+    if args.phase == "predict":
+        os.environ["SME_INFERENCE_ONLY"] = "1"
+        train(extended_dynamics=False)
+        return
     {"prepare": prepare, "train": train, "render": render,
      "extended-dynamics": lambda: train(extended_dynamics=True)}[args.phase]()
 
