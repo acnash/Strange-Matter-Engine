@@ -7,6 +7,7 @@ from pymol import cmd
 
 
 _STATE_COUNT = int(globals().get("GCA_STATE_COUNT", 18))
+_HYDROGEN_CODA_STATE = globals().get("GCA_HYDROGEN_CODA_STATE", _STATE_COUNT)
 _current_state = 1
 _play_thread = None
 _stop_playback = threading.Event()
@@ -32,7 +33,7 @@ def gca_state(state=1):
         cmd.spectrum("b", "cyan_magenta", obj, minimum=0.0, maximum=100.0)
     if objects:
         hydrogen_selection = "(" + " or ".join(objects) + ") and elem H"
-        if state == 18:
+        if _HYDROGEN_CODA_STATE is not None and state == int(_HYDROGEN_CODA_STATE):
             cmd.show("sticks", hydrogen_selection)
             cmd.color("cyber_lime", hydrogen_selection)
         else:

@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import json
 import math
+import os
 import time
 from pathlib import Path
 
@@ -426,6 +427,10 @@ def run_extended_analysis(*, model, data, device, torch_module, hidden_channels,
     result_rows = []
     diagnostics = {}
     saved_means = {}
+    save_node_trajectories = os.environ.get("SME_EXTENDED_SAVE_NODE_TRAJECTORIES", "0") == "1"
+    node_trajectory_dir = output_dir / "node_trajectories"
+    if save_node_trajectories:
+        node_trajectory_dir.mkdir(parents=True, exist_ok=True)
     with torch_module.no_grad():
         for number, row in enumerate(selected.itertuples(), start=1):
             rec = data["train"][int(row.training_index)]
@@ -433,6 +438,14 @@ def run_extended_analysis(*, model, data, device, torch_module, hidden_channels,
                 raise RuntimeError("Graph cache and screening table use different molecule ordering")
             _, trajectory = model.forward_one(rec, int(row.cyp_index), return_trajectory=True)
             node_state = trajectory.cpu().numpy()
+            if save_node_trajectories:
+                np.savez_compressed(
+                    node_trajectory_dir / f"case_{number:03d}.npz",
+                    trajectory=node_state.astype(np.float32),
+                    molecule_id=np.asarray(row.molecule_id),
+                    cyp_target=np.asarray(row.cyp_target),
+                    training_index=np.asarray(int(row.training_index)),
+                )
             mean_state = node_state.mean(axis=1)
             metrics, item_diagnostics = _trajectory_metrics(node_state, burn_in)
             diagnostics[(row.molecule_id, row.cyp_target)] = item_diagnostics
@@ -441,6 +454,16 @@ def run_extended_analysis(*, model, data, device, torch_module, hidden_channels,
             print(json.dumps({"extended_case": number, "total": candidate_count,
                               "molecule_id": row.molecule_id,
                               "cyp_target": row.cyp_target}), flush=True)
+    if os.environ.get("SME_EXTENDED_TRAJECTORY_ONLY", "0") == "1":
+        (output_dir / "trajectory_generation_complete.json").write_text(
+            json.dumps({
+                "checkpoint": str(checkpoint_path),
+                "generations": generations,
+                "candidate_count": candidate_count,
+                "node_trajectories_saved": save_node_trajectories,
+            }, indent=2) + "\n"
+        )
+        return
     frame = pd.DataFrame(result_rows)
     frame["extended_screening_classification"] = _assign_screening_classes(frame)
     frame["finite_time_local_divergence"] = np.nan
@@ -453,6 +476,9 @@ def run_extended_analysis(*, model, data, device, torch_module, hidden_channels,
                   + (1.0 - frame.recurrence_ratio_5000.rank(pct=True))
                   + frame.spectral_entropy_5000.rank(pct=True))
     ).nlargest(20, "interest")
+    if (os.environ.get("SME_EXTENDED_SKIP_PERTURBATION", "0") == "1"
+            or (device.type == "cuda" and os.name == "nt")):
+        perturbation_rank = perturbation_rank.iloc[0:0]
     for index, row in perturbation_rank.iterrows():
         rec = data["train"][int(row.training_index)]
         perturbation = _finite_time_perturbation(
@@ -475,6 +501,8 @@ def run_extended_analysis(*, model, data, device, torch_module, hidden_channels,
         "burn_in": burn_in,
         "elapsed_seconds": elapsed,
         "pymol_generated": False,
+        "node_trajectories_saved": save_node_trajectories,
+        "perturbation_cases": int(len(perturbation_rank)),
     }
     (output_dir / "metadata.json").write_text(json.dumps(metadata, indent=2) + "\n")
     print(json.dumps(metadata, indent=2), flush=True)

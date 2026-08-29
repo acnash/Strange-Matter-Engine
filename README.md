@@ -24,6 +24,8 @@ On the final validation set, DS-GCAE achieved point MA-ST-RAE **0.7842**, bootst
 
 Frozen CUDA inference produced 3,000 direct-inhibition predictions for the 750 blinded molecules without loading test labels. The challenge-ready file is [`results/production_dual_scale_graph_ca_ensemble_v1/ds_gcae_submission.csv`](results/production_dual_scale_graph_ca_ensemble_v1/ds_gcae_submission.csv), with the official column order beginning `SMILES,Molecule_Name`. Reproducibility details and all 20 member checkpoints are recorded in [`inference_manifest.json`](results/production_dual_scale_graph_ca_ensemble_v1/inference_manifest.json).
 
+Ten frozen validation trajectories, two from each DS-GCAE transition-rule family, have also been extended through 1,000 generations and packaged as automatically playing 3D PyMOL colour movies. Instructions and the loader are in [`results/ds_gcae_1000_generation_pymol`](results/ds_gcae_1000_generation_pymol/README.md). These extensions are visual analysis only and perform no training or model selection.
+
 ## Project visual standard
 
 All future notebooks, plots, reports, molecular diagrams, trajectory visualisations, and presentation graphics must reproduce the established **clean cyberpunk** visual language. This is a persistent project requirement, not a one-off styling suggestion.
