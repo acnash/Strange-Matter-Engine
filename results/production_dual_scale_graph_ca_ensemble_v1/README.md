@@ -2,6 +2,8 @@
 
 This directory contains the frozen blinded-test inference output for the **Dual-Scale Graph Cellular Automata Ensemble (DS-GCAE v1)**, the current Strange Matter Engine direct-inhibition submission model.
 
+The permanent, version-independent challenge report is [`METHOD_REPORT.md`](../../METHOD_REPORT.md). Future leading models will update that stable document, while this README remains the historical report for DS-GCAE v1.
+
 ## Model composition
 
 DS-GCAE combines five graph cellular-automata transition rules: gated residual, delayed memory, inertial reaction diffusion, Kuramoto-Sakaguchi, and FitzHugh-Nagumo. Every member independently evolves atom states across the bonded molecular graph, pools its trajectory, and produces four CYP-specific pIC50 values through its fitted ridge readout.
