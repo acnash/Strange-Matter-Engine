@@ -18,6 +18,16 @@ The work is designed for a personal workstation, with an emphasis on compact mod
 
 <p align="center"><em>Four bond-free molecular graph-CA trajectories cascading through 1,000 generations. Each colour records an evolving atomic state. Select the animation to open the full-resolution video.</em></p>
 
+### Molecular information flow and strange attraction
+
+Yes, this is actually a molecule. More precisely, the animation below shows information passing among its atoms and evolving over thousands of generations.
+
+Each atom acts as a cell containing dynamic chemical information. The transition rule determines how each atom responds to its neighbours, while the bonds govern how information is exchanged. Single, double, aromatic, and other bond types influence the propagation and processing of that information throughout the molecular graph.
+
+The three visual axes show a reduced representation of the complete atom-by-channel state. The trajectory remains bounded while microscopic perturbations are repeatedly amplified. Float64 Lyapunov-spectrum analysis identified eight expanding directions, and 64 displaced starting states moved towards the same invariant distribution.
+
+This provides strong computational evidence of a high-dimensional, hyperchaotic strange attractor emerging from molecular information flow inside the model. That is awesome.
+
 <p align="center">
   <a href="results/long_horizon_attractor_campaign_v1/videos/trajectory_07_hyperchaotic_strange_attractor.mp4">
     <img src="results/long_horizon_attractor_campaign_v1/videos/trajectory_07_hyperchaotic_strange_attractor.png" width="800" alt="Three-dimensional reduced phase-space rendering of trajectory 7's Graph-CA strange attractor">
