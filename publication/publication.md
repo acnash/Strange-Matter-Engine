@@ -290,7 +290,7 @@ The intervention campaign comprised 187 modified and baseline systems evaluated 
 
 ### CYP pIC50 Predictions
 
-### Nonlinear Dynamics in Molecule Space-Time
+### Nonlinear Dynamics in Molecular Space-Time
 
 ![Four contrasting Graph-CA dynamical behaviours](../results/long_horizon_attractor_campaign_v1/figures/17_four_graph_ca_dynamical_behaviours.png)
 
