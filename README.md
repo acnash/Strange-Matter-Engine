@@ -18,6 +18,14 @@ The work is designed for a personal workstation, with an emphasis on compact mod
 
 <p align="center"><em>Four bond-free molecular graph-CA trajectories cascading through 1,000 generations. Each colour records an evolving atomic state. Select the animation to open the full-resolution video.</em></p>
 
+<p align="center">
+  <a href="results/long_horizon_attractor_campaign_v1/videos/trajectory_07_hyperchaotic_strange_attractor.mp4">
+    <img src="results/long_horizon_attractor_campaign_v1/videos/trajectory_07_hyperchaotic_strange_attractor.png" width="800" alt="Three-dimensional reduced phase-space rendering of trajectory 7's Graph-CA strange attractor">
+  </a>
+</p>
+
+<p align="center"><em>Trajectory 7 rendered as a rotating three-dimensional phase-space orbit over generations 1,000–5,000. The full atom-by-channel state was circularly embedded and reduced to three PCA coordinates. Select the image to play the 45-second video.</em></p>
+
 The evolving [Teaching curriculum](Teaching/README.md) records the scientific and mathematical background behind every component so that implementation and understanding advance together.
 
 The [Visual Laboratory](notebooks/README.md) provides interactive, code-hidden Jupyter experiences with clean RDKit molecular depictions, a restrained cyberpunk visual system, graph views, atom and bond inspectors, encoding heatmaps, and a transparent first graph cellular automaton. The permanent [challenge method report](METHOD_REPORT.md) always describes the model currently submitted to the leaderboard and retains the same URL when the leading model changes.

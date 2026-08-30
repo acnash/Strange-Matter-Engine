@@ -78,6 +78,12 @@ Taken together, boundedness, a robust positive float64 Lyapunov spectrum, fracta
 
 ## Figures
 
+### Lorenz-style phase-space movie
+
+[![Trajectory 7 hyperchaotic strange attractor](videos/trajectory_07_hyperchaotic_strange_attractor.png)](videos/trajectory_07_hyperchaotic_strange_attractor.mp4)
+
+The 45-second H.264 animation maps the circularly embedded full atom-by-channel state onto three PCA coordinates. Generation supplies animation time. A fading magenta–cyan–lime trail, accumulated orbit, and slowly rotating camera expose the bounded recurrent geometry without implying that the coordinates are physical molecular positions.
+
 ![Attractor screen](figures/01_attractor_screen.png)
 
 ![Phase portraits](figures/02_phase_portraits.png)
