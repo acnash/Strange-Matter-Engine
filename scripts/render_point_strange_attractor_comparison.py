@@ -69,15 +69,15 @@ def add_panel(ax, coordinates, title, subtitle, view):
                linewidth=.7, depthshade=False, label="Generation 5,000")
     ax.set_xlabel("Dynamical PC1", labelpad=7)
     ax.set_ylabel("Dynamical PC2", labelpad=7)
-    ax.set_zlabel("Dynamical PC3", labelpad=7)
+    ax.set_zlabel("Dynamical PC3", labelpad=2)
     ax.tick_params(labelsize=7, colors="#333333")
     for axis in (ax.xaxis, ax.yaxis, ax.zaxis):
         axis.pane.set_facecolor((1, 1, 1, 1)); axis.pane.set_edgecolor("#CCCCCC")
         axis._axinfo["grid"]["color"] = (.86, .86, .86, 1)
         axis._axinfo["grid"]["linewidth"] = .5
-    ax.text2D(.5, .965, title, transform=ax.transAxes, ha="center", va="top",
+    ax.text2D(.5, .985, title, transform=ax.transAxes, ha="center", va="top",
               fontsize=14, fontweight="bold", color="#111111")
-    ax.text2D(.5, .91, subtitle, transform=ax.transAxes, ha="center", va="top",
+    ax.text2D(.5, .935, subtitle, transform=ax.transAxes, ha="center", va="top",
               fontsize=8.5, color="#444444")
     ax.legend(loc="upper left", bbox_to_anchor=(.01, .91), frameon=False, fontsize=8)
 
@@ -94,7 +94,7 @@ def main():
     add_panel(left, point, "A  |  Trajectory 1: Point Attractor",
               "Gated residual · OCNT-2328519 · CYP1A2", (22, 42))
     add_panel(right, strange, "B  |  Trajectory 7: Strange Attractor",
-              "Kuramoto–Sakaguchi · OCNT-0494110 · CYP2C9", (23, 178))
+              "Kuramoto–Sakaguchi · OCNT-0494110 · CYP2C9", (25, 165))
     norm = colors.PowerNorm(gamma=.35, vmin=0, vmax=5000)
     scalar = ScalarMappable(norm=norm, cmap=plt.colormaps["viridis"]); scalar.set_array([])
     colourbar = fig.colorbar(scalar, ax=[left, right], fraction=.022, pad=.035, shrink=.79)
@@ -102,10 +102,7 @@ def main():
     colourbar.set_ticks([0, 25, 50, 100, 250, 500, 1000, 2500, 5000])
     fig.suptitle("Contrasting Long-Horizon Graph Cellular-Automata Dynamics",
                  fontsize=17, fontweight="bold", y=.985)
-    fig.text(.5, .025,
-             "Both panels show the complete 0–5,000-generation atom-by-channel trajectory using the same time-colour mapping.",
-             ha="center", fontsize=9, color="#444444")
-    fig.subplots_adjust(left=.015, right=.91, bottom=.07, top=.91, wspace=.02)
+    fig.subplots_adjust(left=.015, right=.91, bottom=.025, top=.91, wspace=.02)
     png = OUTPUT / "14_point_and_strange_attractor_comparison.png"
     pdf = OUTPUT / "14_point_and_strange_attractor_comparison.pdf"
     fig.savefig(png, dpi=320, bbox_inches="tight", facecolor="white")

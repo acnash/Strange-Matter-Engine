@@ -296,4 +296,24 @@ The intervention campaign comprised 187 modified and baseline systems evaluated 
 
 **Figure 1. Contrasting long-horizon Graph-CA dynamics over an equal generation interval.** Both panels contain every state from generation 0 through generation 5,000 and use an identical colourblind-safe Viridis mapping for computational time. **A**, the gated-residual trajectory of `OCNT-2328519` conditioned on CYP1A2 contracts towards a point attractor; its full-state distance from the terminal state decreases from 8.00 at initialization to 0.00465 by generation 100. **B**, the Kuramoto–Sakaguchi trajectory of `OCNT-0494110` conditioned on CYP2C9 continues to explore a bounded recurrent region. Kuramoto phase channels were circularly embedded before principal-component projection. Circles mark generation 0 and stars mark generation 5,000. These coordinates visualize learned atom-by-channel state-space dynamics rather than Cartesian molecular motion. Matched animations show the [point-attractor convergence](../results/long_horizon_attractor_campaign_v1/videos/trajectory_01_point_attractor_convergence.mp4) and the [strange-attractor trajectory](../results/long_horizon_attractor_campaign_v1/videos/trajectory_07_hyperchaotic_strange_attractor.mp4).
 
+#### Population-level dynamical screen
+
+The final production model for each transition rule retained dynamical summaries for 1,309 validation trajectories, giving 13,090 short-horizon screens. Point-attractor candidates satisfied late motion below $10^{-4}$ and a final step below $10^{-5}$. Oscillator candidates combined recurrence ratio below 0.25 with spectral concentration above 0.5. Remaining trajectories were assigned to a persistent or complex screening class. These three columns are mutually exclusive. Strange-attractor confirmation was evaluated separately using the 5,000-generation perturbation, renormalized divergence, Lyapunov-spectrum, and basin-replication protocol.
+
+| Transition rule | Screened | Point-attractor candidates | Oscillator candidates | Persistent or complex | Confirmed strange attractors |
+|---|---:|---:|---:|---:|---:|
+| Gated residual | 1,309 | 0 | 0 | 1,309 | 0 |
+| Delayed memory | 1,309 | 0 | 0 | 1,309 | 0 |
+| Inertial reaction–diffusion | 1,309 | 0 | 0 | 1,309 | 0 |
+| Gray–Scott | 1,309 | 0 | 0 | 1,309 | 0 |
+| Coupled map | 1,309 | 0 | 1,309 | 0 | 0 |
+| Activator–inhibitor | 1,309 | 0 | 0 | 1,309 | 0 |
+| FitzHugh–Nagumo | 1,309 | 0 | 0 | 1,309 | 0 |
+| Kuramoto–Sakaguchi | 1,309 | 0 | 0 | 1,309 | 2 |
+| Damped symplectic | 1,309 | 0 | 0 | 1,309 | 0 |
+| Conservative graph flux | 1,309 | 1,309 | 0 | 0 | 0 |
+| **Total** | **13,090** | **1,309** | **1,309** | **10,472** | **2** |
+
+The two confirmed strange attractors are a subset of the Kuramoto–Sakaguchi persistent or complex screen. Both candidates selected for definitive testing passed the full confirmation protocol. The coupled-map population comprises 1,309 oscillator-screen candidates; definitive long-horizon periodicity testing remains required before describing them as true oscillators. The full machine-readable table is available in the [dynamical population summary](../results/long_horizon_attractor_campaign_v1/validation_dynamics_population_summary.csv).
+
 ## Conclusions

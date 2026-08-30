@@ -96,6 +96,10 @@ The gated-residual trajectory for `OCNT-2328519` conditioned on CYP1A2 contracts
 
 The two panels use the complete 0-to-5,000-generation histories and an identical time-colour scale. The corresponding vector-ready [PDF](figures/14_point_and_strange_attractor_comparison.pdf) is provided for publication.
 
+### Population-level dynamical screen
+
+The ten production transition rules each retained 1,309 validation-trajectory summaries. The mutually exclusive screen identified 1,309 point-attractor candidates under conservative graph flux, 1,309 oscillator candidates under coupled map, and 10,472 persistent or complex trajectories across the remaining rules. Two Kuramoto–Sakaguchi trajectories from the persistent or complex class underwent definitive long-horizon testing, and both satisfied the strange-attractor evidence protocol. These confirmation counts form a tested subset rather than an estimate of population prevalence. See the complete [rule-level table](validation_dynamics_population_summary.csv).
+
 ![Attractor screen](figures/01_attractor_screen.png)
 
 ![Phase portraits](figures/02_phase_portraits.png)
