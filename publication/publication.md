@@ -38,6 +38,72 @@ The challenge test set contained 750 additional compounds for which all direct-i
 
 ### Long-Horizon Dynamical Analysis
 
+#### Targeted discovery of candidate attractor regimes
+
+Dynamical analysis was performed after predictive training, using frozen model parameters and fixed molecular graphs. Candidate selection therefore changed neither the regression model nor its validation score. The objective was to concentrate long-horizon computation on trajectories showing sustained motion, recurrent geometry, broad frequency content, and sensitivity to small perturbations.
+
+An initial screen was calculated from the complete atom-by-channel validation trajectories. For trajectory \(H_t\), the molecular mean state was calculated at each generation, and late-time motion was measured from the mean Euclidean step length over the second half of the observed sequence. Recurrence was assessed over lags from 2 to 64 generations by comparing the mean lagged state distance with the distance expected from the accumulated mean step length. The smallest normalized lagged distance defined the recurrence ratio. Spectral entropy was calculated from the non-zero-frequency Fourier power of each state channel and averaged across channels. A screening score combined these quantities:
+
+$$
+S = \frac{v_{\mathrm{late}}\left(1 + H_{\mathrm{spectral}}\right)}{R_{\mathrm{recurrence}}},
+$$
+
+where \(v_{\mathrm{late}}\) is late-time motion, \(H_{\mathrm{spectral}}\) is normalized spectral entropy, and \(R_{\mathrm{recurrence}}\) is the recurrence ratio. This score acted as a computational targeting device rather than a definition of chaos. Candidates were drawn from gated residual, delayed memory, inertial reaction–diffusion, Kuramoto–Sakaguchi, and FitzHugh–Nagumo transition-rule families so that the long-horizon analysis included contracting, oscillatory, recurrent, and expanding regimes.
+
+Twenty complete molecular states were propagated through 5,000 frozen cellular-automata generations. Every atom and every dynamical channel was retained at every generation. The first 1,000 generations were treated as burn-in for late-time diagnostics. Ten representative cases were subjected to detailed phase-space analysis, including principal-component projections, recurrence plots, frequency spectra, correlation-dimension estimates, and nearest-neighbour divergence curves. Principal-component coordinates were used exclusively for visualization; all perturbation and Lyapunov calculations operated in the full atom-by-channel state space.
+
+#### Direct perturbation screen
+
+Each detailed case was paired with eight independently oriented full-state perturbations of Euclidean magnitude \(10^{-5}\). Reference and companion states were advanced under the same frozen transition rule, molecular graph, bond features, atom features, and CYP context. Their separation was recorded across the trajectory. Replicated early separation across perturbation directions was used to prioritize candidates for renormalized analysis. Trajectories 7 and 8, corresponding to `OCNT-0494110` conditioned on CYP2C9 and `OCNT-2328784` conditioned on CYP1A2, showed the clearest replicated expanding response and were advanced to the confirmatory tests below.
+
+#### Circular state-space distance
+
+The Kuramoto–Sakaguchi state is phase-like and wrapped to the interval \([-1,1]\). Differences were consequently measured on the circular state space. For reference state \(h\) and companion state \(h'\), the elementwise circular difference was
+
+$$
+\Delta(h',h) = \frac{1}{\pi}\operatorname{atan2}\!\left[
+\sin\!\left(\pi(h'-h)\right),
+\cos\!\left(\pi(h'-h)\right)
+\right],
+$$
+
+and full-state separation was \(d=\lVert\Delta(h',h)\rVert_2\). This prevented an apparent jump across the phase boundary from being interpreted as physical divergence.
+
+#### Renormalized largest Lyapunov exponent
+
+Persistent local instability was tested with a Benettin-style repeated-renormalization calculation. Following a 1,000-generation burn-in, a companion state was placed at distance \(\varepsilon\) from the reference state. Both states were advanced for a renormalization interval of \(\tau=10\) generations. The circular separation \(d_k\) was measured, its logarithmic expansion was recorded, and the companion was returned to distance \(\varepsilon\) along the observed separation direction. This cycle continued for 4,000 measured generations. The largest Lyapunov exponent was estimated as
+
+$$
+\lambda_1 = \frac{1}{K\tau}
+\sum_{k=1}^{K}\log\!\left(\frac{d_k}{\varepsilon}\right).
+$$
+
+The calculation used perturbation magnitudes \(10^{-4}\), \(10^{-5}\), and \(10^{-6}\), with eight independent repeats at each magnitude for each candidate, producing 48 estimates. Repeated renormalization tested whether divergence was continually regenerated throughout the trajectory after local separations had been returned to the same small scale.
+
+#### Float64 Lyapunov spectrum
+
+The leading Lyapunov spectrum was calculated in double precision using eight simultaneous orthogonal perturbation vectors. After each propagation block, the full-state circular difference vectors were assembled into a matrix and subjected to reduced QR decomposition. The logarithms of the absolute diagonal elements of the resulting upper-triangular matrix supplied the local expansion rates, while the orthonormal basis supplied the renormalized companion directions. The calculation used \(\varepsilon=10^{-7}\), a 1,000-generation burn-in, 4,000 measured generations, renormalization intervals of 5, 10, and 20 generations, and two independent repeats for each interval and molecule. Stability across intervals and repeats was used to distinguish persistent multidirectional expansion from numerical precision effects or a single unstable direction.
+
+#### Boundedness and attraction-basin test
+
+Attraction towards a common invariant set was tested by initiating float64 trajectories at full-state displacement radii of 0.1, 0.5, 1.0, and 2.0 from a post-burn-in reference state. Eight independent directions were used at each radius for each molecule, giving 64 displaced trajectories. Every trajectory was propagated for 6,000 generations and sampled every tenth generation.
+
+Boundedness was monitored directly from the maximum absolute state. Convergence at the distributional level was evaluated after circular embedding of every state as concatenated sine and cosine coordinates. Distances between early and late trajectory distributions and the reference invariant distribution were estimated over 32 random one-dimensional projections, providing a sliced distribution distance suitable for the high-dimensional state space. A late-to-early distance ratio below one indicated movement towards the reference distribution. Nearest-reference-cloud distance was retained as a complementary finite-sampling diagnostic.
+
+#### Population-level structure–dynamics analysis
+
+The candidate analysis was followed by a broader test of whether molecular structure was associated with the strength of the learned instability. A scaffold-held-out population of 256 molecule–CYP cases was sampled evenly across CYP1A2, CYP2C9, CYP2D6, and CYP3A4, with 64 cases per endpoint. Sampling was stratified across quartiles of the initial dynamical screening score. The two established leading candidates were added explicitly, producing 258 evaluated cases. For every case, the frozen Kuramoto–Sakaguchi model was subjected to a 1,000-generation burn-in followed by 2,000 measured generations, a ten-generation renormalization interval, perturbation magnitude \(10^{-7}\), and two repeated largest-Lyapunov estimates.
+
+Molecular descriptors comprised molecular weight, calculated logP, topological polar surface area, hydrogen-bond donors and acceptors, rotatable bonds, ring composition, aromatic and heteroatom fractions, formal charge, fraction sp3, and bond-type counts. Graph descriptors comprised atom and bond counts, cyclomatic number, density, degree moments, adjacency spectral radius, algebraic connectivity, largest Laplacian eigenvalue, graph diameter, and mean shortest-path length. Reproducible ETKDG conformers were generated with seed 260830 and MMFF relaxation to calculate radius of gyration, asphericity, eccentricity, inertial shape factor, and spherocity. Cartesian coordinates were absent from the Graph-CA input, so three-dimensional descriptors were interpreted as structural correlates rather than direct dynamical inputs.
+
+Univariate associations with the largest Lyapunov exponent were measured using Spearman correlation and Benjamini–Hochberg correction within each analysis scope. Confidence intervals were calculated from 2,000 bootstrap resamples of complete Bemis–Murcko scaffold clusters. Multivariate reproducibility was assessed with five-fold scaffold-grouped cross-validation using Elastic Net and Extra Trees regression. Held-out permutation importance quantified the contribution of each descriptor while preserving scaffold separation between training and evaluation folds.
+
+#### Frozen-model structural interventions
+
+Causal computational tests were performed on trajectories 7 and 8 while retaining all learned weights, the transition rule, the CYP context, and all parameters of the Lyapunov calculation. Each undirected molecular bond was represented by two directed message-passing edges. Bond deletion removed both directions of a selected connection. Bond-identity interventions replaced its single, double, triple, or aromatic edge encoding with each alternative identity. Ring-opening interventions removed a selected ring connection and suppressed the ring-membership atom encoding. Atom-feature interventions ablated one chemically interpretable group at a time: elemental identity, charge and aromaticity, hybridization, local valence, donor–acceptor state, chirality, or neighbouring-atom chemistry.
+
+The intervention campaign comprised 187 modified and baseline systems. Each system used a 1,000-generation burn-in, 2,000 measured generations, a ten-generation renormalization interval, perturbation magnitude \(10^{-7}\), and two repeats. Intervention effect size was defined as the change in the mean largest Lyapunov exponent relative to the corresponding unmodified molecule–CYP baseline. Positive values indicated faster exponential divergence, while negative values indicated slower divergence. The complete workflow, retained numerical tables, and publication figures are available in the [structure–dynamics campaign archive](../results/structure_dynamics_publication_v1/README.md).
+
 ## Results and Discussion
 
 ### CYP pIC50 Predictions
