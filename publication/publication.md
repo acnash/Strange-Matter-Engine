@@ -32,9 +32,174 @@ The challenge test set contained 750 additional compounds for which all direct-i
 
 ### Molecular Graph Representation
 
+SMILES strings were cleaned with RDKit, reduced to the largest organic fragment, sanitized, and converted to canonical isomeric SMILES. Each standardized molecule was represented as a graph \(G=(V,E)\), where every heavy atom \(i\in V\) was a cellular-automata cell and every covalent bond defined two directed message-passing edges, \(j\rightarrow i\) and \(i\rightarrow j\). Molecular geometry was absent from the predictive input.
+
+The baseline atom encoding contained one-hot element identity for H, C, N, O, F, P, S, Cl, Br, I, and other elements; formal charge; aromaticity; sp, sp2, sp3, and other hybridization states; degree; total attached hydrogens; ring membership; hydrogen-bond donor and acceptor status; and tetrahedral chirality. Training-only model selection could extend this encoding with five chemically organized feature groups:
+
+| Feature group | Atom-level quantities |
+|---|---|
+| Periodic | Atomic number, atomic mass, covalent radius, van der Waals radius, outer electrons, period, group, and approximate atomic volume |
+| Valence | Total and implicit valence, heavy-atom degree, radical electrons, and absolute formal charge |
+| Electronic | Pauling electronegativity, approximate polarizability, heteroatom and halogen indicators, conjugated-bond fraction, first ionization energy, electron affinity, and missing-property indicator |
+| Ring geometry | Number of rings containing the atom and indicators for ring sizes 3, 4, 5, 6, 7, and 8 or greater |
+| Local environment | Mean neighbouring electronegativity, electronegativity difference from the neighbourhood, mean neighbouring atomic number, and mean neighbouring formal charge |
+
+The selected feature profile was stored with every frozen checkpoint, preserving the exact feature names and order required for inference. Continuous quantities were scaled by fixed chemically meaningful constants during graph construction. Bond vector \(e_{ji}\) contained one-hot single, double, triple, or aromatic identity, conjugation, ring membership, and three stereochemical indicators. The same bond vector was attached to both directed representations of an undirected bond.
+
+The four CYP endpoints were represented by a one-hot context vector \(c\). Consequently, a molecule retained one chemical graph while its cellular-automata trajectory and readout were conditioned on CYP1A2, CYP2C9, CYP2D6, or CYP3A4. Independent molecule–CYP graphs were combined as disconnected components during batched GPU evaluation, so message passing remained confined to atoms belonging to the same molecule.
+
 ### Nonlinear Graph Cellular Automaton
 
+For atom \(i\), chemical input \(x_i\) was mapped to an initial state with \(H\) dynamical channels:
+
+$$
+h_i^{(0)}=\tanh\!\left(s_0 W_{\mathrm{init}}x_i\right),
+$$
+
+where \(s_0\) controlled the initialization scale. A shared local rule was then applied recurrently for \(T\) generations. The parameters of this rule were tied across atoms and generations, making the construction a graph recurrent neural network with cellular-automata locality.
+
+At generation \(t\), the message from neighbour \(j\) to atom \(i\) was
+
+$$
+g_{ji}=\sigma\!\left(\frac{W_g e_{ji}}{\theta_b}\right),
+\qquad
+m_{ji}^{(t)}=g_{ji}\odot W_n h_j^{(t)}+W_e e_{ji},
+$$
+
+where \(W_n\) transformed the neighbouring state, \(W_e\) transformed the bond description, \(W_g\) generated a channel-wise bond gate, \(\theta_b\) was the bond temperature, and \(\odot\) denoted elementwise multiplication. Incoming messages and neighbouring states were degree-normalized:
+
+$$
+a_i^{(t)}=\frac{1}{|N(i)|}\sum_{j\in N(i)}m_{ji}^{(t)},
+\qquad
+\bar h_i^{(t)}=\frac{1}{|N(i)|}\sum_{j\in N(i)}h_j^{(t)}.
+$$
+
+Chemical identity and CYP context entered every generation through a common reaction drive:
+
+$$
+r_i^{(t)}=\tanh\!\left(
+W_s h_i^{(t)}+a_i^{(t)}+W_x x_i+W_c c+b
+\right).
+$$
+
+The submitted ensemble used five transition rules sharing this bonded message and reaction calculation.
+
+**Gated residual.** A learned channel-wise gate controlled the proportion of the proposed reaction accepted at each atom:
+
+$$
+\alpha_i^{(t)}=\sigma\!\left(W_\alpha
+[h_i^{(t)},a_i^{(t)},x_i,c]\right),
+\qquad
+h_i^{(t+1)}=(1-s\alpha_i^{(t)})\odot h_i^{(t)}
++s\alpha_i^{(t)}\odot r_i^{(t)},
+$$
+
+where \(s\alpha\) was capped at one and \(s\) was the update scale.
+
+**Inertial reaction–diffusion.** A velocity state introduced momentum, while neighbour exchange and restoring forces supplied graph diffusion and damping:
+
+$$
+f_i^{(t)}=r_i^{(t)}+D\odot(\bar h_i^{(t)}-h_i^{(t)})-R\odot h_i^{(t)},
+$$
+
+$$
+v_i^{(t+1)}=\eta\gamma\odot v_i^{(t)}+\delta\odot f_i^{(t)},
+\qquad
+h_i^{(t+1)}=\tanh\!\left(h_i^{(t)}+\delta\odot v_i^{(t+1)}\right).
+$$
+
+The channel-wise damping \(\gamma\), step size \(\delta\), diffusion \(D\), restoring strength \(R\), and inertial multiplier \(\eta\) were constrained to stable ranges by sigmoid or softplus transformations.
+
+**FitzHugh–Nagumo.** The state was divided into excitation \(u\) and recovery \(v\) channels. Their update combined the cubic excitable-system dynamics with learned chemical drive and graph diffusion:
+
+$$
+\Delta u_i=u_i-\frac{u_i^3}{3}-v_i
++\kappa_s\tanh(W_u r_i)+D_u(\bar u_i-u_i),
+$$
+
+$$
+\Delta v_i=\epsilon\left[u_i+q-v_i+0.1\tanh(W_v r_i)\right]
++D_v(\bar v_i-v_i),
+$$
+
+followed by \(h_i^{(t+1)}=\tanh([u_i+s\Delta u_i,\,v_i+s\Delta v_i])\).
+
+**Kuramoto–Sakaguchi.** Each channel was treated as a wrapped phase \(\phi_i=\pi h_i\). Bond-gated phase coupling and a chemically conditioned natural frequency gave
+
+$$
+q_i^{(t)}=\frac{1}{|N(i)|}\sum_{j\in N(i)}
+g_{ji}\odot\sin\!\left(\phi_j^{(t)}-\phi_i^{(t)}-\psi\right),
+$$
+
+$$
+\phi_i^{(t+1)}=\phi_i^{(t)}+s\left[
+\omega_i^{(t)}+Kq_i^{(t)}\right],
+\qquad
+\omega_i^{(t)}=A\tanh(W_\omega r_i^{(t)}).
+$$
+
+The updated phase was wrapped and divided by \(\pi\) to return it to \([-1,1]\). The phase lag \(\psi\), coupling \(K\), and frequency scale \(A\) were selected during training-only hyperparameter search.
+
+**Delayed memory.** A rule-specific delay \(d\) selected a preceding state from the retained trajectory. The new drive combined the current reaction, a learned transformation of the current and delayed states, and explicit delayed-state feedback:
+
+$$
+\tilde r_i^{(t)}=\tanh\!\left(W_d[r_i^{(t)},h_i^{(t-d)}]\right),
+$$
+
+$$
+h_i^{(t+1)}=\tanh\!\left(
+(1-\zeta s)h_i^{(t)}+s\left[(1-\mu)r_i^{(t)}
++\mu\tilde r_i^{(t)}+\kappa_d(h_i^{(t-d)}-h_i^{(t)})\right]
+\right).
+$$
+
+The delay, memory mixture \(\mu\), delayed feedback \(\kappa_d\), and damping \(\zeta\) were determined from the rule-specific search space.
+
+Each trajectory was pooled into a molecular fingerprint containing the final atom-state mean and variance, the time-averaged atom state, the temporal variance of the molecular mean state, and mean state-change energy. The multiscale variant appended molecular mean states at 12.5%, 25%, 50%, 75%, and 100% of the trajectory. CYP-specific readout features were formed by combining the endpoint one-hot vector with endpoint-gated copies of the dynamical fingerprint.
+
 ### Machine-Learning Training and Validation
+
+The submitted Cross-Fitted Target-Specific Dual-Scale Graph Cellular Automata Ensemble, abbreviated CFT-DS-GCAE, was assembled from frozen experts trained under the scaffold partitions described above. Each nonlinear Graph-CA expert was optimized by backpropagation through time. Adam updated the initialization, message, reaction, and transition-rule parameters with a cosine learning-rate schedule, gradient clipping, and an L2 penalty on cellular-automata weights. Generation count, dynamical-channel count, atom-feature profile, learning rate, ridge penalty, update scale, support fraction, batch size, bond temperature, initialization scale and noise, pooling design, and rule-specific dynamical constants were selected using labelled development data alone.
+
+#### Differentiable ridge readout
+
+Training batches were divided by molecule into support and query subsets. The Graph-CA generated fingerprint matrix \(F_s\) for the support molecules, which was standardized column-wise to \(Z_s\). With centered targets \(y_s-\bar y_s\), the ridge coefficients were obtained by the closed-form differentiable solve
+
+$$
+\beta=\left(Z_s^{\mathsf T}Z_s+\lambda I\right)^{-1}
+Z_s^{\mathsf T}(y_s-\bar y_s).
+$$
+
+For query fingerprint \(f_q\), prediction was
+
+$$
+\widehat y_q=\bar y_s+
+\left(\frac{f_q-\bar F_s}{s_F}\right)^{\mathsf T}\beta,
+$$
+
+where \(\bar F_s\) and \(s_F\) were the support feature mean and scale. The intercept was excluded from the ridge penalty. The linear solve remained connected to the Graph-CA computation graph, allowing query loss gradients to pass through \(\beta\) and into every recurrent generation. A Hermitian pseudoinverse implemented the same ridge objective when highly correlated trajectory statistics made the normal equations numerically singular.
+
+This support–query construction trained the nonlinear cellular automaton to produce fingerprints that generalized beyond the observations used to solve the current ridge layer. At the end of training, a final ridge state was fitted from all permitted fitting observations and stored with the selected Graph-CA checkpoint. Early stopping and checkpoint promotion used MA-ST-RAE on the relevant scaffold-held-out development fold. RMSE was recorded as a secondary optimization diagnostic.
+
+#### Dual-scale expert ensemble
+
+Five transition-rule families entered the submission: gated residual, delayed memory, inertial reaction–diffusion, Kuramoto–Sakaguchi, and FitzHugh–Nagumo. The original expert family contributed one frozen seed from each rule. The multiscale family averaged seeds 1701, 2909, and 4211 within each rule before combining rules. This design yielded ten expert signals per molecule–CYP pair: five original predictions and five seed-averaged multiscale predictions, derived from 20 frozen checkpoint evaluations.
+
+#### Cross-fitted target-specific stacking
+
+A separate standardized ridge stack was fitted for each CYP endpoint using the ten expert signals. Ridge penalties \(0.01, 0.1, 1, 10, 100,\) and \(1000\) were compared inside nested scaffold-grouped folds using endpoint ST-RAE. Each outer-fold prediction was generated by a stack whose penalty and parameters had been selected without that fold. An optional affine calibration
+
+$$
+\widehat y_{\mathrm{cal}}=a\widehat y+b
+$$
+
+was assessed with calibration penalties of 0, 1, 10, 100, 1000, and an identity option. Calibration training also used out-of-fold predictions. The selected final penalties were 1000 for CYP1A2 and CYP2D6 and 100 for CYP2C9 and CYP3A4. Identity calibration, \(a=1\) and \(b=0\), was selected for all four endpoints.
+
+#### Final validation and blinded inference
+
+Model development used five scaffold-grouped folds within the fitting pool. The sealed holdout defined above was opened once after expert and stack selection. Evaluation used the primary and complementary metrics specified in the Dataset and Prediction Task subsection, with final uncertainty estimated from 1,000 bootstrap resamples.
+
+After model freezing, the 20 expert checkpoints generated ten aligned signals for each blinded molecule–CYP pair. Four target-specific stacks produced the continuous pIC50 values, and the selected identity calibrations left them unchanged.
 
 ### Long-Horizon Dynamical Analysis
 
