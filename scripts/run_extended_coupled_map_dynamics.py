@@ -179,10 +179,11 @@ def _assign_screening_classes(frame: pd.DataFrame) -> pd.Series:
 
 
 def _finite_time_perturbation(model, rec, cyp_index, device, torch_module,
-                              hidden_channels: int, epsilon: float = 1e-5) -> dict:
+                              hidden_channels: int, epsilon: float = 1e-5,
+                              seed_offset: int = 0, rule: str = "") -> dict:
     atom_count = len(rec["x"])
     generator = torch_module.Generator(device=device).manual_seed(
-        91001 + int(cyp_index) + atom_count
+        91001 + int(cyp_index) + atom_count + 1009 * seed_offset
     )
     direction = torch_module.randn(
         (atom_count, hidden_channels), generator=generator, device=device
@@ -193,19 +194,29 @@ def _finite_time_perturbation(model, rec, cyp_index, device, torch_module,
         _, perturbed = model.forward_one(
             rec, cyp_index, return_trajectory=True, initial_perturbation=direction
         )
-    separation = torch_module.linalg.vector_norm(
-        perturbed - reference, dim=(1, 2)
-    ).cpu().numpy()
+    difference = perturbed - reference
+    if rule == "kuramoto_sakaguchi":
+        phase_difference = math.pi * difference
+        difference = torch_module.atan2(
+            torch_module.sin(phase_difference), torch_module.cos(phase_difference)
+        ) / math.pi
+    separation = torch_module.linalg.vector_norm(difference, dim=(1, 2)).cpu().numpy()
     fit_end = min(100, len(separation) - 1)
     times = np.arange(1, fit_end + 1)
     log_growth = np.log(np.maximum(separation[1:fit_end + 1], 1e-15) / epsilon)
-    slope = float(np.polyfit(times, log_growth, 1)[0])
+    centered_times = times - times.mean()
+    centered_growth = log_growth - log_growth.mean()
+    slope = float(
+        np.sum(centered_times * centered_growth)
+        / max(float(np.sum(centered_times ** 2)), 1e-30)
+    )
     return {
         "finite_time_local_divergence": slope,
         "perturbation_epsilon": epsilon,
         "perturbation_fit_generations": f"1-{fit_end}",
         "perturbation_final_separation": float(separation[-1]),
         "perturbation_maximum_separation": float(separation.max()),
+        "separation_curve": separation.astype(np.float32),
     }
 
 
@@ -416,7 +427,7 @@ def refresh_completed_outputs(output_dir: Path) -> None:
 
 def run_extended_analysis(*, model, data, device, torch_module, hidden_channels,
                           generations, checkpoint_path, screening_path, output_dir,
-                          candidate_count, burn_in) -> None:
+                          candidate_count, burn_in, rule="") -> None:
     if burn_in >= generations:
         raise ValueError("Burn-in must be smaller than the extended generation count")
     output_dir.mkdir(parents=True, exist_ok=True)
@@ -471,27 +482,55 @@ def run_extended_analysis(*, model, data, device, torch_module, hidden_channels,
     frame["perturbation_fit_generations"] = ""
     frame["perturbation_final_separation"] = np.nan
     frame["perturbation_maximum_separation"] = np.nan
+    frame["perturbation_slope_std"] = np.nan
+    frame["perturbation_positive_fraction"] = np.nan
     perturbation_rank = frame.assign(
         interest=(frame.late_motion_5000.rank(pct=True)
                   + (1.0 - frame.recurrence_ratio_5000.rank(pct=True))
                   + frame.spectral_entropy_5000.rank(pct=True))
     ).nlargest(20, "interest")
+    allow_windows_cuda = os.environ.get(
+        "SME_EXTENDED_ALLOW_WINDOWS_CUDA_PERTURBATION", "0"
+    ) == "1"
     if (os.environ.get("SME_EXTENDED_SKIP_PERTURBATION", "0") == "1"
-            or (device.type == "cuda" and os.name == "nt")):
+            or (device.type == "cuda" and os.name == "nt" and not allow_windows_cuda)):
         perturbation_rank = perturbation_rank.iloc[0:0]
+    perturbation_cases = int(os.environ.get("SME_EXTENDED_PERTURBATION_CASES", "20"))
+    perturbation_rank = perturbation_rank.head(perturbation_cases)
+    perturbation_repeats = int(os.environ.get("SME_EXTENDED_PERTURBATION_REPEATS", "1"))
+    perturbation_dir = output_dir / "perturbation_curves"
+    if len(perturbation_rank):
+        perturbation_dir.mkdir(parents=True, exist_ok=True)
     for index, row in perturbation_rank.iterrows():
         rec = data["train"][int(row.training_index)]
-        perturbation = _finite_time_perturbation(
-            model, rec, int(row.cyp_index), device, torch_module, hidden_channels
+        repetitions = [
+            _finite_time_perturbation(
+                model, rec, int(row.cyp_index), device, torch_module,
+                hidden_channels, seed_offset=repeat, rule=rule
+            )
+            for repeat in range(perturbation_repeats)
+        ]
+        slopes = np.asarray([item["finite_time_local_divergence"] for item in repetitions])
+        frame.loc[index, "finite_time_local_divergence"] = float(slopes.mean())
+        frame.loc[index, "perturbation_slope_std"] = float(slopes.std())
+        frame.loc[index, "perturbation_positive_fraction"] = float(np.mean(slopes > 0))
+        for key in ("perturbation_epsilon", "perturbation_fit_generations",
+                    "perturbation_final_separation", "perturbation_maximum_separation"):
+            values = [item[key] for item in repetitions]
+            frame.loc[index, key] = values[0] if isinstance(values[0], str) else float(np.mean(values))
+        np.savez_compressed(
+            perturbation_dir / f"case_{int(index) + 1:03d}.npz",
+            separation=np.stack([item["separation_curve"] for item in repetitions]),
+            slopes=slopes.astype(np.float32), epsilon=np.asarray(repetitions[0]["perturbation_epsilon"]),
+            molecule_id=np.asarray(row.molecule_id), cyp_target=np.asarray(row.cyp_target),
         )
-        for key, value in perturbation.items():
-            frame.loc[index, key] = value
+        print(json.dumps({"perturbation_case": int(index) + 1,
+                          "repeats": perturbation_repeats,
+                          "mean_slope": float(slopes.mean())}), flush=True)
     elapsed = time.perf_counter() - started
     frame.to_csv(output_dir / "extended_dynamics.csv", index=False)
     _write_priority_structures(frame, output_dir)
     np.savez_compressed(output_dir / "extended_mean_trajectories.npz", **saved_means)
-    _make_plots(frame, diagnostics, output_dir)
-    _write_report(frame, output_dir, generations, burn_in, checkpoint_path, elapsed)
     metadata = {
         "checkpoint": str(checkpoint_path),
         "screening_table": str(screening_path),
@@ -503,6 +542,10 @@ def run_extended_analysis(*, model, data, device, torch_module, hidden_channels,
         "pymol_generated": False,
         "node_trajectories_saved": save_node_trajectories,
         "perturbation_cases": int(len(perturbation_rank)),
+        "perturbation_repeats": perturbation_repeats,
     }
     (output_dir / "metadata.json").write_text(json.dumps(metadata, indent=2) + "\n")
+    if os.environ.get("SME_EXTENDED_SKIP_RENDER", "0") != "1":
+        _make_plots(frame, diagnostics, output_dir)
+        _write_report(frame, output_dir, generations, burn_in, checkpoint_path, elapsed)
     print(json.dumps(metadata, indent=2), flush=True)

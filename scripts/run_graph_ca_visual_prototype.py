@@ -987,6 +987,7 @@ def train(extended_dynamics: bool = False) -> None:
             output_dir=Path(os.environ["SME_EXTENDED_OUTPUT"]),
             candidate_count=int(os.environ.get("SME_EXTENDED_CANDIDATES", "100")),
             burn_in=int(os.environ.get("SME_EXTENDED_BURN_IN", "1000")),
+            rule=RULE,
         )
         return
     ca_params = list(model.parameters())
