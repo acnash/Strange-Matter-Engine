@@ -9,14 +9,16 @@ from pathlib import Path
 import matplotlib as mpl
 import matplotlib.pyplot as plt
 import numpy as np
+import torch
 from matplotlib.animation import FFMpegWriter, FuncAnimation
 from matplotlib.colors import LinearSegmentedColormap
 from mpl_toolkits.mplot3d.art3d import Line3DCollection
 
 
 ROOT = Path(__file__).resolve().parents[1]
-SOURCE = (ROOT / "results" / "long_horizon_attractor_campaign_v1" / "case_data" /
-          "07_kuramoto_sakaguchi_OCNT-0494110_CYP2C9.npz")
+SOURCE = (ROOT / "results" / "long_horizon_attractor_campaign_v1" /
+          "base_trajectories" / "kuramoto_sakaguchi" / "node_trajectories" /
+          "case_002.npz")
 OUTPUT = ROOT / "results" / "long_horizon_attractor_campaign_v1" / "videos"
 FFMPEG = Path(r"C:\ffmpeg\bin\ffmpeg.exe")
 INK, WHITE, CYAN, MAGENTA, LIME = "#070914", "#DCE6F2", "#00E5FF", "#FF1493", "#A6FF00"
@@ -43,7 +45,15 @@ def main() -> None:
     args.output.parent.mkdir(parents=True, exist_ok=True)
     mpl.rcParams["animation.ffmpeg_path"] = str(FFMPEG)
     data = np.load(args.source)
-    coordinates = data["pca_coordinates"][:, :3].astype(np.float64)
+    trajectory = data["trajectory"].astype(np.float64)
+    flattened = trajectory.reshape(len(trajectory), -1)
+    phase = np.pi * flattened
+    flattened = np.concatenate((np.sin(phase), np.cos(phase)), axis=1)
+    device = "cpu"
+    tensor = torch.as_tensor(flattened, dtype=torch.float32, device=device)
+    centred = tensor - tensor.mean(dim=0, keepdim=True)
+    _, _, components = torch.pca_lowrank(centred, q=3, center=False)
+    coordinates = (centred @ components).numpy().astype(np.float64)
     coordinates -= np.median(coordinates, axis=0, keepdims=True)
     scale = np.std(coordinates, axis=0, keepdims=True).clip(1e-12)
     coordinates /= scale
@@ -93,7 +103,7 @@ def main() -> None:
             trail_collection.set_color(colours)
         point = coordinates[index]
         head._offsets3d = ([point[0]], [point[1]], [point[2]])
-        generation = 1000 + index
+        generation = index
         status.set_text(
             f"generation  {generation:5d}\n"
             f"λ₁ ≈ +0.0118 / generation\n"

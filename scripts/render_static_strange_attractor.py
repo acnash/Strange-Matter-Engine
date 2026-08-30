@@ -5,14 +5,16 @@ from pathlib import Path
 
 import matplotlib.pyplot as plt
 import numpy as np
+import torch
 from matplotlib import colors
 from matplotlib.cm import ScalarMappable
 from mpl_toolkits.mplot3d.art3d import Line3DCollection
 
 
 ROOT = Path(__file__).resolve().parents[1]
-SOURCE = (ROOT / "results" / "long_horizon_attractor_campaign_v1" / "case_data" /
-          "07_kuramoto_sakaguchi_OCNT-0494110_CYP2C9.npz")
+SOURCE = (ROOT / "results" / "long_horizon_attractor_campaign_v1" /
+          "base_trajectories" / "kuramoto_sakaguchi" / "node_trajectories" /
+          "case_002.npz")
 OUTPUT = ROOT / "results" / "long_horizon_attractor_campaign_v1" / "figures"
 
 
@@ -27,14 +29,22 @@ def equal_limits(coordinates):
 def main():
     OUTPUT.mkdir(parents=True, exist_ok=True)
     data = np.load(SOURCE)
-    coordinates = data["pca_coordinates"][:, :3].astype(np.float64)
+    trajectory = data["trajectory"].astype(np.float64)
+    flattened = trajectory.reshape(len(trajectory), -1)
+    phase = np.pi * flattened
+    flattened = np.concatenate((np.sin(phase), np.cos(phase)), axis=1)
+    device = "cpu"
+    tensor = torch.as_tensor(flattened, dtype=torch.float32, device=device)
+    centred = tensor - tensor.mean(dim=0, keepdim=True)
+    _, _, components = torch.pca_lowrank(centred, q=3, center=False)
+    coordinates = (centred @ components).numpy().astype(np.float64)
     coordinates -= np.median(coordinates, axis=0, keepdims=True)
     coordinates /= np.std(coordinates, axis=0, keepdims=True).clip(1e-12)
-    generations = np.arange(1000, 1000 + len(coordinates))
+    generations = np.arange(len(coordinates))
     segments = np.stack((coordinates[:-1], coordinates[1:]), axis=1)
 
     cmap = plt.colormaps["viridis"]
-    norm = colors.Normalize(vmin=generations[0], vmax=generations[-1])
+    norm = colors.PowerNorm(gamma=.35, vmin=generations[0], vmax=generations[-1])
     segment_colours = cmap(norm(generations[:-1]))
     segment_colours[:, 3] = 0.78
 
@@ -54,7 +64,7 @@ def main():
     ax.set_box_aspect((1, 1, 1))
     ax.view_init(elev=23, azim=178)
     ax.scatter(*coordinates[0], s=75, marker="o", color=cmap(0.0),
-               edgecolor="black", linewidth=0.8, depthshade=False, label="Generation 1,000")
+               edgecolor="black", linewidth=0.8, depthshade=False, label="Generation 0")
     ax.scatter(*coordinates[-1], s=135, marker="*", color=cmap(1.0),
                edgecolor="black", linewidth=0.8, depthshade=False, label="Generation 5,000")
     ax.set_xlabel("Dynamical PC1", labelpad=10)
@@ -69,13 +79,14 @@ def main():
     ax.set_title("Trajectory 7: Graph-CA Hyperchaotic Strange Attractor",
                  fontsize=16, fontweight="bold", pad=18)
     ax.text2D(.5, .965,
-              "Complete post-burn-in orbit of OCNT-0494110 conditioned on CYP2C9",
+              "Complete orbit of OCNT-0494110 conditioned on CYP2C9",
               transform=ax.transAxes, ha="center", va="top", fontsize=10,
               color="#444444")
     ax.legend(loc="upper left", bbox_to_anchor=(0.01, 0.93), frameon=False)
     scalar = ScalarMappable(norm=norm, cmap=cmap); scalar.set_array([])
     colourbar = fig.colorbar(scalar, ax=ax, fraction=.032, pad=.07, shrink=.72)
     colourbar.set_label("Cellular-Automata Generation", labelpad=10)
+    colourbar.set_ticks([0, 25, 50, 100, 250, 500, 1000, 2500, 5000])
     colourbar.outline.set_edgecolor("#777777")
     fig.text(.5, .025,
              "Colour records computational time from violet-blue to yellow; coordinates are a 3D PCA projection of the full atom-by-channel state.",
