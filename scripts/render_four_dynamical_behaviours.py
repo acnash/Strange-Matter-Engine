@@ -34,6 +34,7 @@ SOURCES = {
 
 def pca_project(path: Path, fit_slice=slice(None), circular: bool = False,
                 terminal_center: bool = False) -> np.ndarray:
+    torch.manual_seed(1701)
     trajectory = np.load(path)["trajectory"].astype(np.float64)
     flattened = trajectory.reshape(len(trajectory), -1)
     if circular:
@@ -57,6 +58,7 @@ def pca_project(path: Path, fit_slice=slice(None), circular: bool = False,
 
 def oscillator_delay_project(path: Path, burn_in: int = 1000) -> np.ndarray:
     """Delay-embed the leading late-orbit full-state component."""
+    torch.manual_seed(1701)
     trajectory = np.load(path)["trajectory"].astype(np.float64)
     flattened = trajectory.reshape(len(trajectory), -1)
     fit_tensor = torch.as_tensor(flattened[burn_in:], dtype=torch.float32)
@@ -243,17 +245,21 @@ def main():
                      (24, 152), slice(1000, None), .35, True)
     norm = colors.PowerNorm(gamma=.35, vmin=0, vmax=5000)
     scalar = ScalarMappable(norm=norm, cmap=plt.colormaps["viridis"]); scalar.set_array([])
-    colourbar = fig.colorbar(scalar, ax=panels, fraction=.018, pad=.025, shrink=.76)
+    colourbar = fig.colorbar(scalar, ax=panels, fraction=.018, pad=.055, shrink=.76)
     colourbar.set_label("Cellular-Automata Generation", labelpad=9)
     colourbar.set_ticks([0, 25, 50, 100, 250, 500, 1000, 2500, 5000])
     fig.suptitle("Four Dynamical Regimes in Graph Cellular Automata",
                  fontsize=18, fontweight="bold", y=.985)
-    fig.subplots_adjust(left=.02, right=.91, bottom=.025, top=.95, hspace=.02, wspace=.01)
+    fig.subplots_adjust(left=.02, right=.84, bottom=.025, top=.95, hspace=.02, wspace=.01)
     four_png = FIGURES / "17_four_graph_ca_dynamical_behaviours.png"
     four_pdf = FIGURES / "17_four_graph_ca_dynamical_behaviours.pdf"
     fig.savefig(four_png, dpi=320, bbox_inches="tight", facecolor="white")
     fig.savefig(four_pdf, bbox_inches="tight", facecolor="white"); plt.close(fig)
     outputs += [four_png, four_pdf]
+
+    if os.environ.get("SME_BEHAVIOUR_RENDER_ONLY") == "figures":
+        for output in outputs: print(output)
+        return
 
     outputs += render_video(
         "trajectory_kuramoto_persistent_complex_candidate", coordinates["complex"],
