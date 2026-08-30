@@ -292,4 +292,8 @@ The intervention campaign comprised 187 modified and baseline systems evaluated 
 
 ### Nonlinear Dynamics in Molecule Space-Time
 
+![Complete time-coloured trajectory of the Graph-CA strange attractor](../results/long_horizon_attractor_campaign_v1/figures/12_trajectory_07_complete_attractor_time_gradient.png)
+
+**Figure 1. Complete trajectory of the Graph-CA strange attractor.** The full atom-by-channel state of `OCNT-0494110`, conditioned on CYP2C9 under the frozen Kuramoto–Sakaguchi transition rule, was circularly embedded and projected onto three principal-component coordinates. The line contains every retained post-burn-in state from generation 1,000 to generation 5,000. Colour records computational time using the colourblind-safe Viridis scale; the circle marks the first displayed state and the star marks the final state. The projection is a visualization of the learned state-space trajectory and does not represent Cartesian molecular motion.
+
 ## Conclusions
