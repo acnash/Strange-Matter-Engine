@@ -1047,6 +1047,16 @@ def train(extended_dynamics: bool = False) -> None:
                 selected_path=Path(os.environ["SME_EXTENDED_OUTPUT"]) / "selected_candidates.csv",
                 output_dir=Path(os.environ["SME_SPECTRUM_OUTPUT"]),
             )
+        if os.environ.get("SME_ATTRACTOR_BASIN", "0") == "1":
+            try:
+                from run_attractor_basin import run_attractor_basin_campaign
+            except ModuleNotFoundError:
+                from scripts.run_attractor_basin import run_attractor_basin_campaign
+            run_attractor_basin_campaign(
+                model=model, data=data, device=device, torch_module=torch,
+                selected_path=Path(os.environ["SME_EXTENDED_OUTPUT"]) / "selected_candidates.csv",
+                output_dir=Path(os.environ["SME_ATTRACTOR_BASIN_OUTPUT"]),
+            )
         return
     ca_params = list(model.parameters())
     optimizer = torch.optim.Adam(ca_params, lr=CA_LR,

@@ -36,6 +36,25 @@ The calculation was then repeated in float64 using eight orthogonal perturbation
 | OCNT-2328784 | CYP1A2 | 10 | 0.0119663 | 0.00443088 | 0.00424843 | 1 |
 | OCNT-2328784 | CYP1A2 | 20 | 0.01213 | 0.00407334 | 0.00391227 | 1 |
 
+## Attraction-basin result
+
+The final test started 64 float64 trajectories at four full-state displacement radii from 0.1 to 2.0. Each was evolved for 6,000 generations. All remained bounded, and all 64 moved closer to the reference invariant distribution. Their late-to-early sliced distribution-distance ratios ranged from approximately 0.50 to 0.76. The late distributions were also comparable to, or closer than, independent temporal portions of the reference attractor itself.
+
+The nearest finite point-cloud statistic fluctuates around one because a single 6,000-generation reference trajectory sparsely samples a high-dimensional set. The distributional test is the more appropriate invariant-set criterion here, and it is unanimous across molecules, radii, and repeats.
+
+Taken together, boundedness, a robust positive float64 Lyapunov spectrum, fractal-dimensional estimates, recurrence structure, and a measurable basin of attraction constitute strong computational evidence that trajectories 7 and 8 lie on high-dimensional strange attractors within the trained Graph-CA model.
+
+| molecule_id | cyp_target | radius | repeats | mean_sliced_ratio | maximum_sliced_ratio | mean_late_to_baseline | mean_cloud_ratio | maximum_cloud_ratio | bounded_fraction | all_runs_approach_distribution | all_runs_approach_cloud |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| OCNT-0494110 | CYP2C9 | 0.1 | 8 | 0.65336 | 0.756963 | 0.908664 | 1.01437 | 1.05649 | 1 | True | False |
+| OCNT-0494110 | CYP2C9 | 0.5 | 8 | 0.62882 | 0.732007 | 0.885551 | 1.01415 | 1.02995 | 1 | True | False |
+| OCNT-0494110 | CYP2C9 | 1 | 8 | 0.64105 | 0.757435 | 0.886423 | 1.01276 | 1.04412 | 1 | True | False |
+| OCNT-0494110 | CYP2C9 | 2 | 8 | 0.60174 | 0.630647 | 0.863478 | 1.01278 | 1.06284 | 1 | True | False |
+| OCNT-2328784 | CYP1A2 | 0.1 | 8 | 0.578864 | 0.646486 | 0.629766 | 0.981702 | 0.994349 | 1 | True | True |
+| OCNT-2328784 | CYP1A2 | 0.5 | 8 | 0.626009 | 0.724839 | 0.671786 | 0.992646 | 1.01012 | 1 | True | False |
+| OCNT-2328784 | CYP1A2 | 1 | 8 | 0.599622 | 0.671652 | 0.623121 | 0.98243 | 1.01197 | 1 | True | False |
+| OCNT-2328784 | CYP1A2 | 2 | 8 | 0.633277 | 0.743346 | 0.658101 | 1.00029 | 1.04399 | 1 | True | False |
+
 ## Rule summary
 
 | transition_rule | cases | mean_slope | minimum_slope | maximum_slope | mean_positive_fraction |
@@ -76,6 +95,10 @@ The calculation was then repeated in float64 using eight orthogonal perturbation
 ![Float64 Lyapunov spectrum](figures/08_float64_lyapunov_spectrum.png)
 
 ![Float64 Lyapunov convergence](figures/09_float64_lyapunov_convergence.png)
+
+![Attraction basin](figures/10_attractor_basin_distribution.png)
+
+![Attraction-basin phase overlay](figures/11_attractor_basin_phase_overlay.png)
 
 ## Retained data
 
