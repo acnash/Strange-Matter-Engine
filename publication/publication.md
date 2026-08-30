@@ -4,7 +4,7 @@
 
 ## Abstract
 
-Cytochrome P450 (CYP) inhibition is a major consideration in drug discovery because it can alter drug metabolism and contribute to clinically significant drug–drug interactions. The OpenADMET CYP Inhibition Challenge provides a blinded setting in which to evaluate computational prediction of direct-inhibition pIC50 across four CYP isoforms. Here, we introduce a molecular graph cellular automaton that represents atoms as cells, chemical bonds as local neighbourhoods, and molecular computation as the repeated evolution of a shared, learned transition rule. Unlike molecular models that reduce a structure directly to a fixed representation, our approach retains the complete sequence of atom states and uses its transient and terminal properties to predict CYP inhibition. We call this evolving representation **molecule space-time**: the joint description of molecular structure and its learned progression through computational time. Predictive performance across the CYP targets was [PREDICTION RESULTS]. As a secondary objective, we investigated the nonlinear dynamics contained within molecule space-time by extending selected trajectories over thousands of generations and examining convergence, recurrence, periodicity, perturbation sensitivity, strange-attractor candidates, and possible chaotic behaviour. This analysis identified [CAPTURED DYNAMICS]. The framework therefore treats prediction and dynamical exploration as complementary views of the same learned molecular process, offering a route toward CYP inhibition models whose internal evolution can be measured, visualised, and studied as a nonlinear system.
+Cytochrome P450 (CYP) inhibition is a major consideration in drug discovery because it can alter drug metabolism and contribute to clinically significant drug–drug interactions. The OpenADMET CYP Inhibition Challenge provides a blinded setting in which to evaluate computational prediction of direct-inhibition pIC50 across four CYP isoforms. Here, we introduce a molecular graph cellular automaton that represents atoms as cells, chemical bonds as local neighbourhoods, and molecular computation as the repeated evolution of a shared, learned transition rule. Unlike molecular models that reduce a structure directly to a fixed representation, our approach retains the complete sequence of atom states and uses its transient and terminal properties to predict CYP inhibition. We call this evolving representation **molecule space-time**: the joint description of molecular structure and its learned progression through computational time. On the sealed scaffold holdout, the cross-fitted target-specific dual-scale Graph-CA ensemble achieved MA-ST-RAE 0.7739 and RMSE 0.8586 pIC50. The corresponding OpenADMET blind evaluation returned MA-ST-RAE 1.0120, macro MAE 1.0861, macro R-squared -0.0766, macro Spearman rho 0.4892, and macro Kendall tau 0.3424. As a secondary objective, we investigated the nonlinear dynamics contained within molecule space-time by extending selected trajectories over thousands of generations and examining convergence, recurrence, periodicity, perturbation sensitivity, strange-attractor candidates, and possible chaotic behaviour. This analysis confirmed two bounded Kuramoto–Sakaguchi trajectories with continually regenerated positive Lyapunov exponents and multidirectional expansion. The framework therefore treats prediction and dynamical exploration as complementary views of the same learned molecular process, offering a route toward CYP inhibition models whose internal evolution can be measured, visualised, and studied as a nonlinear system.
 
 ## Introduction
 
@@ -289,6 +289,37 @@ The intervention campaign comprised 187 modified and baseline systems evaluated 
 ## Results and Discussion
 
 ### CYP pIC50 Predictions
+
+#### Sealed internal validation
+
+The cross-fitted target-specific dual-scale Graph Cellular Automata Ensemble (CFT-DS-GCAE) was evaluated once on the sealed scaffold holdout containing 1,309 molecule–CYP observations. Its point MA-ST-RAE was 0.7739. Across 1,000 bootstrap resamples, mean MA-ST-RAE was 0.7749 with a 95% interval from 0.7356 to 0.8193. RMSE was 0.8586 pIC50. The complementary bootstrap macro metrics were MAE 0.6323 pIC50, R-squared 0.2754, Spearman rho 0.5184, and Kendall tau 0.3699.
+
+| Metric | CFT-DS-GCAE | Previous DS-GCAE |
+|---|---:|---:|
+| Point MA-ST-RAE | **0.7739** | 0.7842 |
+| Bootstrap mean MA-ST-RAE | **0.7749** | 0.7850 |
+| 95% bootstrap interval | 0.7356–0.8193 | 0.7464–0.8274 |
+| RMSE, pIC50 | **0.8586** | 0.8678 |
+| Bootstrap macro MAE, pIC50 | **0.6323** | 0.6387 |
+| Bootstrap macro R-squared | **0.2754** | 0.2706 |
+| Bootstrap macro Spearman rho | **0.5184** | 0.5098 |
+| Bootstrap macro Kendall tau | **0.3699** | 0.3626 |
+
+The four target-specific stacks produced point ST-RAE values of 0.8172 for CYP1A2, 0.7611 for CYP2C9, 0.9409 for CYP2D6, and 0.5764 for CYP3A4. The largest residual difficulty on the sealed holdout therefore occurred for CYP2D6, while CYP3A4 gave the strongest endpoint result.
+
+#### OpenADMET blind challenge evaluation
+
+The challenge organisers calculated the official metrics after submission against labels that remained unavailable during model development. The first submission used the dual-scale Graph-CA ensemble (DS-GCAE) and was recorded at rank 80 of 89. The second used CFT-DS-GCAE and was recorded at rank 82 of 90. Because leaderboard membership changed between snapshots, rank differences do not provide a controlled paired comparison; the metric values supply the direct comparison between the two submitted prediction files.
+
+| Official blind metric | DS-GCAE, submission 1 | CFT-DS-GCAE, submission 2 | Change in submission 2 |
+|---|---:|---:|---:|
+| MA-ST-RAE | 1.0132 | **1.0120** | -0.0012 |
+| Macro MAE | 1.0893 | **1.0861** | -0.0032 |
+| Macro R-squared | -0.0827 | **-0.0766** | +0.0061 |
+| Macro Spearman rho | 0.4751 | **0.4892** | +0.0141 |
+| Macro Kendall tau | 0.3323 | **0.3424** | +0.0101 |
+
+Target-specific cross-fitted stacking improved every reported blind metric, with the clearest gains in rank correlation. The blind MA-ST-RAE remained substantially higher than the sealed internal value, and the negative blind macro R-squared indicates that predictive calibration and generalisation across the hidden chemical distribution remain important limitations of the present model. These leaderboard results represent externally calculated challenge outcomes rather than metrics reconstructed from locally available labels.
 
 ### Nonlinear Dynamics in Molecular Space-Time
 
