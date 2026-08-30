@@ -36,6 +36,8 @@ This provides strong computational evidence of a high-dimensional, hyperchaotic 
 
 <p align="center"><em>Trajectory 7 rendered as a rotating three-dimensional phase-space orbit over generations 1,000–5,000. The full atom-by-channel state was circularly embedded and reduced to three PCA coordinates. Select the animated preview to play the full 45-second video.</em></p>
 
+A subsequent [structure–dynamics campaign](results/structure_dynamics_publication_v1/README.md) measured repeated renormalised Lyapunov divergence for 258 held-out molecule–CYP cases and applied 187 frozen-model interventions to trajectories 7 and 8. Lower algebraic connectivity was associated with stronger divergence, with Spearman rho -0.235 and a scaffold-bootstrap 95% interval from -0.352 to -0.118. Molecular weight, graph diameter, and mean shortest path were positively associated with divergence. Targeted bond changes and ring openings produced large local changes in the Lyapunov exponent, providing computational evidence that graph connectivity and bond identity help govern the emergent regime.
+
 The evolving [Teaching curriculum](Teaching/README.md) records the scientific and mathematical background behind every component so that implementation and understanding advance together.
 
 The [Visual Laboratory](notebooks/README.md) provides interactive, code-hidden Jupyter experiences with clean RDKit molecular depictions, a restrained cyberpunk visual system, graph views, atom and bond inspectors, encoding heatmaps, and a transparent first graph cellular automaton. The permanent [challenge method report](METHOD_REPORT.md) always describes the model currently submitted to the leaderboard and retains the same URL when the leading model changes.

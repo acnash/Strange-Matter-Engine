@@ -6,6 +6,14 @@ Updated: 29 August 2026
 Hardware: NVIDIA GeForce RTX 5070 Ti, CUDA  
 Primary selection metric: MA-ST-RAE, lower is better
 
+## Structure–dynamics publication campaign
+
+The frozen Kuramoto–Sakaguchi Graph-CA was evaluated across 258 held-out molecule–CYP cases, balanced across all four endpoints, using a 1,000-generation burn-in and 2,000 measured generations with repeated Benettin renormalisation. The campaign also completed 187 frozen-model interventions across the two strongest strange-attractor cases. All calculations completed without missing records in 46 minutes 36 seconds on the RTX 5070 Ti.
+
+Lower algebraic connectivity was the strongest structural correlate of the largest Lyapunov exponent, with Spearman rho **-0.235** and a scaffold-bootstrap 95% interval of **-0.352 to -0.118**. Molecular weight, graph diameter, mean shortest path, heavy-atom count, and bond count were positively associated with divergence. A five-fold scaffold-held-out Extra Trees model achieved Spearman rho 0.253 and R-squared 0.051, indicating a reproducible yet modest multivariate structural signal.
+
+The strongest causal intervention converted bond 1–2 in `OCNT-2328784` from single to double, increasing the exponent by **0.00367 per generation**. Deleting aromatic bond 8–9 in the same molecule increased it by 0.00304. Several ring openings in `OCNT-0494110` reduced divergence by approximately 0.0014 to 0.0020 per generation, while ablating its elemental identity encoding reduced it by 0.00158. The complete tables and publication figures are stored in [`results/structure_dynamics_publication_v1`](results/structure_dynamics_publication_v1/README.md).
+
 The current candidate is the **Cross-Fitted Target-Specific Dual-Scale Graph Cellular Automata Ensemble (CFT-DS-GCAE v1)**. It preserves all recurrent bonded-graph cellular-automata members and uses a separate nested cross-fitted ridge stack for each CYP endpoint. The preceding DS-GCAE submission ranked 80th of 89 on the blind leaderboard, with MA-ST-RAE 1.0132, revealing a substantial local-to-blind generalisation gap.
 
 | Validation result | Value |

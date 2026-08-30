@@ -147,6 +147,8 @@ The second visual presents trajectory 7 in a Lorenz-style reduced phase space. T
 
 <p align="center"><em>Select the moving preview to open the full 45-second strange-attractor video. Complete trajectories, perturbation histories, Lyapunov spectra, basin tests, and figures are retained in <a href="results/long_horizon_attractor_campaign_v1">the long-horizon campaign archive</a>.</em></p>
 
+The follow-up [structure–dynamics campaign](results/structure_dynamics_publication_v1/README.md) evaluated 258 held-out molecule–CYP cases using repeated Benettin renormalisation after a 1,000-generation burn-in, alongside 187 causal interventions on trajectories 7 and 8. Lower algebraic connectivity showed the strongest univariate association with the largest Lyapunov exponent, with Spearman rho -0.235 and a scaffold-cluster bootstrap 95% interval from -0.352 to -0.118. Molecular weight, graph diameter, mean shortest path, heavy-atom count, graph density, and several three-dimensional shape descriptors were also examined. The strongest intervention changed a single bond in trajectory 8 from single to double and increased its exponent by 0.00367 per generation; several ring-opening interventions reduced instability in trajectory 7. The model receives atom and bond features without Cartesian coordinates, so the three-dimensional descriptors are treated as structural correlates, while frozen-model bond and feature interventions provide the direct computational tests.
+
 ## Reproducibility and artifacts
 
 The current candidate artifacts are retained in [`results/production_cross_fitted_target_calibrated_gcae_v1`](results/production_cross_fitted_target_calibrated_gcae_v1). Important files include:

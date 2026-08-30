@@ -1013,20 +1013,21 @@ def train(extended_dynamics: bool = False) -> None:
             from run_extended_coupled_map_dynamics import run_extended_analysis
         except ModuleNotFoundError:
             from scripts.run_extended_coupled_map_dynamics import run_extended_analysis
-        run_extended_analysis(
-            model=model,
-            data=data,
-            device=device,
-            torch_module=torch,
-            hidden_channels=hidden,
-            generations=GENERATIONS,
-            checkpoint_path=Path(os.environ["SME_CHECKPOINT"]),
-            screening_path=Path(os.environ["SME_SCREENING_CSV"]),
-            output_dir=Path(os.environ["SME_EXTENDED_OUTPUT"]),
-            candidate_count=int(os.environ.get("SME_EXTENDED_CANDIDATES", "100")),
-            burn_in=int(os.environ.get("SME_EXTENDED_BURN_IN", "1000")),
-            rule=RULE,
-        )
+        if os.environ.get("SME_SKIP_EXTENDED_ANALYSIS", "0") != "1":
+            run_extended_analysis(
+                model=model,
+                data=data,
+                device=device,
+                torch_module=torch,
+                hidden_channels=hidden,
+                generations=GENERATIONS,
+                checkpoint_path=Path(os.environ["SME_CHECKPOINT"]),
+                screening_path=Path(os.environ["SME_SCREENING_CSV"]),
+                output_dir=Path(os.environ["SME_EXTENDED_OUTPUT"]),
+                candidate_count=int(os.environ.get("SME_EXTENDED_CANDIDATES", "100")),
+                burn_in=int(os.environ.get("SME_EXTENDED_BURN_IN", "1000")),
+                rule=RULE,
+            )
         if os.environ.get("SME_RENORMALIZED_LYAPUNOV", "0") == "1":
             try:
                 from run_renormalized_lyapunov import run_renormalized_campaign
@@ -1056,6 +1057,17 @@ def train(extended_dynamics: bool = False) -> None:
                 model=model, data=data, device=device, torch_module=torch,
                 selected_path=Path(os.environ["SME_EXTENDED_OUTPUT"]) / "selected_candidates.csv",
                 output_dir=Path(os.environ["SME_ATTRACTOR_BASIN_OUTPUT"]),
+            )
+        if os.environ.get("SME_STRUCTURE_DYNAMICS", "0") == "1":
+            try:
+                from run_structure_dynamics_campaign import run_structure_dynamics_campaign
+            except ModuleNotFoundError:
+                from scripts.run_structure_dynamics_campaign import run_structure_dynamics_campaign
+            run_structure_dynamics_campaign(
+                model=model, data=data, device=device, torch_module=torch,
+                screening_path=Path(os.environ["SME_SCREENING_CSV"]),
+                output_dir=Path(os.environ["SME_STRUCTURE_DYNAMICS_OUTPUT"]),
+                atom_feature_names=list(requested_feature_names),
             )
         return
     ca_params = list(model.parameters())
