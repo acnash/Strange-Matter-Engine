@@ -23,6 +23,19 @@ Every one of the 48 estimates was positive. The 1e-4 and 1e-5 results provide th
 | OCNT-2328784 | CYP1A2 | 1e-05 | 8 | 0.0186757 | 0.00174623 | 0.0169968 | 0.0216457 | 1 | 0.89125 |
 | OCNT-2328784 | CYP1A2 | 0.0001 | 8 | 0.0159455 | 0.0017918 | 0.0120184 | 0.0176781 | 1 | 0.92875 |
 
+## Float64 Lyapunov spectrum
+
+The calculation was then repeated in float64 using eight orthogonal perturbation vectors and QR re-orthogonalization. Intervals of 5, 10, and 20 generations were tested twice for each molecule. All 96 spectrum estimates were positive. The largest exponent was stable near 0.0112 to 0.0124 per generation, and even the eighth leading exponent remained positive. This is evidence of high-dimensional expanding dynamics, often termed hyperchaos, rather than a float32 rounding artefact or a single unstable direction.
+
+| molecule_id | cyp_target | interval | largest_mean | smallest_of_eight_mean | minimum_observed | positive_fraction |
+| --- | --- | --- | --- | --- | --- | --- |
+| OCNT-0494110 | CYP2C9 | 5 | 0.0117914 | 0.00375521 | 0.00371061 | 1 |
+| OCNT-0494110 | CYP2C9 | 10 | 0.0116555 | 0.00414794 | 0.00401203 | 1 |
+| OCNT-0494110 | CYP2C9 | 20 | 0.011262 | 0.00397699 | 0.00391642 | 1 |
+| OCNT-2328784 | CYP1A2 | 5 | 0.0113809 | 0.00424172 | 0.00410759 | 1 |
+| OCNT-2328784 | CYP1A2 | 10 | 0.0119663 | 0.00443088 | 0.00424843 | 1 |
+| OCNT-2328784 | CYP1A2 | 20 | 0.01213 | 0.00407334 | 0.00391227 | 1 |
+
 ## Rule summary
 
 | transition_rule | cases | mean_slope | minimum_slope | maximum_slope | mean_positive_fraction |
@@ -59,6 +72,10 @@ Every one of the 48 estimates was positive. The 1e-4 and 1e-5 results provide th
 ![Kuramoto divergence](figures/06_kuramoto_trajectory_07_08_divergence.png)
 
 ![Renormalized Lyapunov estimates](figures/07_renormalized_lyapunov.png)
+
+![Float64 Lyapunov spectrum](figures/08_float64_lyapunov_spectrum.png)
+
+![Float64 Lyapunov convergence](figures/09_float64_lyapunov_convergence.png)
 
 ## Retained data
 

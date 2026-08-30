@@ -924,25 +924,27 @@ def train(extended_dynamics: bool = False) -> None:
 
         def initial_node_state(self, rec):
             """Return the learned initial CA state for dynamical analysis."""
-            x = torch.as_tensor(rec["x"], device=device)
+            dtype = next(self.parameters()).dtype
+            x = torch.as_tensor(rec["x"], device=device, dtype=dtype)
             return torch.tanh(INIT_SCALE * self.init(x))
 
         def kuramoto_step(self, rec, cyp: int, h):
             """Advance one frozen Kuramoto-Sakaguchi generation from an arbitrary state."""
             if RULE != "kuramoto_sakaguchi":
                 raise ValueError("kuramoto_step is only defined for the Kuramoto-Sakaguchi rule")
-            x = torch.as_tensor(rec["x"], device=device)
+            x = torch.as_tensor(rec["x"], device=device, dtype=h.dtype)
             src = torch.as_tensor(rec["src"], device=device)
             dst = torch.as_tensor(rec["dst"], device=device)
-            edge = torch.as_tensor(rec["edge"], device=device)
-            context = torch.zeros(4, device=device); context[cyp] = 1.0
+            edge = torch.as_tensor(rec["edge"], device=device, dtype=h.dtype)
+            context = torch.zeros(4, device=device, dtype=h.dtype); context[cyp] = 1.0
             agg = torch.zeros_like(h)
-            degree = torch.zeros((h.shape[0], 1), device=device)
+            degree = torch.zeros((h.shape[0], 1), device=device, dtype=h.dtype)
             if src.numel():
                 edge_gate = torch.sigmoid(self.bond_gate(edge) / BOND_TEMPERATURE)
                 msg = edge_gate * self.neighbour(h[src]) + self.bond(edge)
                 agg.index_add_(0, dst, msg)
-                degree.index_add_(0, dst, torch.ones((dst.numel(), 1), device=device))
+                degree.index_add_(0, dst, torch.ones((dst.numel(), 1), device=device,
+                                                     dtype=h.dtype))
                 agg = agg / degree.clamp_min(1.0)
             c = context.expand(h.shape[0], -1)
             reaction = torch.tanh(self.self_layer(h) + agg + self.chem(x) +
@@ -1034,6 +1036,16 @@ def train(extended_dynamics: bool = False) -> None:
                 model=model, data=data, device=device, torch_module=torch,
                 selected_path=Path(os.environ["SME_EXTENDED_OUTPUT"]) / "selected_candidates.csv",
                 output_dir=Path(os.environ["SME_RENORMALIZED_OUTPUT"]),
+            )
+        if os.environ.get("SME_LYAPUNOV_SPECTRUM", "0") == "1":
+            try:
+                from run_renormalized_lyapunov import run_lyapunov_spectrum_campaign
+            except ModuleNotFoundError:
+                from scripts.run_renormalized_lyapunov import run_lyapunov_spectrum_campaign
+            run_lyapunov_spectrum_campaign(
+                model=model, data=data, device=device, torch_module=torch,
+                selected_path=Path(os.environ["SME_EXTENDED_OUTPUT"]) / "selected_candidates.csv",
+                output_dir=Path(os.environ["SME_SPECTRUM_OUTPUT"]),
             )
         return
     ca_params = list(model.parameters())
