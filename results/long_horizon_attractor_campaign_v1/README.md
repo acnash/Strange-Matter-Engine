@@ -84,6 +84,12 @@ Taken together, boundedness, a robust positive float64 Lyapunov spectrum, fracta
 
 The 45-second H.264 animation maps the circularly embedded full atom-by-channel state onto three PCA coordinates. Generation supplies animation time. A fading magenta–cyan–lime trail, accumulated orbit, and slowly rotating camera expose the bounded recurrent geometry without implying that the coordinates are physical molecular positions.
 
+### Point-attractor comparison
+
+[![Trajectory 1 point-attractor convergence](videos/trajectory_01_point_attractor_convergence.png)](videos/trajectory_01_point_attractor_convergence.mp4)
+
+The gated-residual trajectory for `OCNT-2328519` conditioned on CYP1A2 contracts from a full-state distance of 8.00 to 0.00465 from the terminal state within 100 generations. The 30-second H.264 animation expands those early generations, retains the accumulated orbit, and marks the terminal point throughout. Its white-background [publication figure](figures/13_trajectory_01_point_attractor_convergence.png) provides a matched static comparison with the strange-attractor orbit.
+
 ![Attractor screen](figures/01_attractor_screen.png)
 
 ![Phase portraits](figures/02_phase_portraits.png)
