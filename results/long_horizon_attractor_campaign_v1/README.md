@@ -96,6 +96,12 @@ The gated-residual trajectory for `OCNT-2328519` conditioned on CYP1A2 contracts
 
 The two panels use the complete 0-to-5,000-generation histories and an identical time-colour scale. The corresponding vector-ready [PDF](figures/14_point_and_strange_attractor_comparison.pdf) is provided for publication.
 
+### Four-behaviour publication plate
+
+![Four Graph-CA dynamical behaviours](figures/17_four_graph_ca_dynamical_behaviours.png)
+
+The publication plate adds a Kuramoto–Sakaguchi [persistent or complex candidate animation](videos/trajectory_kuramoto_persistent_complex_candidate.mp4) and a coupled-map [period-two oscillator candidate animation](videos/trajectory_coupled_map_period2_oscillator_candidate.mp4) beneath the point and strange attractors. The oscillator panel uses a mature delay embedding so that its two alternating full-state phases remain visible. A vector-ready [PDF](figures/17_four_graph_ca_dynamical_behaviours.pdf) and separate [persistent/complex](figures/15_kuramoto_persistent_complex_candidate.pdf) and [oscillator](figures/16_coupled_map_oscillator_candidate.pdf) figures are included.
+
 ### Population-level dynamical screen
 
 The ten production transition rules each retained 1,309 validation-trajectory summaries. The mutually exclusive screen identified 1,309 point-attractor candidates under conservative graph flux, 1,309 oscillator candidates under coupled map, and 10,472 persistent or complex trajectories across the remaining rules. Two Kuramoto–Sakaguchi trajectories from the persistent or complex class underwent definitive long-horizon testing, and both satisfied the strange-attractor evidence protocol. These confirmation counts form a tested subset rather than an estimate of population prevalence. See the complete [rule-level table](validation_dynamics_population_summary.csv).
