@@ -30,11 +30,11 @@ This provides strong computational evidence of a high-dimensional, hyperchaotic 
 
 <p align="center">
   <a href="results/long_horizon_attractor_campaign_v1/videos/trajectory_07_hyperchaotic_strange_attractor.mp4">
-    <img src="results/long_horizon_attractor_campaign_v1/videos/trajectory_07_hyperchaotic_strange_attractor.png" width="800" alt="Three-dimensional reduced phase-space rendering of trajectory 7's Graph-CA strange attractor">
+    <img src="results/long_horizon_attractor_campaign_v1/videos/trajectory_07_hyperchaotic_strange_attractor_preview.gif" width="800" alt="Animated three-dimensional reduced phase-space rendering of trajectory 7's Graph-CA strange attractor">
   </a>
 </p>
 
-<p align="center"><em>Trajectory 7 rendered as a rotating three-dimensional phase-space orbit over generations 1,000–5,000. The full atom-by-channel state was circularly embedded and reduced to three PCA coordinates. Select the image to play the 45-second video.</em></p>
+<p align="center"><em>Trajectory 7 rendered as a rotating three-dimensional phase-space orbit over generations 1,000–5,000. The full atom-by-channel state was circularly embedded and reduced to three PCA coordinates. Select the animated preview to play the full 45-second video.</em></p>
 
 The evolving [Teaching curriculum](Teaching/README.md) records the scientific and mathematical background behind every component so that implementation and understanding advance together.
 

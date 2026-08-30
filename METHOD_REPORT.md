@@ -125,7 +125,27 @@ The submission contains no missing or non-finite predictions, no duplicate molec
 
 The project stores trajectory-derived diagnostics and, for selected runs, richer trajectory archives to support downstream study of information flow, convergence, oscillation, recurrence, transient structure, perturbation sensitivity, and candidate attractor regimes. These diagnostics did not influence challenge model selection.
 
-Finite-time recurrence or spectral structure is treated as a candidate dynamical regime rather than proof of chaos or a strange attractor. Stronger claims require long-horizon propagation, perturbation-pair divergence, Lyapunov-style estimates, recurrence analysis across seeds, and checks against timestep and numerical-precision artifacts.
+The first visual below follows four bond-free molecular Graph-CA trajectories through 1,000 generations. Atom colour records the evolving local state, allowing molecular information flow to be inspected directly across several transition-rule families.
+
+<p align="center">
+  <a href="results/ds_gcae_1000_generation_pymol/trajectories_05_06_07_08_four_column_atom_cascade.mp4">
+    <img src="assets/readme/graph-ca-four-trajectory-cascade.gif" width="800" alt="Four animated molecular Graph-CA trajectories over 1,000 generations">
+  </a>
+</p>
+
+<p align="center"><em>Select the moving preview to open the full-resolution four-trajectory video.</em></p>
+
+Long-horizon analysis subsequently extended 20 complete atom-by-channel states through 5,000 generations. Trajectories 7 and 8 showed bounded recurrent dynamics, robust positive renormalized divergence, eight positive leading Lyapunov exponents in float64, and attraction towards a common invariant distribution from 64 displaced starting states. Together, these measurements provide strong computational evidence of high-dimensional, hyperchaotic strange attractors within the trained Graph-CA model.
+
+The second visual presents trajectory 7 in a Lorenz-style reduced phase space. The full circularly embedded atom-by-channel state is projected onto three PCA coordinates, generation supplies animation time, and the fading trail exposes the bounded recurrent geometry.
+
+<p align="center">
+  <a href="results/long_horizon_attractor_campaign_v1/videos/trajectory_07_hyperchaotic_strange_attractor.mp4">
+    <img src="results/long_horizon_attractor_campaign_v1/videos/trajectory_07_hyperchaotic_strange_attractor_preview.gif" width="800" alt="Animated reduced phase-space trajectory of a Graph-CA hyperchaotic strange attractor">
+  </a>
+</p>
+
+<p align="center"><em>Select the moving preview to open the full 45-second strange-attractor video. Complete trajectories, perturbation histories, Lyapunov spectra, basin tests, and figures are retained in <a href="results/long_horizon_attractor_campaign_v1">the long-horizon campaign archive</a>.</em></p>
 
 ## Reproducibility and artifacts
 
