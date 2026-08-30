@@ -22,4 +22,6 @@ Descriptor associations identify structural correlates of the learned dynamics. 
 - `descriptor_correlations.csv` and `scaffold_bootstrap_correlations.csv`: univariate statistics.
 - `scaffold_grouped_model_performance.csv`: scaffold-held-out multivariate tests.
 - `causal_interventions_with_effects.csv`: every frozen-model intervention and effect size.
-- `figures/`: publication-resolution figures.
+- `figures/structure_dynamics_publication_composite.png`: white-background four-panel publication plate.
+- `figures/structure_dynamics_publication_composite.pdf`: vector publication plate.
+- `figures/`: individual publication-resolution panels and exploratory dark-background figures.
