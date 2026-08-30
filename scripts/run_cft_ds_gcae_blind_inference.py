@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Apply the frozen target-calibrated Graph-CA ridge stack to blind predictions."""
+"""Apply the frozen target-specific dual-scale Graph-CA ridge stack to blind predictions."""
 
 from __future__ import annotations
 
@@ -112,11 +112,11 @@ def main() -> None:
     columns = ["SMILES", "Molecule_Name"] + [
         f"{endpoint}_pIC50_direct_inhibition" for endpoint in ENDPOINTS
     ]
-    write_csv(STUDY / "cftc_gcae_blinded_predictions_long.csv", long_rows)
-    write_csv(STUDY / "cftc_gcae_submission.csv", submission_rows, columns)
+    write_csv(STUDY / "cft_ds_gcae_blinded_predictions_long.csv", long_rows)
+    write_csv(STUDY / "cft_ds_gcae_submission.csv", submission_rows, columns)
     manifest = {
-        "model": "Cross-Fitted Target-Calibrated Graph Cellular Automata Ensemble",
-        "abbreviation": "CFTC-GCAE",
+        "model": "Cross-Fitted Target-Specific Dual-Scale Graph Cellular Automata Ensemble",
+        "abbreviation": "CFT-DS-GCAE",
         "version": "v1",
         "source_member_predictions": str(SOURCE.relative_to(ROOT)),
         "feature_order": summary["feature_names"],

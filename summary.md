@@ -1,12 +1,12 @@
 # Latest production summary
 
-## Current production candidate: CFTC-GCAE v1
+## Current production candidate: CFT-DS-GCAE v1
 
 Updated: 29 August 2026  
 Hardware: NVIDIA GeForce RTX 5070 Ti, CUDA  
 Primary selection metric: MA-ST-RAE, lower is better
 
-The current candidate is the **Cross-Fitted Target-Calibrated Graph Cellular Automata Ensemble (CFTC-GCAE v1)**. It preserves all recurrent bonded-graph cellular-automata members and uses a separate nested cross-fitted ridge stack for each CYP endpoint. The preceding DS-GCAE submission ranked 80th of 89 on the blind leaderboard, with MA-ST-RAE 1.0132, revealing a substantial local-to-blind generalisation gap.
+The current candidate is the **Cross-Fitted Target-Specific Dual-Scale Graph Cellular Automata Ensemble (CFT-DS-GCAE v1)**. It preserves all recurrent bonded-graph cellular-automata members and uses a separate nested cross-fitted ridge stack for each CYP endpoint. The preceding DS-GCAE submission ranked 80th of 89 on the blind leaderboard, with MA-ST-RAE 1.0132, revealing a substantial local-to-blind generalisation gap.
 
 | Validation result | Value |
 |---|---:|
@@ -21,9 +21,9 @@ The current candidate is the **Cross-Fitted Target-Calibrated Graph Cellular Aut
 
 The final meta-model has ten inputs per endpoint: five original graph-CA predictions and five multiscale predictions, with three seeds averaged inside every multiscale rule. Ridge penalties are 1000 for CYP1A2 and CYP2D6 and 100 for CYP2C9 and CYP3A4. Optional affine calibration was evaluated leakage-safely and identity calibration was selected for all four endpoints.
 
-Blind inference completed on all 750 challenge molecules using the 20 previously frozen checkpoint predictions, producing 3,000 finite pIC50 predictions. Test labels were not loaded. The candidate submission is `results/production_cross_fitted_target_calibrated_gcae_v1/cftc_gcae_submission.csv`; it contains exactly 750 rows and six columns in the official order and has no missing or non-finite predictions.
+Blind inference completed on all 750 challenge molecules using the 20 previously frozen checkpoint predictions, producing 3,000 finite pIC50 predictions. Test labels were not loaded. The candidate submission is `results/production_cross_fitted_target_calibrated_gcae_v1/cft_ds_gcae_submission.csv`; it contains exactly 750 rows and six columns in the official order and has no missing or non-finite predictions.
 
-CFTC-GCAE improves over DS-GCAE by 0.0103 point MA-ST-RAE and 0.0091 pIC50 RMSE on the sealed validation set. The bootstrap intervals overlap, so this remains a modest candidate improvement rather than a guaranteed blind-set gain.
+CFT-DS-GCAE improves over DS-GCAE by 0.0103 point MA-ST-RAE and 0.0091 pIC50 RMSE on the sealed validation set. The bootstrap intervals overlap, so this remains a modest candidate improvement rather than a guaranteed blind-set gain.
 
 ## Challenge-aligned v5 production campaign complete
 

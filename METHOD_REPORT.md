@@ -4,7 +4,7 @@
 
 This is the permanent, version-independent method report for the Strange Matter Engine entry in the OpenADMET CYP Inhibition Blind Challenge. Its path remains stable. Whenever a new leading model replaces the submitted model, this document is updated on `main` to identify and describe that model, while versioned result directories preserve the historical artifacts.
 
-**Current production candidate:** Cross-Fitted Target-Calibrated Graph Cellular Automata Ensemble (CFTC-GCAE v1)
+**Current production candidate:** Cross-Fitted Target-Specific Dual-Scale Graph Cellular Automata Ensemble (CFT-DS-GCAE v1)
 
 **Previously submitted model:** Dual-Scale Graph Cellular Automata Ensemble (DS-GCAE v1)
 
@@ -58,9 +58,9 @@ Hyperparameter searches were performed using scaffold-aware partitions of the la
 
 MA-ST-RAE was the primary promotion and selection metric. RMSE, MAE, R-squared, Spearman correlation, and Kendall correlation were retained as secondary diagnostics. Final metric uncertainty was estimated with 1,000 bootstrap resamples. The challenge-blinded test set did not participate in hyperparameter tuning, early stopping, seed selection, rule weighting, ensemble blending, or dynamical-regime selection.
 
-## CFTC-GCAE v1 ensemble construction
+## CFT-DS-GCAE v1 ensemble construction
 
-CFTC-GCAE v1 retains the two five-rule expert families developed for DS-GCAE:
+CFT-DS-GCAE v1 retains the two five-rule expert families developed for DS-GCAE:
 
 - **Original experts:** one trained seed from each of the five transition rules.
 - **Multiscale experts:** seeds 1701, 2909, and 4211 averaged within each transition rule.
@@ -100,13 +100,13 @@ Endpoint point ST-RAE values were:
 | CYP2D6 | 0.940906 |
 | CYP3A4 | 0.576373 |
 
-DS-GCAE v1 achieved point MA-ST-RAE 0.784156 and RMSE 0.867775 on the same sealed validation set. CFTC-GCAE improves those values by approximately 0.0103 and 0.0091 pIC50 respectively. The bootstrap intervals overlap, so the available uncertainty does not establish a statistically resolved separation.
+DS-GCAE v1 achieved point MA-ST-RAE 0.784156 and RMSE 0.867775 on the same sealed validation set. CFT-DS-GCAE improves those values by approximately 0.0103 and 0.0091 pIC50 respectively. The bootstrap intervals overlap, so the available uncertainty does not establish a statistically resolved separation.
 
-The first DS-GCAE blind submission ranked 80th of 89. The organiser reported MA-ST-RAE 1.0132, MA 1.0893, macro R-squared -0.0827, macro Spearman rho 0.4751, and macro Kendall tau 0.3323. This divergence from local validation motivated target-specific stacking and stronger cross-fitting. The blind result is reported as evidence about DS-GCAE and is not used as a label-level training signal for CFTC-GCAE.
+The first DS-GCAE blind submission ranked 80th of 89. The organiser reported MA-ST-RAE 1.0132, MA 1.0893, macro R-squared -0.0827, macro Spearman rho 0.4751, and macro Kendall tau 0.3323. This divergence from local validation motivated target-specific stacking and stronger cross-fitting. The blind result is reported as evidence about DS-GCAE and is not used as a label-level training signal for CFT-DS-GCAE.
 
 ## Blinded inference and submission
 
-Frozen inference ran on all 750 blinded challenge molecules and produced 3,000 finite CFTC-GCAE predictions, one for every molecule and CYP endpoint. The inference manifest records `labels_loaded: false`, successful schema validation, the feature order, target-specific ridge states, and calibration decisions.
+Frozen inference ran on all 750 blinded challenge molecules and produced 3,000 finite CFT-DS-GCAE predictions, one for every molecule and CYP endpoint. The inference manifest records `labels_loaded: false`, successful schema validation, the feature order, target-specific ridge states, and calibration decisions.
 
 The current regression submission contains exactly 750 rows and the six required columns in the official order:
 
@@ -131,8 +131,8 @@ Finite-time recurrence or spectral structure is treated as a candidate dynamical
 
 The current candidate artifacts are retained in [`results/production_cross_fitted_target_calibrated_gcae_v1`](results/production_cross_fitted_target_calibrated_gcae_v1). Important files include:
 
-- [`cftc_gcae_submission.csv`](results/production_cross_fitted_target_calibrated_gcae_v1/cftc_gcae_submission.csv), the challenge-ready regression file;
-- [`cftc_gcae_blinded_predictions_long.csv`](results/production_cross_fitted_target_calibrated_gcae_v1/cftc_gcae_blinded_predictions_long.csv), the auditable expert and stacked predictions;
+- [`cft_ds_gcae_submission.csv`](results/production_cross_fitted_target_calibrated_gcae_v1/cft_ds_gcae_submission.csv), the challenge-ready regression file;
+- [`cft_ds_gcae_blinded_predictions_long.csv`](results/production_cross_fitted_target_calibrated_gcae_v1/cft_ds_gcae_blinded_predictions_long.csv), the auditable expert and stacked predictions;
 - [`study_summary.json`](results/production_cross_fitted_target_calibrated_gcae_v1/study_summary.json), the nested cross-fitting parameters and validation report;
 - [`inference_manifest.json`](results/production_cross_fitted_target_calibrated_gcae_v1/inference_manifest.json), the frozen inference specification; and
 - [`scripts/run_cross_fitted_target_calibrated_ensemble.py`](scripts/run_cross_fitted_target_calibrated_ensemble.py), the validation and fitting runner.
@@ -148,4 +148,4 @@ The validation estimates arise from one challenge dataset and its scaffold-aware
 | Date | Leading model or candidate | Change |
 |---|---|---|
 | 29 August 2026 | DS-GCAE v1 | Created the permanent method report and documented the first frozen regression submission. |
-| 29 August 2026 | CFTC-GCAE v1 candidate | Added nested target-specific ridge stacking after the first blind result; generated a new label-free submission candidate. |
+| 29 August 2026 | CFT-DS-GCAE v1 candidate | Added nested target-specific ridge stacking after the first blind result; generated a new label-free submission candidate. |

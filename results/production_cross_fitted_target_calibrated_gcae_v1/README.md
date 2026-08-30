@@ -1,4 +1,4 @@
-# Cross-Fitted Target-Calibrated Graph Cellular Automata Ensemble v1
+# Cross-Fitted Target-Specific Dual-Scale Graph Cellular Automata Ensemble v1
 
 This production candidate replaces fixed averaging with four target-specific ridge stacks. Each stack receives ten predictions produced by the existing graph cellular automata: one original and one three-seed multiscale prediction from each of gated residual, delayed memory, inertial reaction diffusion, Kuramoto-Sakaguchi, and FitzHugh-Nagumo.
 
@@ -6,7 +6,7 @@ Model construction used five nested scaffold-grouped folds. For every outer-fold
 
 ## Validation results
 
-| Metric | CFTC-GCAE v1 | Previous DS-GCAE v1 |
+| Metric | CFT-DS-GCAE v1 | Previous DS-GCAE v1 |
 |---|---:|---:|
 | Point MA-ST-RAE | **0.7739** | 0.7842 |
 | Bootstrap MA-ST-RAE mean | **0.7749** | 0.7850 |
@@ -28,10 +28,10 @@ Calibration was searched rather than assumed. Cross-validation selected identity
 
 ## Files
 
-- `cftc_gcae_submission.csv`: challenge-formatted regression predictions for 750 blinded molecules.
-- `cftc_gcae_blinded_predictions_long.csv`: 3,000 auditable endpoint predictions with all ten expert inputs.
+- `cft_ds_gcae_submission.csv`: challenge-formatted regression predictions for 750 blinded molecules.
+- `cft_ds_gcae_blinded_predictions_long.csv`: 3,000 auditable endpoint predictions with all ten expert inputs.
 - `study_summary.json`: nested-fold settings, fitted ridge states, validation results, and 1,000-resample bootstrap metrics.
 - `validation_predictions.csv`: sealed validation predictions and member signals.
 - `inference_manifest.json`: frozen inference specification and leakage safeguards.
 
-The validation improvement is modest and its bootstrap interval overlaps that of DS-GCAE v1. The challenge result for DS-GCAE showed a substantial local-to-blind generalisation gap, so CFTC-GCAE should be regarded as a better validated candidate rather than a guaranteed leaderboard improvement.
+The validation improvement is modest and its bootstrap interval overlaps that of DS-GCAE v1. The challenge result for DS-GCAE showed a substantial local-to-blind generalisation gap, so CFT-DS-GCAE should be regarded as a better validated candidate rather than a guaranteed leaderboard improvement.
