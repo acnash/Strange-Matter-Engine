@@ -102,10 +102,7 @@ def main():
 
     fig.suptitle("Independent Evidence for Graph-CA Strange Attractors",
                  fontsize=17, fontweight="bold", y=.985)
-    fig.text(.5, .018,
-             "Positive divergence is regenerated after repeated renormalization, spans the leading spectrum, remains stable across numerical intervals, and occurs within a bounded attracting basin.",
-             ha="center", fontsize=9, color="#444444")
-    fig.subplots_adjust(left=.08, right=.98, bottom=.075, top=.93, hspace=.30, wspace=.23)
+    fig.subplots_adjust(left=.08, right=.98, bottom=.065, top=.93, hspace=.30, wspace=.23)
     png = OUTPUT / "18_strange_attractor_evidence_plate.png"
     pdf = OUTPUT / "18_strange_attractor_evidence_plate.pdf"
     fig.savefig(png, dpi=320, bbox_inches="tight", facecolor="white")

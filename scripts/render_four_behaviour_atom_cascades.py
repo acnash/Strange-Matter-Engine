@@ -85,8 +85,8 @@ def main() -> None:
     width, height = 4800, 2750
     image = Image.new("RGB", (width, height), "white")
     draw = ImageDraw.Draw(image, "RGBA")
-    title_font, panel_font = font(58, True), font(45, True)
-    detail_font, tick_font = font(34), font(30)
+    title_font, panel_font = font(72, True), font(56, True)
+    detail_font, tick_font = font(42), font(40)
     draw.text((width / 2, 42),
               "Molecular Information Cascades Across Four Graph-CA Dynamical Regimes",
               font=title_font, fill="#14202B", anchor="ma")
@@ -138,7 +138,7 @@ def main() -> None:
         drawing_options = Draw.MolDrawOptions()
         drawing_options.padding = 0.06
         drawing_options.bondLineWidth = 3.0
-        drawing_options.fixedFontSize = 26
+        drawing_options.fixedFontSize = 34
         depiction = Draw.MolToImage(molecule, size=(1040, 610), options=drawing_options)
         image.paste(depiction, (int(centre_x - 520), 2070))
         draw.text((centre_x, 2680), case.molecule, font=detail_font,
