@@ -115,6 +115,27 @@ def main() -> None:
     axes[1].legend(fontsize=7, ncol=2)
     fig.savefig(figures / "06_kuramoto_trajectory_07_08_divergence.png", dpi=220); plt.close(fig)
 
+    renormalized_dir = OUT / "renormalized_lyapunov"
+    renormalized = pd.read_csv(renormalized_dir / "renormalized_lyapunov_runs.csv")
+    renormalized_summary = pd.read_csv(renormalized_dir / "renormalized_lyapunov_summary.csv")
+    fig, axes = plt.subplots(1, 2, figsize=(14, 5.5), constrained_layout=True)
+    for ax, molecule_id in zip(axes, ("OCNT-0494110", "OCNT-2328784")):
+        molecule = renormalized[renormalized.molecule_id == molecule_id]
+        for epsilon, colour in zip((1e-4, 1e-5, 1e-6), (CYAN, MAGENTA, ORANGE)):
+            q = molecule[np.isclose(molecule.epsilon, epsilon)]
+            ax.scatter(np.full(len(q), epsilon), q.renormalized_lyapunov,
+                       color=colour, s=35, alpha=.7)
+            ax.errorbar(epsilon, q.renormalized_lyapunov.mean(),
+                        yerr=q.renormalized_lyapunov.std(), fmt="o", color=WHITE,
+                        capsize=5, markersize=7)
+        ax.set_xscale("log"); ax.axhline(0, color=LIME, lw=1)
+        ax.set(xlabel="Renormalized perturbation magnitude",
+               ylabel="Largest Lyapunov estimate per generation",
+               title=molecule_id)
+        ax.grid(alpha=.12)
+    fig.suptitle("Repeatedly renormalized Kuramoto-Sakaguchi divergence")
+    fig.savefig(figures / "07_renormalized_lyapunov.png", dpi=220); plt.close(fig)
+
     rule_summary = perturbations.groupby("transition_rule").agg(
         cases=("molecule_id", "size"), mean_slope=("direct_perturbation_slope", "mean"),
         minimum_slope=("direct_perturbation_slope", "min"),
@@ -129,6 +150,10 @@ def main() -> None:
         "## Current result", "",
         "Kuramoto-Sakaguchi is the only rule family in which all four screened molecules show replicated positive finite-time separation. Trajectories 7 and 8 remain the principal candidates. Inertial reaction-diffusion and delayed memory contract every tested perturbation. Gated residual has a contracting mean response in all four cases but some direction-dependent early growth. FitzHugh-Nagumo has a mixed, molecule-dependent response.", "",
         "This is evidence of local finite-time sensitivity, not yet proof of a strange attractor. A defensible chaos claim still requires a renormalized largest Lyapunov exponent, stability across perturbation magnitudes and numerical precision, and exclusion of a very long complex transient.", "",
+        "## Renormalized Lyapunov result", "",
+        "A Benettin-style calculation was subsequently applied to trajectories 7 and 8. After a 1,000-generation burn-in, the companion state was evolved for ten generations, measured with circular phase distance, returned to its original distance, and evolved again. This was repeated across 4,000 measured generations, eight directions, and three perturbation magnitudes.", "",
+        "Every one of the 48 estimates was positive. The 1e-4 and 1e-5 results provide the primary float32 estimates; 1e-6 is retained as a numerical-resolution sensitivity test. Persistent positive growth after repeated renormalization shows that divergence is continually regenerated along both trajectories, rather than being a single initial separation followed by saturation.", "",
+        markdown_table(renormalized_summary), "",
         "## Rule summary", "", markdown_table(rule_summary), "",
         "## Leading sensitivity candidates", "", markdown_table(top[["visual_rank", "transition_rule", "molecule_id", "cyp_target", "direct_perturbation_slope", "direct_perturbation_slope_std", "direct_positive_fraction", "correlation_dimension", "spectral_entropy"]]), "",
         "## Figures", "",
@@ -138,6 +163,7 @@ def main() -> None:
         "![Perturbation summary](figures/04_direct_perturbation_summary.png)", "",
         "![Perturbation curves](figures/05_perturbation_curve_gallery.png)", "",
         "![Kuramoto divergence](figures/06_kuramoto_trajectory_07_08_divergence.png)", "",
+        "![Renormalized Lyapunov estimates](figures/07_renormalized_lyapunov.png)", "",
         "## Retained data", "",
         "- `base_trajectories`: lossless 5,001-frame atom-by-channel trajectories.",
         "- `case_data`: PCA coordinates, recurrence matrices, spectra, correlation integrals, step energies, and nearest-neighbour divergence curves.",
@@ -149,7 +175,8 @@ def main() -> None:
     metadata.update({"direct_perturbation_cases": len(perturbations),
                      "direct_perturbations_per_case": 8,
                      "direct_perturbation_trajectories": len(perturbations) * 8,
-                     "claim_status": "replicated finite-time sensitivity; renormalized Lyapunov confirmation required"})
+                     "renormalized_lyapunov_runs": len(renormalized),
+                     "claim_status": "persistent positive renormalized Lyapunov evidence; numerical-precision replication remains required"})
     (OUT / "metadata.json").write_text(json.dumps(metadata, indent=2) + "\n", encoding="utf-8")
     print(rule_summary.to_string(index=False))
 

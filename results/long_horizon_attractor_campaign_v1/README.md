@@ -8,6 +8,21 @@ Kuramoto-Sakaguchi is the only rule family in which all four screened molecules 
 
 This is evidence of local finite-time sensitivity, not yet proof of a strange attractor. A defensible chaos claim still requires a renormalized largest Lyapunov exponent, stability across perturbation magnitudes and numerical precision, and exclusion of a very long complex transient.
 
+## Renormalized Lyapunov result
+
+A Benettin-style calculation was subsequently applied to trajectories 7 and 8. After a 1,000-generation burn-in, the companion state was evolved for ten generations, measured with circular phase distance, returned to its original distance, and evolved again. This was repeated across 4,000 measured generations, eight directions, and three perturbation magnitudes.
+
+Every one of the 48 estimates was positive. The 1e-4 and 1e-5 results provide the primary float32 estimates; 1e-6 is retained as a numerical-resolution sensitivity test. Persistent positive growth after repeated renormalization shows that divergence is continually regenerated along both trajectories, rather than being a single initial separation followed by saturation.
+
+| molecule_id | cyp_target | epsilon | repeats | mean_lyapunov | std_lyapunov | minimum_lyapunov | maximum_lyapunov | positive_fraction | mean_positive_block_fraction |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| OCNT-0494110 | CYP2C9 | 1e-06 | 8 | 0.0257641 | 0.00131069 | 0.0239401 | 0.0277349 | 1 | 0.820625 |
+| OCNT-0494110 | CYP2C9 | 1e-05 | 8 | 0.0172121 | 0.0012069 | 0.015671 | 0.0191674 | 1 | 0.820937 |
+| OCNT-0494110 | CYP2C9 | 0.0001 | 8 | 0.0165731 | 0.00178588 | 0.0127807 | 0.0183443 | 1 | 0.941562 |
+| OCNT-2328784 | CYP1A2 | 1e-06 | 8 | 0.0277784 | 0.00216024 | 0.024512 | 0.0300122 | 1 | 0.851562 |
+| OCNT-2328784 | CYP1A2 | 1e-05 | 8 | 0.0186757 | 0.00174623 | 0.0169968 | 0.0216457 | 1 | 0.89125 |
+| OCNT-2328784 | CYP1A2 | 0.0001 | 8 | 0.0159455 | 0.0017918 | 0.0120184 | 0.0176781 | 1 | 0.92875 |
+
 ## Rule summary
 
 | transition_rule | cases | mean_slope | minimum_slope | maximum_slope | mean_positive_fraction |
@@ -42,6 +57,8 @@ This is evidence of local finite-time sensitivity, not yet proof of a strange at
 ![Perturbation curves](figures/05_perturbation_curve_gallery.png)
 
 ![Kuramoto divergence](figures/06_kuramoto_trajectory_07_08_divergence.png)
+
+![Renormalized Lyapunov estimates](figures/07_renormalized_lyapunov.png)
 
 ## Retained data
 

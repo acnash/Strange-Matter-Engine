@@ -922,6 +922,42 @@ def train(extended_dynamics: bool = False) -> None:
                 return pred, torch.stack(states)
             return pred
 
+        def initial_node_state(self, rec):
+            """Return the learned initial CA state for dynamical analysis."""
+            x = torch.as_tensor(rec["x"], device=device)
+            return torch.tanh(INIT_SCALE * self.init(x))
+
+        def kuramoto_step(self, rec, cyp: int, h):
+            """Advance one frozen Kuramoto-Sakaguchi generation from an arbitrary state."""
+            if RULE != "kuramoto_sakaguchi":
+                raise ValueError("kuramoto_step is only defined for the Kuramoto-Sakaguchi rule")
+            x = torch.as_tensor(rec["x"], device=device)
+            src = torch.as_tensor(rec["src"], device=device)
+            dst = torch.as_tensor(rec["dst"], device=device)
+            edge = torch.as_tensor(rec["edge"], device=device)
+            context = torch.zeros(4, device=device); context[cyp] = 1.0
+            agg = torch.zeros_like(h)
+            degree = torch.zeros((h.shape[0], 1), device=device)
+            if src.numel():
+                edge_gate = torch.sigmoid(self.bond_gate(edge) / BOND_TEMPERATURE)
+                msg = edge_gate * self.neighbour(h[src]) + self.bond(edge)
+                agg.index_add_(0, dst, msg)
+                degree.index_add_(0, dst, torch.ones((dst.numel(), 1), device=device))
+                agg = agg / degree.clamp_min(1.0)
+            c = context.expand(h.shape[0], -1)
+            reaction = torch.tanh(self.self_layer(h) + agg + self.chem(x) +
+                                  self.context(c) + self.bias)
+            phase = math.pi * h
+            phase_coupling = torch.zeros_like(h)
+            if src.numel():
+                lag = math.pi * (DYN_C - 0.5)
+                phase_messages = edge_gate * torch.sin(phase[src] - phase[dst] - lag)
+                phase_coupling.index_add_(0, dst, phase_messages)
+                phase_coupling = phase_coupling / degree.clamp_min(1.0)
+            natural_frequency = DYN_A * torch.tanh(self.frequency_drive(reaction))
+            next_phase = phase + UPDATE_SCALE * (natural_frequency + DYN_B * phase_coupling)
+            return torch.atan2(torch.sin(next_phase), torch.cos(next_phase)) / math.pi
+
     model = GraphCA().to(device)
     if inference_only:
         model.load_state_dict(checkpoint["state_dict"])
@@ -989,6 +1025,16 @@ def train(extended_dynamics: bool = False) -> None:
             burn_in=int(os.environ.get("SME_EXTENDED_BURN_IN", "1000")),
             rule=RULE,
         )
+        if os.environ.get("SME_RENORMALIZED_LYAPUNOV", "0") == "1":
+            try:
+                from run_renormalized_lyapunov import run_renormalized_campaign
+            except ModuleNotFoundError:
+                from scripts.run_renormalized_lyapunov import run_renormalized_campaign
+            run_renormalized_campaign(
+                model=model, data=data, device=device, torch_module=torch,
+                selected_path=Path(os.environ["SME_EXTENDED_OUTPUT"]) / "selected_candidates.csv",
+                output_dir=Path(os.environ["SME_RENORMALIZED_OUTPUT"]),
+            )
         return
     ca_params = list(model.parameters())
     optimizer = torch.optim.Adam(ca_params, lr=CA_LR,
