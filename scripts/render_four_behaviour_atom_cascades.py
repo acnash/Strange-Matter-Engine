@@ -10,7 +10,7 @@ import numpy as np
 import pandas as pd
 from PIL import Image, ImageDraw, ImageFont
 from rdkit import Chem
-from rdkit.Chem import AllChem
+from rdkit.Chem import AllChem, Draw
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -82,16 +82,16 @@ def cyan_magenta(fraction: np.ndarray) -> np.ndarray:
 
 def main() -> None:
     table = pd.read_csv(TRAIN).set_index("Molecule_Name")
-    width, height = 4800, 1950
+    width, height = 4800, 2750
     image = Image.new("RGB", (width, height), "white")
     draw = ImageDraw.Draw(image, "RGBA")
-    title_font, panel_font = font(55, True), font(36, True)
-    detail_font, tick_font = font(25), font(22)
+    title_font, panel_font = font(58, True), font(45, True)
+    detail_font, tick_font = font(34), font(30)
     draw.text((width / 2, 42),
               "Molecular Information Cascades Across Four Graph-CA Dynamical Regimes",
               font=title_font, fill="#14202B", anchor="ma")
     column_width = width / 4
-    plot_top, plot_bottom = 235, 1690
+    plot_top, plot_bottom = 260, 1680
 
     for case_index, case in enumerate(CASES):
         state = np.load(case.trajectory)["trajectory"].astype(np.float64)
@@ -131,20 +131,30 @@ def main() -> None:
                          fill=(red, green, blue, 92))
         draw.text((centre_x, 135), f"{case.panel}  |  {case.regime}",
                   font=panel_font, fill="#14202B", anchor="ma")
-        draw.text((centre_x, 185), f"{case.rule} · {case.molecule} · {case.target}",
+        draw.text((centre_x, 200), f"{case.rule} · {case.molecule} · {case.target}",
                   font=detail_font, fill="#4A4A4A", anchor="ma")
 
-    bar_left, bar_right, bar_top, bar_bottom = 1050, 3750, 1780, 1820
+        molecule = Chem.MolFromSmiles(table.loc[case.molecule, "SMILES"])
+        drawing_options = Draw.MolDrawOptions()
+        drawing_options.padding = 0.06
+        drawing_options.bondLineWidth = 3.0
+        drawing_options.fixedFontSize = 26
+        depiction = Draw.MolToImage(molecule, size=(1040, 610), options=drawing_options)
+        image.paste(depiction, (int(centre_x - 520), 2070))
+        draw.text((centre_x, 2680), case.molecule, font=detail_font,
+                  fill="#333333", anchor="ma")
+
+    bar_left, bar_right, bar_top, bar_bottom = 850, 3950, 1780, 1835
     for pixel in range(bar_left, bar_right):
         colour = (cyan_magenta(np.asarray([(pixel - bar_left) / (bar_right - bar_left)]))[0] * 255).astype(int)
         draw.line((pixel, bar_top, pixel, bar_bottom), fill=tuple(colour) + (255,))
     draw.rectangle((bar_left, bar_top, bar_right, bar_bottom), outline="#333333", width=2)
     for step in range(6):
         x_tick = bar_left + step / 5 * (bar_right - bar_left)
-        draw.line((x_tick, bar_bottom, x_tick, bar_bottom + 10), fill="#333333", width=2)
-        draw.text((x_tick, bar_bottom + 15), f"{step / 5:.1f}", font=tick_font,
+        draw.line((x_tick, bar_bottom, x_tick, bar_bottom + 14), fill="#333333", width=3)
+        draw.text((x_tick, bar_bottom + 20), f"{step / 5:.1f}", font=tick_font,
                   fill="#333333", anchor="ma")
-    draw.text(((bar_left + bar_right) / 2, 1905), "Normalized Mean Atom State Across 16 Dynamical Channels",
+    draw.text(((bar_left + bar_right) / 2, 1935), "Normalized Mean Atom State Across 16 Dynamical Channels",
               font=detail_font, fill="#222222", anchor="ms")
 
     OUTPUT.mkdir(parents=True, exist_ok=True)
