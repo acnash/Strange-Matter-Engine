@@ -121,7 +121,7 @@ def ensure_graph_cache(worker_python):
 
 def run_fit(rule, study_name, label, config, seed, epochs, patience,
             fit_limit, validation_limit, device="auto", python_path=None,
-            analyse=False, cv_fold=None, cv_folds=5):
+            analyse=False, cv_fold=None, cv_folds=5, active_cyp=None):
     run_name = f"{study_name}/runs/{label}"
     metrics_file = metric_path(run_name)
     if metrics_file.exists():
@@ -170,6 +170,8 @@ def run_fit(rule, study_name, label, config, seed, epochs, patience,
     if cv_fold is not None:
         env["SME_CV_FOLD"] = str(cv_fold)
         env["SME_CV_FOLDS"] = str(cv_folds)
+    if active_cyp is not None:
+        env["SME_ACTIVE_CYP"] = str(active_cyp)
     run_dir = metrics_file.parent
     run_dir.mkdir(parents=True, exist_ok=True)
     log_path = run_dir / "console.log"

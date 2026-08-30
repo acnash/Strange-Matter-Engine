@@ -70,6 +70,10 @@ INTERVAL_LOSS_BETA = float(os.environ.get("SME_INTERVAL_LOSS_BETA", "0.5"))
 INTERVAL_TEMPERATURE = float(os.environ.get("SME_INTERVAL_TEMPERATURE", "0.05"))
 SEED = int(os.environ.get("SME_SEED", "1701"))
 CYPS = ("CYP1A2", "CYP2C9", "CYP2D6", "CYP3A4")
+ACTIVE_CYP = os.environ.get("SME_ACTIVE_CYP", "").strip()
+if ACTIVE_CYP and ACTIVE_CYP not in CYPS:
+    raise ValueError(f"SME_ACTIVE_CYP must be one of {CYPS}, received {ACTIVE_CYP!r}")
+ACTIVE_CYP_INDEX = CYPS.index(ACTIVE_CYP) if ACTIVE_CYP else None
 LABEL_COLS = tuple(f"{c}_pIC50_direct_inhibition" for c in CYPS)
 LABEL_HIGH_COLS = tuple(f"{col}_conf_high" for col in LABEL_COLS)
 LABEL_LOW_COLS = tuple(f"{col}_conf_low" for col in LABEL_COLS)
@@ -1078,8 +1082,21 @@ def train(extended_dynamics: bool = False) -> None:
         pairs = []
         for i in indices:
             for c, y in enumerate(data["train"][i]["labels"]):
-                if np.isfinite(y): pairs.append((i, c, float(y)))
+                if (ACTIVE_CYP_INDEX is None or c == ACTIVE_CYP_INDEX) and np.isfinite(y):
+                    pairs.append((i, c, float(y)))
         return pairs
+
+    metric_cyps = (ACTIVE_CYP,) if ACTIVE_CYP else CYPS
+
+    def metric_endpoints(endpoints):
+        if ACTIVE_CYP_INDEX is None:
+            return endpoints
+        if not np.all(endpoints == ACTIVE_CYP_INDEX):
+            raise RuntimeError("A CYP-specialist run received another endpoint")
+        return np.zeros_like(endpoints)
+
+    def complete_per_cyp(values):
+        return {name: float(values.get(name, np.nan)) for name in CYPS}
 
     fit_indices = list(data["train_idx"])
     validation_indices = list(data["val_idx"])
@@ -1113,6 +1130,9 @@ def train(extended_dynamics: bool = False) -> None:
     interval_normalizers = {}
     for cyp_index in range(len(CYPS)):
         endpoint_pairs = [(i, y) for i, c, y in fit_pairs if c == cyp_index]
+        if not endpoint_pairs:
+            interval_normalizers[cyp_index] = 1.0
+            continue
         endpoint_targets = np.asarray([y for _, y in endpoint_pairs], dtype=float)
         baseline = float(endpoint_targets.mean())
         endpoint_errors = []
@@ -1173,9 +1193,11 @@ def train(extended_dynamics: bool = False) -> None:
         lows, highs, endpoints = credible_bounds(pairs)
         metric = (bootstrap_macro_soft_threshold_rae if bootstrap
                   else macro_soft_threshold_rae)
-        ma_st_rae, per_cyp = metric(ys, ps, lows, highs, endpoints, CYPS)
+        ma_st_rae, per_cyp = metric(
+            ys, ps, lows, highs, metric_endpoints(endpoints), metric_cyps
+        )
         return (float(np.sqrt(np.mean((ys - ps) ** 2))), ma_st_rae,
-                per_cyp, ys, ps)
+                complete_per_cyp(per_cyp), ys, ps)
 
     history, best, best_rmse, best_state, patience = [], math.inf, math.inf, None, 0
     rng = random.Random(SEED)
@@ -1332,10 +1354,13 @@ def train(extended_dynamics: bool = False) -> None:
         reserved_y, reserved_p = np.asarray([]), np.asarray([])
     val_lows, val_highs, val_endpoints = credible_bounds(val_pairs)
     val_point_ma_st_rae, val_point_per_cyp = macro_soft_threshold_rae(
-        val_y, val_p, val_lows, val_highs, val_endpoints, CYPS
+        val_y, val_p, val_lows, val_highs,
+        metric_endpoints(val_endpoints), metric_cyps
     )
+    val_point_per_cyp = complete_per_cyp(val_point_per_cyp)
     challenge_report = bootstrap_regression_report(
-        val_y, val_p, val_lows, val_highs, val_endpoints, CYPS
+        val_y, val_p, val_lows, val_highs,
+        metric_endpoints(val_endpoints), metric_cyps
     )
     pair_rows = []
     for split, pairs, ys, ps in (("fit", fit_pairs, train_y, train_p),
@@ -1388,6 +1413,7 @@ def train(extended_dynamics: bool = False) -> None:
         "peak_gpu_memory_bytes": (torch.cuda.max_memory_allocated(device)
                                   if device.type == "cuda" else 0),
         "runtime": run_runtime,
+        "active_cyp": ACTIVE_CYP or None,
         "validation_protocol": ({"kind": "scaffold_cross_validation",
                                   "fold": int(cv_fold_text), "folds": cv_folds,
                                   "split_seed": int(os.environ.get(
