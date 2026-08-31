@@ -4,9 +4,9 @@
 
 This is the permanent, version-independent method report for the Strange Matter Engine entry in the OpenADMET CYP Inhibition Blind Challenge. Its path remains stable. Whenever a new leading model replaces the submitted model, this document is updated on `main` to identify and describe that model, while versioned result directories preserve the historical artifacts.
 
-**Current production candidate:** Cross-Fitted Target-Specific Dual-Scale Graph Cellular Automata Ensemble (CFT-DS-GCAE v1)
+**Current production candidate:** Cross-Validated CYP-Specialist Graph Cellular Automata (CV-CYP-GCA v1)
 
-**Previously submitted model:** Dual-Scale Graph Cellular Automata Ensemble (DS-GCAE v1)
+**Previously submitted models:** Dual-Scale Graph Cellular Automata Ensemble (DS-GCAE v1) and Cross-Fitted Target-Specific Dual-Scale Graph Cellular Automata Ensemble (CFT-DS-GCAE v1)
 
 **Challenge track:** Direct Inhibition, regression
 
@@ -36,15 +36,7 @@ Every ensemble member follows the same general computation:
 4. Statistics from several points in the trajectory form a molecular dynamical fingerprint.
 5. A CYP-conditioned differentiable ridge readout maps the fingerprint to predicted pIC50.
 
-The current ensemble contains five complementary transition rules:
-
-- gated residual;
-- delayed memory;
-- inertial reaction diffusion;
-- Kuramoto-Sakaguchi; and
-- FitzHugh-Nagumo.
-
-The repeated local update and bonded neighbourhood remain present in every member. Ensemble averaging occurs after each member has completed its own graph-CA trajectory and ridge prediction.
+CV-CYP-GCA screened all ten implemented transition rules separately for each CYP. The final systems contain conservative graph flux, delayed memory, Gray-Scott, damped symplectic, activator-inhibitor, FitzHugh-Nagumo, and coupled-map members. Each CYP retains only the rules selected by its own scaffold cross-validation. The repeated local update and bonded neighbourhood remain present in every member, and prediction combination occurs after each selected member has completed its Graph-CA trajectory and ridge prediction.
 
 ## Learning and ridge readout
 
@@ -58,55 +50,50 @@ Hyperparameter searches were performed using scaffold-aware partitions of the la
 
 MA-ST-RAE was the primary promotion and selection metric. RMSE, MAE, R-squared, Spearman correlation, and Kendall correlation were retained as secondary diagnostics. Final metric uncertainty was estimated with 1,000 bootstrap resamples. The challenge-blinded test set did not participate in hyperparameter tuning, early stopping, seed selection, rule weighting, ensemble blending, or dynamical-regime selection.
 
-## CFT-DS-GCAE v1 ensemble construction
+## CV-CYP-GCA v1 construction
 
-CFT-DS-GCAE v1 retains the two five-rule expert families developed for DS-GCAE:
+CV-CYP-GCA moves CYP specialisation into cellular-automata training. Four independent systems were trained, one each for CYP1A2, CYP2C9, CYP2D6, and CYP3A4. Support targets, query targets, backpropagation loss, early stopping, and the differentiable ridge solve contained observations from the active CYP only. The cellular dynamics therefore learned endpoint-specific molecular representations.
 
-- **Original experts:** one trained seed from each of the five transition rules.
-- **Multiscale experts:** seeds 1701, 2909, and 4211 averaged within each transition rule.
+All ten transition rules were screened for every endpoint using the established configuration and a CYP-directed alternative that varied chemical features, trajectory length, and ridge regularisation. The three leading rule/configuration pairs per CYP advanced to five-fold scaffold confirmation with two training seeds. Sparse ridge subset selection used out-of-fold predictions and endpoint ST-RAE, while the reserved scaffold holdout remained sealed.
 
-This produces ten prediction signals for each molecule and endpoint. A separate standardised ridge stack is fitted for CYP1A2, CYP2C9, CYP2D6, and CYP3A4. Ridge strength is selected inside nested scaffold-grouped folds using endpoint ST-RAE. An affine slope and offset calibration is then evaluated using predictions that were themselves generated out of fold. Calibration is retained only when it improves held-out ST-RAE.
+| Endpoint | Selected transition rules | Final ridge penalty |
+|---|---|---:|
+| CYP1A2 | Conservative graph flux, delayed memory, Gray-Scott | 1000 |
+| CYP2C9 | Damped symplectic, activator-inhibitor | 100 |
+| CYP2D6 | Delayed memory, FitzHugh-Nagumo | 1000 |
+| CYP3A4 | Gray-Scott, damped symplectic, coupled map | 100 |
 
-The final target-specific settings are:
-
-| Endpoint | Ridge penalty | Calibration slope | Calibration offset |
-|---|---:|---:|---:|
-| CYP1A2 | 1000 | 1.0 | 0.0 |
-| CYP2C9 | 100 | 1.0 | 0.0 |
-| CYP2D6 | 1000 | 1.0 | 0.0 |
-| CYP3A4 | 100 | 1.0 | 0.0 |
-
-Cross-validation selected identity calibration for all four final stacks. This is a valid calibrated-model outcome: the optional correction was rejected because it did not generalise within the development folds. The final system still contains the 20 frozen checkpoint evaluations used to construct its ten seed-averaged signals.
+Each selected rule contributes ten frozen predictions per blind molecule, comprising five scaffold folds and two training seeds. Predictions are averaged within a rule, after which the saved CYP-specific ridge state produces the final pIC50 value.
 
 ## Validation results
 
 | Metric | Result |
 |---|---:|
-| Point MA-ST-RAE | **0.773895** |
-| Bootstrap MA-ST-RAE mean | **0.774878** |
-| MA-ST-RAE 95% bootstrap interval | 0.735589 to 0.819301 |
-| RMSE | 0.858630 pIC50 |
-| Macro MAE, bootstrap mean | 0.632268 pIC50 |
-| Macro R-squared, bootstrap mean | 0.275448 |
-| Macro Spearman rho, bootstrap mean | 0.518365 |
-| Macro Kendall tau, bootstrap mean | 0.369915 |
+| Point MA-ST-RAE | **0.768985** |
+| Bootstrap MA-ST-RAE mean | **0.769697** |
+| MA-ST-RAE 95% bootstrap interval | 0.731973 to 0.812732 |
+| RMSE | 0.862535 pIC50 |
+| Macro MAE, bootstrap mean | 0.629648 pIC50 |
+| Macro R-squared, bootstrap mean | 0.269356 |
+| Macro Spearman rho, bootstrap mean | 0.521821 |
+| Macro Kendall tau, bootstrap mean | 0.371549 |
 
 Endpoint point ST-RAE values were:
 
 | Endpoint | ST-RAE |
 |---|---:|
-| CYP1A2 | 0.817214 |
-| CYP2C9 | 0.761089 |
-| CYP2D6 | 0.940906 |
-| CYP3A4 | 0.576373 |
+| CYP1A2 | 0.820068 |
+| CYP2C9 | 0.751381 |
+| CYP2D6 | 0.947044 |
+| CYP3A4 | 0.557449 |
 
-DS-GCAE v1 achieved point MA-ST-RAE 0.784156 and RMSE 0.867775 on the same sealed validation set. CFT-DS-GCAE improves those values by approximately 0.0103 and 0.0091 pIC50 respectively. The bootstrap intervals overlap, so the available uncertainty does not establish a statistically resolved separation.
+On the same sealed validation set, DS-GCAE v1 achieved point MA-ST-RAE 0.784156 and RMSE 0.867775, while CFT-DS-GCAE achieved 0.773895 and 0.858630. CV-CYP-GCA produced the lowest internal point MA-ST-RAE, improving on CFT-DS-GCAE by 0.004910. Its bootstrap interval overlaps the preceding model's interval, so the available internal evidence supports a modest candidate improvement.
 
 The first DS-GCAE blind submission ranked 80th of 89. The organiser reported MA-ST-RAE 1.0132, MA 1.0893, macro R-squared -0.0827, macro Spearman rho 0.4751, and macro Kendall tau 0.3323. This divergence from local validation motivated target-specific stacking and stronger cross-fitting. The blind result is reported as evidence about DS-GCAE and is not used as a label-level training signal for CFT-DS-GCAE.
 
 ## Blinded inference and submission
 
-Frozen inference ran on all 750 blinded challenge molecules and produced 3,000 finite CFT-DS-GCAE predictions, one for every molecule and CYP endpoint. The inference manifest records `labels_loaded: false`, successful schema validation, the feature order, target-specific ridge states, and calibration decisions.
+Frozen inference ran on all 750 blinded challenge molecules and produced 3,000 finite CV-CYP-GCA predictions, one for every molecule and CYP endpoint. For each endpoint, five scaffold folds and two seeds were averaged within every selected rule before the saved CYP-specific ridge state generated the final pIC50. The inference manifest records `labels_loaded: false`, successful schema validation, the selected rules, and the exact submission columns.
 
 The current regression submission contains exactly 750 rows and the six required columns in the official order:
 
@@ -151,19 +138,19 @@ The follow-up [structure–dynamics campaign](results/structure_dynamics_publica
 
 ## Reproducibility and artifacts
 
-The current candidate artifacts are retained in [`results/production_cross_fitted_target_calibrated_gcae_v1`](results/production_cross_fitted_target_calibrated_gcae_v1). Important files include:
+The current candidate artifacts are retained in [`results/production_cv_cyp_specialist_gca_v1`](results/production_cv_cyp_specialist_gca_v1). Important files include:
 
-- [`cft_ds_gcae_submission.csv`](results/production_cross_fitted_target_calibrated_gcae_v1/cft_ds_gcae_submission.csv), the challenge-ready regression file;
-- [`cft_ds_gcae_blinded_predictions_long.csv`](results/production_cross_fitted_target_calibrated_gcae_v1/cft_ds_gcae_blinded_predictions_long.csv), the auditable expert and stacked predictions;
-- [`study_summary.json`](results/production_cross_fitted_target_calibrated_gcae_v1/study_summary.json), the nested cross-fitting parameters and validation report;
-- [`inference_manifest.json`](results/production_cross_fitted_target_calibrated_gcae_v1/inference_manifest.json), the frozen inference specification; and
-- [`scripts/run_cross_fitted_target_calibrated_ensemble.py`](scripts/run_cross_fitted_target_calibrated_ensemble.py), the validation and fitting runner.
+- [`cv_cyp_gca_submission.csv`](results/production_cv_cyp_specialist_gca_v1/cv_cyp_gca_submission.csv), the challenge-ready regression file;
+- [`blind_predictions_long.csv`](results/production_cv_cyp_specialist_gca_v1/blind_predictions_long.csv), the auditable rule-level and final predictions;
+- [`study_summary.json`](results/production_cv_cyp_specialist_gca_v1/study_summary.json), the cross-validation selection parameters and validation report;
+- [`inference_manifest.json`](results/production_cv_cyp_specialist_gca_v1/inference_manifest.json), the frozen inference and schema-validation record; and
+- [`scripts/run_cv_cyp_specialist_gca.py`](scripts/run_cv_cyp_specialist_gca.py), the resumable training, validation, and inference runner.
 
 Production training and inference used an NVIDIA GeForce RTX 5070 Ti through CUDA. The shared implementation also supports CPU execution for inspection and forward-only analysis. Environment files, training scripts, saved checkpoints, validation tables, figures, and PDF reports are committed in this repository.
 
 ## Limitations
 
-The validation estimates arise from one challenge dataset and its scaffold-aware partitions. CYP2D6 remains the weakest endpoint by ST-RAE. The improvement from target-specific stacking is modest, and the preceding blind result demonstrates that local validation can substantially overestimate performance on the challenge distribution. The current candidate provides calibrated point-model selection rather than predictive uncertainty intervals.
+The validation estimates arise from one challenge dataset and its scaffold-aware partitions. CYP2D6 remains the weakest endpoint by ST-RAE. The improvement from CYP-specialist cellular dynamics is modest, and the preceding blind results demonstrate that local validation can substantially overestimate performance on the challenge distribution. The current candidate provides point predictions rather than predictive uncertainty intervals.
 
 ## Update history
 
@@ -171,3 +158,4 @@ The validation estimates arise from one challenge dataset and its scaffold-aware
 |---|---|---|
 | 29 August 2026 | DS-GCAE v1 | Created the permanent method report and documented the first frozen regression submission. |
 | 29 August 2026 | CFT-DS-GCAE v1 candidate | Added nested target-specific ridge stacking after the first blind result; generated a new label-free submission candidate. |
+| 31 August 2026 | CV-CYP-GCA v1 candidate | Trained independent nonlinear Graph-CA systems for each CYP, selected sparse transition-rule subsets, and generated a validated blind regression submission. |

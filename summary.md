@@ -1,8 +1,8 @@
 # Latest production summary
 
-## Current production candidate: CFT-DS-GCAE v1
+## Current production candidate: CV-CYP-GCA v1
 
-Updated: 29 August 2026  
+Updated: 31 August 2026
 Hardware: NVIDIA GeForce RTX 5070 Ti, CUDA  
 Primary selection metric: MA-ST-RAE, lower is better
 
@@ -14,24 +14,24 @@ Lower algebraic connectivity was the strongest structural correlate of the large
 
 The strongest causal intervention converted bond 1–2 in `OCNT-2328784` from single to double, increasing the exponent by **0.00367 per generation**. Deleting aromatic bond 8–9 in the same molecule increased it by 0.00304. Several ring openings in `OCNT-0494110` reduced divergence by approximately 0.0014 to 0.0020 per generation, while ablating its elemental identity encoding reduced it by 0.00158. The complete tables and publication figures are stored in [`results/structure_dynamics_publication_v1`](results/structure_dynamics_publication_v1/README.md).
 
-The current candidate is the **Cross-Fitted Target-Specific Dual-Scale Graph Cellular Automata Ensemble (CFT-DS-GCAE v1)**. It preserves all recurrent bonded-graph cellular-automata members and uses a separate nested cross-fitted ridge stack for each CYP endpoint. The preceding DS-GCAE submission ranked 80th of 89 on the blind leaderboard, with MA-ST-RAE 1.0132, revealing a substantial local-to-blind generalisation gap.
+The current candidate is **Cross-Validated CYP-Specialist Graph Cellular Automata (CV-CYP-GCA v1)**. Four independently backpropagated nonlinear systems specialise the cellular dynamics and differentiable ridge readout for CYP1A2, CYP2C9, CYP2D6, and CYP3A4. All ten transition rules were screened for each endpoint, with the three leading configurations confirmed across five scaffold folds and two seeds before sparse rule selection.
 
 | Validation result | Value |
 |---|---:|
-| Point MA-ST-RAE | **0.7739** |
-| Bootstrap MA-ST-RAE mean | **0.7749** |
-| 95% bootstrap interval | 0.7356 to 0.8193 |
-| RMSE | 0.8586 pIC50 |
-| CYP1A2 ST-RAE | 0.8172 |
-| CYP2C9 ST-RAE | 0.7611 |
-| CYP2D6 ST-RAE | 0.9409 |
-| CYP3A4 ST-RAE | 0.5764 |
+| Point MA-ST-RAE | **0.7690** |
+| Bootstrap MA-ST-RAE mean | **0.7697** |
+| 95% bootstrap interval | 0.7320 to 0.8127 |
+| RMSE | 0.8625 pIC50 |
+| CYP1A2 ST-RAE | 0.8201 |
+| CYP2C9 ST-RAE | 0.7514 |
+| CYP2D6 ST-RAE | 0.9470 |
+| CYP3A4 ST-RAE | 0.5574 |
 
-The final meta-model has ten inputs per endpoint: five original graph-CA predictions and five multiscale predictions, with three seeds averaged inside every multiscale rule. Ridge penalties are 1000 for CYP1A2 and CYP2D6 and 100 for CYP2C9 and CYP3A4. Optional affine calibration was evaluated leakage-safely and identity calibration was selected for all four endpoints.
+The selected rule sets are conservative graph flux, delayed memory, and Gray-Scott for CYP1A2; damped symplectic and activator-inhibitor for CYP2C9; delayed memory and FitzHugh-Nagumo for CYP2D6; and Gray-Scott, damped symplectic, and coupled map for CYP3A4. Ridge penalties are 1000 for CYP1A2 and CYP2D6 and 100 for CYP2C9 and CYP3A4.
 
-Blind inference completed on all 750 challenge molecules using the 20 previously frozen checkpoint predictions, producing 3,000 finite pIC50 predictions. Test labels were not loaded. The candidate submission is `results/production_cross_fitted_target_calibrated_gcae_v1/cft_ds_gcae_submission.csv`; it contains exactly 750 rows and six columns in the official order and has no missing or non-finite predictions.
+Frozen blind inference evaluates each selected cellular automaton across five scaffold folds and two seeds, averages predictions within each retained rule, and applies the saved endpoint ridge combination. The validated challenge file is retained under `results/production_cv_cyp_specialist_gca_v1`.
 
-CFT-DS-GCAE improves over DS-GCAE by 0.0103 point MA-ST-RAE and 0.0091 pIC50 RMSE on the sealed validation set. The bootstrap intervals overlap, so this remains a modest candidate improvement rather than a guaranteed blind-set gain.
+CV-CYP-GCA improves over CFT-DS-GCAE by 0.0049 point MA-ST-RAE on the sealed validation set. The overlapping bootstrap intervals support treating this as a modest candidate improvement pending organiser evaluation.
 
 ## Challenge-aligned v5 production campaign complete
 

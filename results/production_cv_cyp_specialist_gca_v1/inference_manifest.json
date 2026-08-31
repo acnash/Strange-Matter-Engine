@@ -1,0 +1,38 @@
+{
+  "method": "CV-CYP-GCA",
+  "submission": "results\\production_cv_cyp_specialist_gca_v1\\cv_cyp_gca_submission.csv",
+  "rows": 750,
+  "columns": [
+    "SMILES",
+    "Molecule_Name",
+    "CYP1A2_pIC50_direct_inhibition",
+    "CYP2C9_pIC50_direct_inhibition",
+    "CYP2D6_pIC50_direct_inhibition",
+    "CYP3A4_pIC50_direct_inhibition"
+  ],
+  "finite_predictions": 3000,
+  "expected_predictions": 3000,
+  "unique_molecule_names": 750,
+  "labels_loaded": false,
+  "schema_valid": true,
+  "selected_rules": {
+    "CYP1A2": [
+      "conservative_graph_flux",
+      "delayed_memory",
+      "gray_scott"
+    ],
+    "CYP2C9": [
+      "damped_symplectic",
+      "activator_inhibitor"
+    ],
+    "CYP2D6": [
+      "delayed_memory",
+      "fitzhugh_nagumo"
+    ],
+    "CYP3A4": [
+      "gray_scott",
+      "damped_symplectic",
+      "coupled_map"
+    ]
+  }
+}

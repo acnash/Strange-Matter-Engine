@@ -166,8 +166,37 @@ def confirm(worker: Path, selected: dict) -> None:
 
 def prediction_rows(endpoint, candidate, seed, fold, split):
     label = run_label("confirm", endpoint, candidate["rule"], candidate["variant"], seed, fold)
-    return [row for row in read_csv(run_path(label) / "validation_predictions.csv")
+    filename = ("checkpoint_evaluation_predictions.csv"
+                if split == "reserved_holdout" else "validation_predictions.csv")
+    return [row for row in read_csv(run_path(label) / filename)
             if row["split"] == split and row["cyp_target"] == endpoint]
+
+
+def evaluate_holdouts(worker: Path, selected: dict) -> None:
+    jobs = [(endpoint, candidate, seed, fold)
+            for endpoint, candidates in selected.items() for candidate in candidates
+            for seed in SEEDS for fold in FOLDS]
+    for number, (endpoint, candidate, seed, fold) in enumerate(jobs, 1):
+        label = run_label("confirm", endpoint, candidate["rule"], candidate["variant"], seed, fold)
+        run_dir = run_path(label)
+        output = run_dir / "checkpoint_evaluation_predictions.csv"
+        if output.exists():
+            continue
+        progress("checkpoint_holdout_evaluation", completed=number - 1,
+                 total=len(jobs), endpoint=endpoint, rule=candidate["rule"],
+                 seed=seed, fold=fold)
+        env = os.environ.copy()
+        env.update({
+            "SME_GRAPH_CACHE": str(production.GRAPH_CACHE),
+            "SME_CHECKPOINT": str(run_dir / "model.pt"),
+            "SME_RUN_NAME": f"{STUDY_NAME}/runs/{label}",
+            "SME_DEVICE": "cuda", "SME_EVALUATE_CHECKPOINT": "1",
+            "SME_ACTIVE_CYP": endpoint, "SME_CV_FOLD": str(fold),
+            "SME_CV_FOLDS": str(len(FOLDS)),
+        })
+        with (run_dir / "checkpoint_evaluation.log").open("w", encoding="utf-8") as log:
+            subprocess.run([str(worker), str(RUNNER), "train"], cwd=ROOT, env=env,
+                           stdout=log, stderr=subprocess.STDOUT, check=True)
 
 
 def matrices(selected: dict, split: str):
@@ -255,6 +284,99 @@ def assemble(selected: dict) -> dict:
     return summary
 
 
+def blind_member(worker: Path, endpoint: str, candidate: dict,
+                 seed: int, fold: int) -> Path:
+    label = run_label("confirm", endpoint, candidate["rule"],
+                      candidate["variant"], seed, fold)
+    output_dir = STUDY / "blind_members" / label
+    output = output_dir / "blinded_test_predictions.csv"
+    if output.exists():
+        return output
+    output_dir.mkdir(parents=True, exist_ok=True)
+    env = os.environ.copy()
+    env.update({
+        "SME_GRAPH_CACHE": str(BLIND_CACHE), "SME_INCLUDE_BLIND": "1",
+        "SME_CHECKPOINT": str(run_path(label) / "model.pt"),
+        "SME_RUN_NAME": f"{STUDY_NAME}/blind_members/{label}",
+        "SME_DEVICE": "cuda", "SME_ACTIVE_CYP": endpoint,
+    })
+    with (output_dir / "console.log").open("w", encoding="utf-8") as log:
+        subprocess.run([str(worker), str(RUNNER), "predict"], cwd=ROOT, env=env,
+                       stdout=log, stderr=subprocess.STDOUT, check=True)
+    return output
+
+
+def generate_blind(worker: Path, selected: dict, summary: dict) -> None:
+    required = []
+    for endpoint in ENDPOINTS:
+        columns = summary["final_models"][endpoint]["columns"]
+        for column in columns:
+            candidate = selected[endpoint][column]
+            for seed in SEEDS:
+                for fold in FOLDS:
+                    required.append((endpoint, column, candidate, seed, fold))
+    member_maps = {}
+    for number, (endpoint, column, candidate, seed, fold) in enumerate(required, 1):
+        progress("blind_checkpoint_inference", completed=number - 1,
+                 total=len(required), endpoint=endpoint,
+                 rule=candidate["rule"], seed=seed, fold=fold)
+        path = blind_member(worker, endpoint, candidate, seed, fold)
+        rows = [row for row in read_csv(path) if row["cyp_target"] == endpoint]
+        member_maps[(endpoint, column, seed, fold)] = {
+            row["molecule_id"]: float(row["predicted_pic50"]) for row in rows
+        }
+
+    test_rows = read_csv(TEST_CSV)
+    forbidden = {"experimental_pic50", "credible_interval_low", "credible_interval_high"}
+    if test_rows and forbidden.intersection(test_rows[0]):
+        raise RuntimeError("Blind input contains forbidden label columns")
+    wide_rows, long_rows = [], []
+    for source in test_rows:
+        molecule = source["Molecule_Name"]
+        wide = {"SMILES": source["SMILES"], "Molecule_Name": molecule}
+        for endpoint in ENDPOINTS:
+            model = summary["final_models"][endpoint]
+            features = []
+            detail = {"molecule_id": molecule, "smiles": source["SMILES"],
+                      "cyp_target": endpoint}
+            for column in model["columns"]:
+                values = [member_maps[(endpoint, column, seed, fold)][molecule]
+                          for seed in SEEDS for fold in FOLDS]
+                average = float(np.mean(values))
+                features.append(average)
+                rule = selected[endpoint][column]["rule"]
+                detail[f"mean_{rule}"] = average
+            prediction = float(meta.predict_ridge(
+                np.asarray(features, dtype=float)[None, :], model["ridge"])[0])
+            if not np.isfinite(prediction):
+                raise RuntimeError(f"Non-finite blind prediction for {molecule}/{endpoint}")
+            wide[f"{endpoint}_pIC50_direct_inhibition"] = prediction
+            detail["predicted_pic50"] = prediction
+            long_rows.append(detail)
+        wide_rows.append(wide)
+    fields = ["SMILES", "Molecule_Name"] + [
+        f"{endpoint}_pIC50_direct_inhibition" for endpoint in ENDPOINTS]
+    submission = STUDY / "cv_cyp_gca_submission.csv"
+    write_csv(submission, wide_rows, fields)
+    long_fields = list(dict.fromkeys(
+        key for row in long_rows for key in row.keys()
+    ))
+    write_csv(STUDY / "blind_predictions_long.csv", long_rows, long_fields)
+    manifest = {
+        "method": "CV-CYP-GCA", "submission": str(submission.relative_to(ROOT)),
+        "rows": len(wide_rows), "columns": fields,
+        "finite_predictions": int(len(wide_rows) * len(ENDPOINTS)),
+        "expected_predictions": 750 * 4,
+        "unique_molecule_names": len({row["Molecule_Name"] for row in wide_rows}),
+        "labels_loaded": False, "schema_valid": len(wide_rows) == 750,
+        "selected_rules": {endpoint: summary["final_models"][endpoint]["rules"]
+                           for endpoint in ENDPOINTS},
+    }
+    if not manifest["schema_valid"] or manifest["unique_molecule_names"] != 750:
+        raise RuntimeError(f"Invalid blind submission manifest: {manifest}")
+    write_json(STUDY / "inference_manifest.json", manifest)
+
+
 def main() -> None:
     worker = Path(os.environ.get(
         "SME_PYTHON", "C:/Users/Anthony/anaconda3/envs/strange-matter-gpu/python.exe"))
@@ -264,9 +386,16 @@ def main() -> None:
     selected = (json.loads(screening_path.read_text(encoding="utf-8"))
                 if screening_path.exists() else screen(worker))
     confirm(worker, selected)
-    progress("assembling_validation")
-    summary = assemble(selected)
-    progress("validation_complete", summary=summary)
+    evaluate_holdouts(worker, selected)
+    summary_path = STUDY / "study_summary.json"
+    if summary_path.exists():
+        summary = json.loads(summary_path.read_text(encoding="utf-8"))
+    else:
+        progress("assembling_validation")
+        summary = assemble(selected)
+    generate_blind(worker, selected, summary)
+    progress("complete", summary=summary,
+             submission="cv_cyp_gca_submission.csv")
     print(json.dumps(meta.serialise(summary), indent=2))
 
 

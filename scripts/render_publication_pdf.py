@@ -5,6 +5,8 @@ from __future__ import annotations
 
 import re
 import subprocess
+import time
+import uuid
 from pathlib import Path
 
 import markdown
@@ -84,15 +86,27 @@ window.MathJax = {{
 </head><body>{html_body}</body></html>"""
     html_path = TEMP / "publication_print.html"
     html_path.write_text(document, encoding="utf-8")
+    profile = TEMP / f"edge-profile-{uuid.uuid4().hex}"
+    profile.mkdir(parents=True, exist_ok=True)
+    if OUTPUT.exists():
+        OUTPUT.unlink()
+    started = time.time()
     command = [
         str(EDGE), "--headless=new", "--disable-gpu", "--no-pdf-header-footer",
-        f"--user-data-dir={(TEMP / 'edge-profile').resolve()}",
+        f"--user-data-dir={profile.resolve()}",
         "--run-all-compositor-stages-before-draw", "--virtual-time-budget=20000",
         f"--print-to-pdf={OUTPUT.resolve()}", html_path.resolve().as_uri(),
     ]
     completed = subprocess.run(command, check=False, capture_output=True, text=True)
-    if completed.returncode or not OUTPUT.exists():
-        raise RuntimeError(completed.stderr or "Edge failed to create the PDF")
+    deadline = time.time() + 10.0
+    while not OUTPUT.exists() and time.time() < deadline:
+        time.sleep(0.2)
+    if (completed.returncode or not OUTPUT.exists()
+            or OUTPUT.stat().st_mtime < started):
+        raise RuntimeError(
+            f"Edge failed to create the PDF (exit={completed.returncode}, "
+            f"stdout={completed.stdout!r}, stderr={completed.stderr!r})"
+        )
     print(OUTPUT.resolve())
 
 

@@ -457,7 +457,8 @@ def train(extended_dynamics: bool = False) -> None:
     print(json.dumps(run_runtime), flush=True)
     checkpoint = None
     inference_only = os.environ.get("SME_INFERENCE_ONLY", "0") == "1"
-    if extended_dynamics or inference_only:
+    checkpoint_evaluation = os.environ.get("SME_EVALUATE_CHECKPOINT", "0") == "1"
+    if extended_dynamics or inference_only or checkpoint_evaluation:
         checkpoint_path = os.environ.get("SME_CHECKPOINT")
         if not checkpoint_path:
             raise ValueError("SME_CHECKPOINT is required for checkpoint inference")
@@ -1074,6 +1075,9 @@ def train(extended_dynamics: bool = False) -> None:
                 atom_feature_names=list(requested_feature_names),
             )
         return
+    if checkpoint_evaluation:
+        model.load_state_dict(checkpoint["state_dict"])
+        model.eval()
     ca_params = list(model.parameters())
     optimizer = torch.optim.Adam(ca_params, lr=CA_LR,
                                  betas=(0.9, 0.999), eps=1e-8)
@@ -1198,6 +1202,35 @@ def train(extended_dynamics: bool = False) -> None:
         )
         return (float(np.sqrt(np.mean((ys - ps) ** 2))), ma_st_rae,
                 complete_per_cyp(per_cyp), ys, ps)
+
+    if checkpoint_evaluation:
+        ridge_state = {
+            key: value.to(device) for key, value in checkpoint["ridge_state"].items()
+        }
+        pairs = observed_pairs(reserved_validation_indices)
+        _, _, _, ys, predictions = evaluate(pairs, ridge_state, bootstrap=False)
+        rows = []
+        for (i, c, _), experimental, prediction in zip(pairs, ys, predictions):
+            record = data["train"][i]
+            low = record["label_conf_low"][c]
+            high = record["label_conf_high"][c]
+            rows.append({
+                "split": "reserved_holdout", "molecule_id": record["name"],
+                "cyp_target": CYPS[c], "experimental_pic50": experimental,
+                "predicted_pic50": prediction, "credible_interval_low": low,
+                "credible_interval_high": high,
+                "soft_threshold_absolute_error": max(low - prediction,
+                                                     prediction - high, 0.0),
+                "residual": prediction - experimental,
+            })
+        OUT.mkdir(parents=True, exist_ok=True)
+        with (OUT / "checkpoint_evaluation_predictions.csv").open(
+                "w", newline="", encoding="utf-8") as handle:
+            writer = csv.DictWriter(handle, fieldnames=rows[0].keys())
+            writer.writeheader(); writer.writerows(rows)
+        print(json.dumps({"checkpoint_evaluation_observations": len(rows),
+                          "active_cyp": ACTIVE_CYP or None}, indent=2))
+        return
 
     history, best, best_rmse, best_state, patience = [], math.inf, math.inf, None, 0
     rng = random.Random(SEED)
