@@ -138,21 +138,21 @@ The third film places four long-horizon regimes on a synchronized 2 × 2 canvas.
 
 <p align="center">
   <a href="results/long_horizon_attractor_campaign_v1/videos/four_graph_ca_dynamical_regimes_2x2.mp4">
-    <img src="results/long_horizon_attractor_campaign_v1/videos/four_graph_ca_dynamical_regimes_2x2_poster.png" width="900" alt="Four synchronized Graph-CA dynamical regimes in a two-by-two video">
+    <img src="results/long_horizon_attractor_campaign_v1/videos/four_graph_ca_dynamical_regimes_2x2_preview.gif" width="900" alt="Animated preview of four synchronized Graph-CA dynamical regimes in a two-by-two video">
   </a>
 </p>
 
-<p align="center"><em>Select the image to open the synchronized 30-second, 4K comparison video.</em></p>
+<p align="center"><em>The animation plays directly in this report. Select it to open the synchronized 30-second, 4K MP4.</em></p>
 
 The fourth film expresses two complete molecular trajectories as one-dimensional cellular-automaton space-time diagrams. Atoms appear as columns in SMILES/RDKit order and successive generations descend as coloured rows. Cellular updates continue to use the true bonded molecular graph. The left panel is the gated-residual point attractor, whose atom states rapidly form stable vertical bands. The right panel is the confirmed Kuramoto–Sakaguchi strange attractor, whose changing colour structure records persistent nonlinear information flow across 5,000 generations.
 
 <p align="center">
   <a href="results/long_horizon_attractor_campaign_v1/videos/point_and_strange_molecular_1d_cellular_automata_side_by_side_tall.mp4">
-    <img src="results/long_horizon_attractor_campaign_v1/videos/point_and_strange_molecular_1d_cellular_automata_side_by_side_tall_poster.png" width="900" alt="Point-attractor and strange-attractor molecular one-dimensional cellular automata shown side by side">
+    <img src="results/long_horizon_attractor_campaign_v1/videos/point_and_strange_molecular_1d_cellular_automata_side_by_side_tall_preview.gif" width="900" alt="Animated point-attractor and strange-attractor molecular one-dimensional cellular automata shown side by side">
   </a>
 </p>
 
-<p align="center"><em>Select the image to open the synchronized 30-second molecular space-time comparison.</em></p>
+<p align="center"><em>The animation plays directly in this report. Select it to open the full-resolution 30-second molecular space-time MP4.</em></p>
 
 The follow-up [structure–dynamics campaign](results/structure_dynamics_publication_v1/README.md) evaluated 258 held-out molecule–CYP cases using repeated Benettin renormalisation after a 1,000-generation burn-in, alongside 187 causal interventions on trajectories 7 and 8. Lower algebraic connectivity showed the strongest univariate association with the largest Lyapunov exponent, with Spearman rho -0.235 and a scaffold-cluster bootstrap 95% interval from -0.352 to -0.118. Molecular weight, graph diameter, mean shortest path, heavy-atom count, graph density, and several three-dimensional shape descriptors were also examined. The strongest intervention changed a single bond in trajectory 8 from single to double and increased its exponent by 0.00367 per generation; several ring-opening interventions reduced instability in trajectory 7. The model receives atom and bond features without Cartesian coordinates, so the three-dimensional descriptors are treated as structural correlates, while frozen-model bond and feature interventions provide the direct computational tests.
 
