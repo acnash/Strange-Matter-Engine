@@ -89,7 +89,7 @@ Endpoint point ST-RAE values were:
 
 On the same sealed validation set, DS-GCAE v1 achieved point MA-ST-RAE 0.784156 and RMSE 0.867775, CFT-DS-GCAE achieved 0.773895 and 0.858630, and CV-CYP-GCA achieved 0.768985 and 0.862535. EA-CV-CYP-GCA produced the lowest internal point MA-ST-RAE, improving on CV-CYP-GCA by 0.014483 and improving RMSE by 0.010255 pIC50.
 
-As of 1 September 2026, the CV-CYP-GCA submission ranked 99th of 111. The organiser reported MA-ST-RAE 1.0171, macro MAE 1.0848, macro R-squared -0.0840, macro Spearman rho 0.5180, and macro Kendall tau 0.3637. This result is the external benchmark for EA-CV-CYP-GCA and supplies aggregate evaluation only; blinded labels remain unavailable and no leaderboard values enter training.
+As of 1 September 2026, the EA-CV-CYP-GCA submission ranked 99th of 111. The organiser reported MA-ST-RAE 1.0071, macro MAE 1.0778, macro R-squared -0.0715, macro Spearman rho 0.5345, and macro Kendall tau 0.3750. Every reported blind metric improved over the preceding CV-CYP-GCA submission. These aggregate results supply external evaluation only; blinded labels remain unavailable and no leaderboard values enter training.
 
 ## Blinded inference and submission
 
@@ -133,6 +133,26 @@ The second visual presents trajectory 7 in a Lorenz-style reduced phase space. T
 </p>
 
 <p align="center"><em>Select the moving preview to open the full 45-second strange-attractor video. Complete trajectories, perturbation histories, Lyapunov spectra, basin tests, and figures are retained in <a href="results/long_horizon_attractor_campaign_v1">the long-horizon campaign archive</a>.</em></p>
+
+The third film places four long-horizon regimes on a synchronized 2 × 2 canvas. The upper-left panel shows gated-residual contraction towards a point attractor; the upper-right panel shows the confirmed Kuramoto–Sakaguchi hyperchaotic strange attractor; the lower-left panel shows persistent complex Kuramoto–Sakaguchi motion; and the lower-right panel shows a coupled-map period-two oscillator candidate. Generation acts as the shared time coordinate, while the fading trajectories reveal the different geometries explored in reduced state space.
+
+<p align="center">
+  <a href="results/long_horizon_attractor_campaign_v1/videos/four_graph_ca_dynamical_regimes_2x2.mp4">
+    <img src="results/long_horizon_attractor_campaign_v1/videos/four_graph_ca_dynamical_regimes_2x2_poster.png" width="900" alt="Four synchronized Graph-CA dynamical regimes in a two-by-two video">
+  </a>
+</p>
+
+<p align="center"><em>Select the image to open the synchronized 30-second, 4K comparison video.</em></p>
+
+The fourth film expresses two complete molecular trajectories as one-dimensional cellular-automaton space-time diagrams. Atoms appear as columns in SMILES/RDKit order and successive generations descend as coloured rows. Cellular updates continue to use the true bonded molecular graph. The left panel is the gated-residual point attractor, whose atom states rapidly form stable vertical bands. The right panel is the confirmed Kuramoto–Sakaguchi strange attractor, whose changing colour structure records persistent nonlinear information flow across 5,000 generations.
+
+<p align="center">
+  <a href="results/long_horizon_attractor_campaign_v1/videos/point_and_strange_molecular_1d_cellular_automata_side_by_side_tall.mp4">
+    <img src="results/long_horizon_attractor_campaign_v1/videos/point_and_strange_molecular_1d_cellular_automata_side_by_side_tall_poster.png" width="900" alt="Point-attractor and strange-attractor molecular one-dimensional cellular automata shown side by side">
+  </a>
+</p>
+
+<p align="center"><em>Select the image to open the synchronized 30-second molecular space-time comparison.</em></p>
 
 The follow-up [structure–dynamics campaign](results/structure_dynamics_publication_v1/README.md) evaluated 258 held-out molecule–CYP cases using repeated Benettin renormalisation after a 1,000-generation burn-in, alongside 187 causal interventions on trajectories 7 and 8. Lower algebraic connectivity showed the strongest univariate association with the largest Lyapunov exponent, with Spearman rho -0.235 and a scaffold-cluster bootstrap 95% interval from -0.352 to -0.118. Molecular weight, graph diameter, mean shortest path, heavy-atom count, graph density, and several three-dimensional shape descriptors were also examined. The strongest intervention changed a single bond in trajectory 8 from single to double and increased its exponent by 0.00367 per generation; several ring-opening interventions reduced instability in trajectory 7. The model receives atom and bond features without Cartesian coordinates, so the three-dimensional descriptors are treated as structural correlates, while frozen-model bond and feature interventions provide the direct computational tests.
 
