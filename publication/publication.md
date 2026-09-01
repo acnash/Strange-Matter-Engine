@@ -4,7 +4,7 @@
 
 ## Abstract
 
-Cytochrome P450 (CYP) inhibition is a major consideration in drug discovery because it can alter drug metabolism and contribute to clinically significant drug–drug interactions. The OpenADMET CYP Inhibition Challenge provides a blinded setting in which to evaluate computational prediction of direct-inhibition pIC50 across four CYP isoforms. Here, we introduce a molecular graph cellular automaton that represents atoms as cells, chemical bonds as local neighbourhoods, and molecular computation as the repeated evolution of a shared, learned transition rule. Our approach retains the complete sequence of atom states and uses its transient and terminal properties to predict CYP inhibition. We call this evolving representation **molecule space-time**: the joint description of molecular structure and its learned progression through computational time. The latest Cross-Validated CYP-Specialist Graph Cellular Automata system trained independent nonlinear dynamics for each isoform and achieved sealed-holdout MA-ST-RAE 0.7690 and RMSE 0.8625 pIC50. The preceding CFT-DS-GCAE OpenADMET blind evaluation returned MA-ST-RAE 1.0120, macro MAE 1.0861, macro R-squared -0.0766, macro Spearman rho 0.4892, and macro Kendall tau 0.3424. As a secondary objective, we investigated the nonlinear dynamics contained within molecule space-time by extending selected trajectories over thousands of generations and examining convergence, recurrence, periodicity, perturbation sensitivity, strange-attractor candidates, and possible chaotic behaviour. This analysis confirmed two bounded Kuramoto–Sakaguchi trajectories with continually regenerated positive Lyapunov exponents and multidirectional expansion. The framework treats prediction and dynamical exploration as complementary views of the same learned molecular process, offering a route toward CYP inhibition models whose internal evolution can be measured, visualised, and studied as a nonlinear system.
+Cytochrome P450 (CYP) inhibition is a major consideration in drug discovery because it can alter drug metabolism and contribute to clinically significant drug–drug interactions. The OpenADMET CYP Inhibition Challenge provides a blinded setting in which to evaluate computational prediction of direct-inhibition pIC50 across four CYP isoforms. Here, we introduce a molecular graph cellular automaton that represents atoms as cells, chemical bonds as local neighbourhoods, and molecular computation as the repeated evolution of a shared, learned transition rule. Our approach retains the complete sequence of atom states and uses its transient and terminal properties to predict CYP inhibition. We call this evolving representation **molecule space-time**: the joint description of molecular structure and its learned progression through computational time. The latest Endpoint-Aligned Cross-Validated CYP-Specialist Graph Cellular Automata system aligned recurrent backpropagation, differentiable ridge fitting, and model selection with one active isoform and achieved sealed-holdout MA-ST-RAE 0.7545 and RMSE 0.8523 pIC50. The preceding CV-CYP-GCA OpenADMET blind evaluation returned MA-ST-RAE 1.0171, macro MAE 1.0848, macro R-squared -0.0840, macro Spearman rho 0.5180, and macro Kendall tau 0.3637. As a secondary objective, we investigated the nonlinear dynamics contained within molecule space-time by extending selected trajectories over thousands of generations and examining convergence, recurrence, periodicity, perturbation sensitivity, strange-attractor candidates, and possible chaotic behaviour. This analysis confirmed two bounded Kuramoto–Sakaguchi trajectories with continually regenerated positive Lyapunov exponents and multidirectional expansion. The framework treats prediction and dynamical exploration as complementary views of the same learned molecular process, offering a route toward CYP inhibition models whose internal evolution can be measured, visualised, and studied as a nonlinear system.
 
 ## Introduction
 
@@ -36,7 +36,7 @@ The response matrix was incomplete because compounds were not necessarily measur
 | CYP3A4 | 2,335 |
 | **Total** | **6,525** |
 
-Each observed compound–CYP pair constituted one supervised regression example. DS-GCAE and CFT-DS-GCAE learned a shared CYP-conditioned mapping, while CV-CYP-GCA trained an independent nonlinear Graph-CA system for each isoform. Missing endpoint values were retained as missing and contributed neither targets nor loss terms. The single-concentration, time-dependent-inhibition, and Emax datasets distributed with the challenge were outside the scope of this direct-inhibition study.
+Each observed compound–CYP pair constituted one supervised regression example. DS-GCAE and CFT-DS-GCAE learned a shared CYP-conditioned mapping. CV-CYP-GCA used independent endpoint models with shared four-endpoint supervision inside recurrent training batches. EA-CV-CYP-GCA aligned each independent nonlinear Graph-CA system with one isoform throughout recurrent backpropagation, differentiable ridge fitting, validation, and checkpoint selection. Missing endpoint values were retained as missing and contributed neither targets nor loss terms. The single-concentration, time-dependent-inhibition, and Emax datasets distributed with the challenge were outside the scope of this direct-inhibition study.
 
 To assess generalisation beyond closely related chemistry, compounds were grouped by their standardised Bemis–Murcko scaffold before data partitioning. A fixed 20% subset of scaffold groups was reserved as a sealed holdout, leaving 5,216 observed compound–CYP pairs for model fitting and internal selection and 1,309 pairs for final validation. No scaffold group occurred in both partitions. Hyperparameter selection was conducted within the fitting pool, while the reserved scaffold holdout remained unused until final evaluation.
 
@@ -177,7 +177,7 @@ Each trajectory was pooled into a molecular fingerprint containing the final ato
 
 ### Machine-Learning Training and Validation
 
-The predictive campaign evaluated DS-GCAE, CFT-DS-GCAE, and the latest Cross-Validated CYP-Specialist Graph Cellular Automata system, abbreviated CV-CYP-GCA. Each nonlinear Graph-CA expert was optimized by backpropagation through time. Adam updated the initialization, message, reaction, and transition-rule parameters with a cosine learning-rate schedule, gradient clipping, and an L2 penalty on cellular-automata weights. Generation count, dynamical-channel count, atom-feature profile, learning rate, ridge penalty, update scale, support fraction, batch size, bond temperature, initialization scale and noise, pooling design, and rule-specific dynamical constants were selected using labelled development data alone.
+The predictive campaign evaluated DS-GCAE, CFT-DS-GCAE, CV-CYP-GCA, and the latest Endpoint-Aligned Cross-Validated CYP-Specialist Graph Cellular Automata system, abbreviated EA-CV-CYP-GCA. Each nonlinear Graph-CA expert was optimized by backpropagation through time. Adam updated the initialization, message, reaction, and transition-rule parameters with a cosine learning-rate schedule, gradient clipping, and an L2 penalty on cellular-automata weights. Generation count, dynamical-channel count, atom-feature profile, learning rate, ridge penalty, update scale, support fraction, batch size, bond temperature, initialization scale and noise, pooling design, and rule-specific dynamical constants were selected using labelled development data alone.
 
 #### Differentiable ridge readout
 
@@ -221,9 +221,9 @@ Model development used five scaffold-grouped folds within the fitting pool. The 
 
 After model freezing, the 20 expert checkpoints generated ten aligned signals for each blinded molecule–CYP pair. Four target-specific stacks produced the continuous pIC50 values, and the selected identity calibrations left them unchanged.
 
-#### Cross-validated CYP-specialist training
+#### Endpoint-aligned cross-validated CYP-specialist training
 
-CV-CYP-GCA trained four independent nonlinear systems, one for each CYP isoform. Every support/query ridge solve, backpropagation loss, early-stopping decision, and checkpoint promotion used observations from the active CYP only. All ten transition rules were screened for each endpoint using two scaffold folds. The three leading rule/configuration pairs per endpoint advanced to five-fold scaffold confirmation with two training seeds. Sparse ridge subset selection was performed from out-of-fold predictions before the sealed holdout was evaluated.
+EA-CV-CYP-GCA trained four independent nonlinear systems, one for each CYP isoform. Every support/query ridge solve, backpropagation loss, early-stopping decision, and checkpoint promotion used observations from the active CYP only. This alignment corrected the preceding CV-CYP-GCA training regime, in which endpoint-specific validation and final readouts were paired with recurrent training batches that still contained all four endpoints. All ten transition rules were screened for each endpoint using two scaffold folds. The three leading rule/configuration pairs per endpoint advanced to five-fold scaffold confirmation with two training seeds. Sparse ridge subset selection was performed from out-of-fold predictions before the sealed holdout was evaluated.
 
 The final CYP1A2 system combined conservative graph flux, delayed memory, and Gray-Scott. CYP2C9 combined damped symplectic and activator-inhibitor. CYP2D6 combined delayed memory and FitzHugh-Nagumo. CYP3A4 combined Gray-Scott, damped symplectic, and coupled map. Each retained rule supplied predictions from five scaffold folds and two seeds, which were averaged before the saved endpoint-specific ridge combination.
 
@@ -312,34 +312,34 @@ The intervention campaign comprised 187 modified and baseline systems evaluated 
 
 #### Sealed internal validation
 
-CV-CYP-GCA was evaluated once on the sealed scaffold holdout containing 1,309 molecule–CYP observations. Its point MA-ST-RAE was 0.7690. Across 1,000 bootstrap resamples, mean MA-ST-RAE was 0.7697 with a 95% interval from 0.7320 to 0.8127. RMSE was 0.8625 pIC50. The complementary bootstrap macro metrics were MAE 0.6296 pIC50, R-squared 0.2694, Spearman rho 0.5218, and Kendall tau 0.3715.
+EA-CV-CYP-GCA was evaluated once on the sealed scaffold holdout containing 1,309 molecule–CYP observations. Its point MA-ST-RAE was 0.7545. Across 1,000 bootstrap resamples, mean MA-ST-RAE was 0.7551 with a 95% interval from 0.7177 to 0.7970. RMSE was 0.8523 pIC50. The complementary bootstrap macro metrics were MAE 0.6218 pIC50, R-squared 0.2864, Spearman rho 0.5327, and Kendall tau 0.3816.
 
-| Metric | CV-CYP-GCA | CFT-DS-GCAE | DS-GCAE |
-|---|---:|---:|---:|
-| Point MA-ST-RAE | **0.7690** | 0.7739 | 0.7842 |
-| Bootstrap mean MA-ST-RAE | **0.7697** | 0.7749 | 0.7850 |
-| 95% bootstrap interval | 0.7320–0.8127 | 0.7356–0.8193 | 0.7464–0.8274 |
-| RMSE, pIC50 | 0.8625 | **0.8586** | 0.8678 |
-| Bootstrap macro MAE, pIC50 | **0.6296** | 0.6323 | 0.6387 |
-| Bootstrap macro R-squared | 0.2694 | **0.2754** | 0.2706 |
-| Bootstrap macro Spearman rho | **0.5218** | 0.5184 | 0.5098 |
-| Bootstrap macro Kendall tau | **0.3715** | 0.3699 | 0.3626 |
+| Metric | EA-CV-CYP-GCA | CV-CYP-GCA | CFT-DS-GCAE | DS-GCAE |
+|---|---:|---:|---:|---:|
+| Point MA-ST-RAE | **0.7545** | 0.7690 | 0.7739 | 0.7842 |
+| Bootstrap mean MA-ST-RAE | **0.7551** | 0.7697 | 0.7749 | 0.7850 |
+| 95% bootstrap interval | 0.7177–0.7970 | 0.7320–0.8127 | 0.7356–0.8193 | 0.7464–0.8274 |
+| RMSE, pIC50 | **0.8523** | 0.8625 | 0.8586 | 0.8678 |
+| Bootstrap macro MAE, pIC50 | **0.6218** | 0.6296 | 0.6323 | 0.6387 |
+| Bootstrap macro R-squared | **0.2864** | 0.2694 | 0.2754 | 0.2706 |
+| Bootstrap macro Spearman rho | **0.5327** | 0.5218 | 0.5184 | 0.5098 |
+| Bootstrap macro Kendall tau | **0.3816** | 0.3715 | 0.3699 | 0.3626 |
 
-The four specialist systems produced point ST-RAE values of 0.8201 for CYP1A2, 0.7514 for CYP2C9, 0.9470 for CYP2D6, and 0.5574 for CYP3A4. CYP2D6 presented the largest residual difficulty on the sealed holdout, while CYP3A4 gave the strongest endpoint result. The point MA-ST-RAE improvement over CFT-DS-GCAE was 0.0049, with overlapping bootstrap intervals indicating a modest internal difference.
+The four endpoint-aligned systems produced point ST-RAE values of 0.8208 for CYP1A2, 0.7246 for CYP2C9, 0.9382 for CYP2D6, and 0.5344 for CYP3A4. CYP2D6 presented the largest residual difficulty on the sealed holdout, while CYP3A4 gave the strongest endpoint result. Endpoint alignment improved point MA-ST-RAE by 0.0145 and RMSE by 0.0103 pIC50 relative to CV-CYP-GCA.
 
 #### OpenADMET blind challenge evaluation
 
-The challenge organisers calculated the official metrics after submission against labels that remained unavailable during model development. The first submission used the dual-scale Graph-CA ensemble (DS-GCAE) and was recorded at rank 80 of 89. The second used CFT-DS-GCAE and was recorded at rank 82 of 90. Because leaderboard membership changed between snapshots, rank differences do not provide a controlled paired comparison; the metric values supply the direct comparison between the two submitted prediction files.
+The challenge organisers calculated the official metrics after submission against labels that remained unavailable during model development. The first submission used the dual-scale Graph-CA ensemble (DS-GCAE) and was recorded at rank 80 of 89. The second used CFT-DS-GCAE and was initially recorded at rank 82 of 90. The CV-CYP-GCA submission stood at rank 99 of 111 on 1 September 2026. Changing leaderboard membership makes rank a time-specific snapshot, while metric values provide the direct comparison between submitted prediction files.
 
-| Official blind metric | DS-GCAE, submission 1 | CFT-DS-GCAE, submission 2 | Change in submission 2 |
+| Official blind metric | DS-GCAE | CFT-DS-GCAE | CV-CYP-GCA |
 |---|---:|---:|---:|
-| MA-ST-RAE | 1.0132 | **1.0120** | -0.0012 |
-| Macro MAE | 1.0893 | **1.0861** | -0.0032 |
-| Macro R-squared | -0.0827 | **-0.0766** | +0.0061 |
-| Macro Spearman rho | 0.4751 | **0.4892** | +0.0141 |
-| Macro Kendall tau | 0.3323 | **0.3424** | +0.0101 |
+| MA-ST-RAE | 1.0132 | **1.0120** | 1.0171 |
+| Macro MAE | 1.0893 | 1.0861 | **1.0848** |
+| Macro R-squared | -0.0827 | **-0.0766** | -0.0840 |
+| Macro Spearman rho | 0.4751 | 0.4892 | **0.5180** |
+| Macro Kendall tau | 0.3323 | 0.3424 | **0.3637** |
 
-Target-specific cross-fitted stacking improved every reported blind metric, with the clearest gains in rank correlation. The blind MA-ST-RAE remained substantially higher than the sealed internal value, and the negative blind macro R-squared indicates that predictive calibration and generalisation across the hidden chemical distribution remain important limitations of the present model. These leaderboard results represent externally calculated challenge outcomes rather than metrics reconstructed from locally available labels.
+CV-CYP-GCA improved macro MAE and both rank correlations relative to the preceding submissions. Its MA-ST-RAE and macro R-squared declined, and the gap between sealed internal and blind performance indicates that calibration and generalisation across the hidden chemical distribution remain important limitations. These leaderboard results represent externally calculated challenge outcomes rather than metrics reconstructed from locally available labels.
 
 ### Nonlinear Dynamics in Molecular Space-Time
 
@@ -377,7 +377,7 @@ The two confirmed strange attractors are a subset of the Kuramoto–Sakaguchi pe
 
 ## Conclusions
 
-We represented drug molecules as connected graph cellular automata in which atoms acted as cells, covalent bonds defined local neighbourhoods, and 16-channel atom states evolved through learned transition rules. Complete trajectories were pooled into molecular fingerprints and linked to CYP1A2, CYP2C9, CYP2D6, and CYP3A4 pIC50 values through differentiable ridge regression. Five transition-rule families and two temporal representations formed DS-GCAE, endpoint-specific cross-fitted ridge stacking produced CFT-DS-GCAE, and endpoint-specific backpropagation subsequently produced CV-CYP-GCA. On the sealed scaffold holdout, CV-CYP-GCA achieved MA-ST-RAE 0.7690 and RMSE 0.8625 pIC50. The preceding CFT-DS-GCAE official OpenADMET blind evaluation returned MA-ST-RAE 1.0120, providing the external benchmark against which the new submission will be assessed.
+We represented drug molecules as connected graph cellular automata in which atoms acted as cells, covalent bonds defined local neighbourhoods, and 16-channel atom states evolved through learned transition rules. Complete trajectories were pooled into molecular fingerprints and linked to CYP1A2, CYP2C9, CYP2D6, and CYP3A4 pIC50 values through differentiable ridge regression. Five transition-rule families and two temporal representations formed DS-GCAE, endpoint-specific cross-fitted ridge stacking produced CFT-DS-GCAE, independent endpoint models produced CV-CYP-GCA, and endpoint-aligned recurrent backpropagation produced EA-CV-CYP-GCA. On the sealed scaffold holdout, EA-CV-CYP-GCA achieved MA-ST-RAE 0.7545 and RMSE 0.8523 pIC50. The preceding CV-CYP-GCA official OpenADMET blind evaluation returned MA-ST-RAE 1.0171, providing the external benchmark against which the new submission will be assessed.
 
 The retained cellular-automata histories also exposed several forms of emergent molecular information dynamics. Across 13,090 screened trajectories we observed contraction towards a point attractor, period-two oscillator candidates, persistent complex motion, and two Kuramoto–Sakaguchi trajectories that satisfied our operational tests for hyperchaotic strange attractors. Their perturbation sensitivity was continually regenerated after renormalization, their leading Lyapunov spectra contained several positive exponents, and perturbed initial conditions remained bounded while approaching the same attracting distribution. Structural association and intervention experiments further indicated that molecular connectivity and bond identity influence the strength of this instability.
 

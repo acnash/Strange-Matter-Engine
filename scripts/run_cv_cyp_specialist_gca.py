@@ -33,8 +33,11 @@ import run_overnight_retrained_ten_rule_cft_ds_gcae as previous
 import run_production_transition_study as production
 from challenge_metrics import bootstrap_regression_report, soft_threshold_rae
 
-STUDY_NAME = "production_cv_cyp_specialist_gca_v1"
+STUDY_NAME = os.environ.get(
+    "SME_CYP_CAMPAIGN_NAME", "production_cv_cyp_specialist_gca_v1"
+)
 STUDY = ROOT / "results" / STUDY_NAME
+ENDPOINT_ALIGNED = os.environ.get("SME_ENDPOINT_ALIGNED", "0") == "1"
 RULES = previous.RULES
 ENDPOINTS = ensemble.ENDPOINTS
 SCREEN_FOLDS = (0, 1)
@@ -102,6 +105,9 @@ def run_path(label: str) -> Path:
 
 def fit(worker: Path, stage, endpoint, rule, variant, config, seed, fold,
         epochs, patience):
+    config = deepcopy(config)
+    if ENDPOINT_ALIGNED:
+        config["specialist_objective"] = "endpoint_only"
     label = run_label(stage, endpoint, rule, variant, seed, fold)
     return production.run_fit(
         rule, STUDY_NAME, label, config, seed, epochs, patience,
@@ -204,23 +210,24 @@ def matrices(selected: dict, split: str):
     for endpoint in ENDPOINTS:
         rules = selected[endpoint]
         maps = []
-        for candidate in rules:
+        reference_rows = {}
+        for candidate_index, candidate in enumerate(rules):
             values = {}
             for seed in SEEDS:
                 for fold in FOLDS:
-                    for row in prediction_rows(endpoint, candidate, seed, fold, split):
+                    candidate_rows = prediction_rows(
+                        endpoint, candidate, seed, fold, split
+                    )
+                    for row in candidate_rows:
                         key = ((int(row.get("fold", fold)) if split == "validation" else 0),
                                row["molecule_id"], endpoint)
                         values.setdefault(key, []).append(float(row["predicted_pic50"]))
+                        if candidate_index == 0:
+                            reference_rows.setdefault(key, row)
             maps.append(values)
         keys = sorted(set.intersection(*(set(mapping) for mapping in maps)))
         for key in keys:
-            reference = None
-            for seed in SEEDS:
-                for fold in FOLDS:
-                    rows = prediction_rows(endpoint, rules[0], seed, fold, split)
-                    reference = next((r for r in rows if r["molecule_id"] == key[1]), reference)
-            row = dict(reference); row["fold"] = key[0]
+            row = dict(reference_rows[key]); row["fold"] = key[0]
             all_rows.append(row)
             all_matrix.append([float(np.mean(mapping[key])) for mapping in maps])
     return all_rows, np.asarray(all_matrix)
@@ -239,14 +246,48 @@ def select_subset(rows, matrix, endpoint):
                 prediction = np.empty(len(x))
                 for fold in sorted(set(folds)):
                     train, held = folds != fold, folds == fold
-                    state = meta.fit_ridge(x[train][:, columns], y[train], penalty)
+                    state = fit_ridge_stable(
+                        x[train][:, columns], y[train], penalty
+                    )
                     prediction[held] = meta.predict_ridge(x[held][:, columns], state)
                 score = float(soft_threshold_rae(y, prediction, low, high))
                 if score < best["score"]:
                     best = {"score": score, "columns": list(columns),
                             "penalty": float(penalty)}
-    best["ridge"] = meta.fit_ridge(x[:, best["columns"]], y, best["penalty"])
+    best["ridge"] = fit_ridge_stable(
+        x[:, best["columns"]], y, best["penalty"]
+    )
     return best
+
+
+def fit_ridge_stable(x: np.ndarray, y: np.ndarray, penalty: float) -> dict:
+    """Fit the small stacking ridge system through PyTorch's stable solver.
+
+    The Windows NumPy LAPACK loader can terminate inside ``numpy.linalg.solve``
+    after a long CUDA campaign.  This equivalent CPU float64 solve avoids that
+    platform failure while retaining the same standardized ridge objective.
+    """
+    import torch
+
+    mean = x.mean(axis=0)
+    scale = x.std(axis=0)
+    scale[scale < 1e-8] = 1.0
+    standardized = (x - mean) / scale
+    target_mean = float(y.mean())
+    design = torch.as_tensor(standardized, dtype=torch.float64)
+    target = torch.as_tensor(y - target_mean, dtype=torch.float64)
+    identity = torch.eye(design.shape[1], dtype=torch.float64)
+    coefficients = torch.linalg.solve(
+        design.T @ design + float(penalty) * identity,
+        design.T @ target,
+    ).cpu().numpy()
+    return {
+        "feature_mean": mean,
+        "feature_scale": scale,
+        "coefficients": coefficients,
+        "intercept": target_mean,
+        "penalty": float(penalty),
+    }
 
 
 def assemble(selected: dict) -> dict:
@@ -272,7 +313,10 @@ def assemble(selected: dict) -> dict:
         output.append(item)
     write_csv(STUDY / "reserved_holdout_predictions.csv", output)
     summary = {
-        "method": "CV-CYP-GCA", "architecture": "cross_validated_cyp_specialist_graph_ca",
+        "method": ("EA-CV-CYP-GCA" if ENDPOINT_ALIGNED else "CV-CYP-GCA"),
+        "architecture": ("endpoint_aligned_cross_validated_cyp_specialist_graph_ca"
+                         if ENDPOINT_ALIGNED else
+                         "cross_validated_cyp_specialist_graph_ca"),
         "specialisation_stage": "nonlinear_ca_backpropagation_and_ridge_readout",
         "screened_rules_per_endpoint": len(RULES), "selected_candidates": selected,
         "final_models": models, "reserved_holdout_point_ma_st_rae": point,
@@ -356,14 +400,17 @@ def generate_blind(worker: Path, selected: dict, summary: dict) -> None:
         wide_rows.append(wide)
     fields = ["SMILES", "Molecule_Name"] + [
         f"{endpoint}_pIC50_direct_inhibition" for endpoint in ENDPOINTS]
-    submission = STUDY / "cv_cyp_gca_submission.csv"
+    submission_name = ("endpoint_aligned_cv_cyp_gca_submission.csv"
+                       if ENDPOINT_ALIGNED else "cv_cyp_gca_submission.csv")
+    submission = STUDY / submission_name
     write_csv(submission, wide_rows, fields)
     long_fields = list(dict.fromkeys(
         key for row in long_rows for key in row.keys()
     ))
     write_csv(STUDY / "blind_predictions_long.csv", long_rows, long_fields)
     manifest = {
-        "method": "CV-CYP-GCA", "submission": str(submission.relative_to(ROOT)),
+        "method": ("EA-CV-CYP-GCA" if ENDPOINT_ALIGNED else "CV-CYP-GCA"),
+        "submission": str(submission.relative_to(ROOT)),
         "rows": len(wide_rows), "columns": fields,
         "finite_predictions": int(len(wide_rows) * len(ENDPOINTS)),
         "expected_predictions": 750 * 4,
@@ -395,7 +442,8 @@ def main() -> None:
         summary = assemble(selected)
     generate_blind(worker, selected, summary)
     progress("complete", summary=summary,
-             submission="cv_cyp_gca_submission.csv")
+             submission=("endpoint_aligned_cv_cyp_gca_submission.csv"
+                         if ENDPOINT_ALIGNED else "cv_cyp_gca_submission.csv"))
     print(json.dumps(meta.serialise(summary), indent=2))
 
 

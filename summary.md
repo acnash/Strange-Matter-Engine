@@ -1,8 +1,8 @@
 # Latest production summary
 
-## Current production candidate: CV-CYP-GCA v1
+## Current production candidate: EA-CV-CYP-GCA v1
 
-Updated: 31 August 2026
+Updated: 1 September 2026
 Hardware: NVIDIA GeForce RTX 5070 Ti, CUDA  
 Primary selection metric: MA-ST-RAE, lower is better
 
@@ -14,24 +14,24 @@ Lower algebraic connectivity was the strongest structural correlate of the large
 
 The strongest causal intervention converted bond 1–2 in `OCNT-2328784` from single to double, increasing the exponent by **0.00367 per generation**. Deleting aromatic bond 8–9 in the same molecule increased it by 0.00304. Several ring openings in `OCNT-0494110` reduced divergence by approximately 0.0014 to 0.0020 per generation, while ablating its elemental identity encoding reduced it by 0.00158. The complete tables and publication figures are stored in [`results/structure_dynamics_publication_v1`](results/structure_dynamics_publication_v1/README.md).
 
-The current candidate is **Cross-Validated CYP-Specialist Graph Cellular Automata (CV-CYP-GCA v1)**. Four independently backpropagated nonlinear systems specialise the cellular dynamics and differentiable ridge readout for CYP1A2, CYP2C9, CYP2D6, and CYP3A4. All ten transition rules were screened for each endpoint, with the three leading configurations confirmed across five scaffold folds and two seeds before sparse rule selection.
+The current candidate is **Endpoint-Aligned Cross-Validated CYP-Specialist Graph Cellular Automata (EA-CV-CYP-GCA v1)**. Four independently backpropagated nonlinear systems specialise cellular dynamics and differentiable ridge readouts for CYP1A2, CYP2C9, CYP2D6, and CYP3A4. Endpoint alignment ensures that each training batch and ridge solve uses the same active CYP as checkpoint selection. All ten rules were screened for each endpoint, with three configurations confirmed across five scaffold folds and two seeds before sparse rule selection.
 
 | Validation result | Value |
 |---|---:|
-| Point MA-ST-RAE | **0.7690** |
-| Bootstrap MA-ST-RAE mean | **0.7697** |
-| 95% bootstrap interval | 0.7320 to 0.8127 |
-| RMSE | 0.8625 pIC50 |
-| CYP1A2 ST-RAE | 0.8201 |
-| CYP2C9 ST-RAE | 0.7514 |
-| CYP2D6 ST-RAE | 0.9470 |
-| CYP3A4 ST-RAE | 0.5574 |
+| Point MA-ST-RAE | **0.7545** |
+| Bootstrap MA-ST-RAE mean | **0.7551** |
+| 95% bootstrap interval | 0.7177 to 0.7970 |
+| RMSE | 0.8523 pIC50 |
+| CYP1A2 ST-RAE | 0.8208 |
+| CYP2C9 ST-RAE | 0.7246 |
+| CYP2D6 ST-RAE | 0.9382 |
+| CYP3A4 ST-RAE | 0.5344 |
 
-The selected rule sets are conservative graph flux, delayed memory, and Gray-Scott for CYP1A2; damped symplectic and activator-inhibitor for CYP2C9; delayed memory and FitzHugh-Nagumo for CYP2D6; and Gray-Scott, damped symplectic, and coupled map for CYP3A4. Ridge penalties are 1000 for CYP1A2 and CYP2D6 and 100 for CYP2C9 and CYP3A4.
+The selected rule sets are FitzHugh-Nagumo, Gray-Scott, and conservative graph flux for CYP1A2; Gray-Scott and damped symplectic for CYP2C9; delayed memory and FitzHugh-Nagumo for CYP2D6; and damped symplectic, FitzHugh-Nagumo, and delayed memory for CYP3A4. Ridge penalties are 1000 for CYP1A2 and CYP2D6 and 100 for CYP2C9 and CYP3A4.
 
-Frozen blind inference evaluates each selected cellular automaton across five scaffold folds and two seeds, averages predictions within each retained rule, and applies the saved endpoint ridge combination. The validated challenge file is retained under `results/production_cv_cyp_specialist_gca_v1`.
+Frozen blind inference evaluates each selected cellular automaton across five scaffold folds and two seeds, averages predictions within each retained rule, and applies the saved endpoint ridge combination. The validated challenge file is retained under `results/production_endpoint_aligned_cv_cyp_gca_v1`.
 
-CV-CYP-GCA improves over CFT-DS-GCAE by 0.0049 point MA-ST-RAE on the sealed validation set. The overlapping bootstrap intervals support treating this as a modest candidate improvement pending organiser evaluation.
+EA-CV-CYP-GCA improves over CV-CYP-GCA by 0.0145 point MA-ST-RAE and 0.0103 pIC50 RMSE on the sealed validation set. As of 1 September, the preceding CV-CYP-GCA submission stands 99th of 111 with official MA-ST-RAE 1.0171, macro MAE 1.0848, macro R-squared -0.0840, macro Spearman rho 0.5180, and macro Kendall tau 0.3637.
 
 ## Challenge-aligned v5 production campaign complete
 

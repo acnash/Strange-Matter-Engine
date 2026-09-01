@@ -74,6 +74,13 @@ ACTIVE_CYP = os.environ.get("SME_ACTIVE_CYP", "").strip()
 if ACTIVE_CYP and ACTIVE_CYP not in CYPS:
     raise ValueError(f"SME_ACTIVE_CYP must be one of {CYPS}, received {ACTIVE_CYP!r}")
 ACTIVE_CYP_INDEX = CYPS.index(ACTIVE_CYP) if ACTIVE_CYP else None
+SPECIALIST_OBJECTIVE = os.environ.get("SME_SPECIALIST_OBJECTIVE", "shared")
+if SPECIALIST_OBJECTIVE not in {"shared", "endpoint_only"}:
+    raise ValueError(
+        "SME_SPECIALIST_OBJECTIVE must be 'shared' or 'endpoint_only'"
+    )
+if SPECIALIST_OBJECTIVE == "endpoint_only" and ACTIVE_CYP_INDEX is None:
+    raise ValueError("endpoint_only training requires SME_ACTIVE_CYP")
 LABEL_COLS = tuple(f"{c}_pIC50_direct_inhibition" for c in CYPS)
 LABEL_HIGH_COLS = tuple(f"{col}_conf_high" for col in LABEL_COLS)
 LABEL_LOW_COLS = tuple(f"{col}_conf_low" for col in LABEL_COLS)
@@ -1253,10 +1260,16 @@ def train(extended_dynamics: bool = False) -> None:
             support_batch, query_batch = [], []
             for i in support_molecules:
                 for c, y in enumerate(data["train"][i]["labels"]):
-                    if np.isfinite(y): support_batch.append((i, c, float(y)))
+                    if (np.isfinite(y) and
+                            (SPECIALIST_OBJECTIVE != "endpoint_only" or
+                             c == ACTIVE_CYP_INDEX)):
+                        support_batch.append((i, c, float(y)))
             for i in query_molecules:
                 for c, y in enumerate(data["train"][i]["labels"]):
-                    if np.isfinite(y): query_batch.append((i, c, float(y)))
+                    if (np.isfinite(y) and
+                            (SPECIALIST_OBJECTIVE != "endpoint_only" or
+                             c == ACTIVE_CYP_INDEX)):
+                        query_batch.append((i, c, float(y)))
             if len(support_batch) < 2 or not query_batch:
                 continue
             optimizer.zero_grad()
@@ -1355,6 +1368,7 @@ def train(extended_dynamics: bool = False) -> None:
                 "trajectory_pooling": TRAJECTORY_POOLING,
                 "ridge_mode": RIDGE_MODE,
                 "loss_mode": LOSS_MODE,
+                "specialist_objective": SPECIALIST_OBJECTIVE,
                 "interval_loss_beta": INTERVAL_LOSS_BETA,
                 "interval_temperature": INTERVAL_TEMPERATURE,
                 "ridge_state": {k: v.detach().cpu() for k, v in final_ridge_state.items()},
@@ -1459,6 +1473,7 @@ def train(extended_dynamics: bool = False) -> None:
         "trajectory_pooling": TRAJECTORY_POOLING,
         "ridge_mode": RIDGE_MODE,
         "loss_mode": LOSS_MODE,
+        "specialist_objective": SPECIALIST_OBJECTIVE,
         "interval_loss_beta": INTERVAL_LOSS_BETA,
         "interval_temperature": INTERVAL_TEMPERATURE,
         "hyperparameters": {"ca_lr": CA_LR,
