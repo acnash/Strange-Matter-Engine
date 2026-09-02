@@ -39,9 +39,27 @@ def _(mo):
           --magenta: #ff38c7;
           --violet: #9678ff;
           --ink: #e9fbff;
-          --muted: #91a9bd;
+          --obs-muted: #91a9bd;
+          --background: 232 49% 4%;
+          --foreground: 187 100% 95%;
+          --card: 225 56% 9%;
+          --card-foreground: 187 100% 95%;
+          --popover: 225 56% 9%;
+          --popover-foreground: 187 100% 95%;
+          --primary: 183 100% 57%;
+          --primary-foreground: 232 49% 4%;
+          --secondary: 267 44% 18%;
+          --secondary-foreground: 187 100% 95%;
+          --muted: 224 28% 16%;
+          --muted-foreground: 207 24% 66%;
+          --accent: 315 100% 61%;
+          --accent-foreground: 232 49% 4%;
+          --border: 187 70% 25%;
+          --input: 224 36% 16%;
+          --ring: 183 100% 57%;
         }
-        body, .marimo, .marimo-main {
+        html, body, .marimo, .marimo-main, marimo-app {
+          color-scheme: dark !important;
           background:
             radial-gradient(circle at 18% 0%, rgba(34,245,255,.10), transparent 34rem),
             radial-gradient(circle at 88% 18%, rgba(255,56,199,.09), transparent 30rem),
@@ -49,9 +67,24 @@ def _(mo):
           color: var(--ink) !important;
         }
         .marimo-main { max-width: 1440px !important; }
-        h1, h2, h3 { color: var(--ink) !important; letter-spacing: .02em; }
+        marimo-cell, .marimo-cell, .output-area, .cell-output, .marimo-output,
+        [data-testid="cell-output"], [data-testid="output"] {
+          background: transparent !important; color: var(--ink) !important;
+        }
+        .cm-editor, .cm-scroller, .cm-gutters, .cm-content,
+        [data-testid="cell-editor"], [data-testid="cell-editor"] * {
+          background-color: #09101d !important; color: #dffcff !important;
+        }
+        button, input, select, [role="combobox"], [role="listbox"], [role="option"] {
+          background-color: #0b1424 !important; color: var(--ink) !important;
+          border-color: rgba(34,245,255,.34) !important;
+        }
+        [role="option"]:hover, [role="option"][aria-selected="true"] {
+          background-color: #182441 !important; color: var(--cyan) !important;
+        }
+        h1, h2, h3, h4, strong, b { color: var(--ink) !important; letter-spacing: .02em; }
         h2 { border-bottom: 1px solid rgba(34,245,255,.3); padding-bottom: .45rem; }
-        p, li, td, th, label { color: var(--ink); }
+        p, li, td, th, label, span { color: inherit; }
         code { color: var(--cyan) !important; background: rgba(34,245,255,.08) !important; }
         a { color: var(--cyan) !important; }
         .hero-shell {
@@ -68,9 +101,25 @@ def _(mo):
         .hero-title { margin: .55rem 0 .4rem; font-size: clamp(2.4rem, 6vw, 5.8rem); line-height: .92;
           background: linear-gradient(90deg, #f6ffff 8%, var(--cyan) 52%, var(--magenta));
           -webkit-background-clip: text; color: transparent; text-transform: uppercase; }
-        .hero-copy { max-width: 850px; color: var(--muted); font-size: 1.08rem; }
+        .hero-copy { max-width: 850px; color: var(--obs-muted); font-size: 1.08rem; }
         .signal-card { border: 1px solid rgba(150,120,255,.28); border-radius: 16px;
           background: var(--panel); padding: 1rem 1.2rem; box-shadow: inset 0 0 30px rgba(34,245,255,.025); }
+        .obs-panel { color: var(--ink); border: 1px solid rgba(34,245,255,.26);
+          border-radius: 16px; background: #091221; padding: 1.2rem 1.35rem; margin: .35rem 0; }
+        .obs-panel h2, .obs-panel h3, .obs-panel strong { color: #ffffff !important; }
+        .obs-panel .accent { color: var(--magenta) !important; }
+        .obs-panel .metric { color: #ffffff !important; font-family: monospace; }
+        .obs-table-shell { overflow-x: auto; border: 1px solid rgba(34,245,255,.3);
+          border-radius: 15px; background: #08111f; padding: .5rem; }
+        .obs-table { width: 100%; border-collapse: collapse; background: #08111f !important; }
+        .obs-table th { color: var(--cyan) !important; background: #101b30 !important;
+          text-align: left; padding: .72rem; border-bottom: 1px solid rgba(34,245,255,.35); }
+        .obs-table td { color: var(--ink) !important; background: #08111f !important;
+          padding: .68rem; border-bottom: 1px solid rgba(145,169,189,.13); }
+        .obs-table tr:hover td { background: #101b30 !important; }
+        footer, footer *, [data-testid="footer"], [data-testid="footer"] * {
+          background: #050711 !important; color: var(--obs-muted) !important;
+        }
         </style>
         <section class="hero-shell">
           <div class="eyebrow">OPENADMET × STRANGE MATTER ENGINE // LIVE GRAPH SIGNAL</div>
@@ -182,7 +231,16 @@ def _(cascades, dynamic_case, generation, go, mo):
                 color=cascade_view["activity"],
                 colorscale=[[0, "#22f5ff"], [0.5, "#9678ff"], [1, "#ff38c7"]],
                 opacity=0.48,
-                colorbar=dict(title="Learned<br>activity", thickness=12),
+                cmin=0,
+                cmax=100,
+                colorbar=dict(
+                    title=dict(text="Learned<br>activity", font=dict(color="#ffffff")),
+                    thickness=10,
+                    len=0.38,
+                    y=0.77,
+                    tickfont=dict(color="#ffffff"),
+                    outlinewidth=0,
+                ),
             ),
             customdata=cascade_view[["generation", "atom", "element"]],
             hovertemplate="generation %{customdata[0]}<br>atom %{customdata[1]} · %{customdata[2]}<br>activity %{marker.color:.2f}<extra></extra>",
@@ -207,10 +265,19 @@ def _(cascades, dynamic_case, generation, go, mo):
         title="MOLECULAR INFORMATION CASCADE",
         legend=dict(bgcolor="rgba(5,7,17,.7)"),
         scene=dict(
-            bgcolor="#050711",
-            xaxis=dict(title="molecular x", gridcolor="#163044", zerolinecolor="#22f5ff"),
-            yaxis=dict(title="molecular z", gridcolor="#163044", zerolinecolor="#22f5ff"),
-            zaxis=dict(title="generation descent", gridcolor="#281b45", autorange="reversed"),
+            bgcolor="rgba(0,0,0,0)",
+            xaxis=dict(
+                title="molecular x", showbackground=False, showgrid=False,
+                showline=False, zeroline=False, color="#ffffff",
+            ),
+            yaxis=dict(
+                title="molecular z", showbackground=False, showgrid=False,
+                showline=False, zeroline=False, color="#ffffff",
+            ),
+            zaxis=dict(
+                title="generation descent", showbackground=False, showgrid=False,
+                showline=False, zeroline=False, color="#ffffff", autorange="reversed",
+            ),
             camera=dict(eye=dict(x=1.45, y=1.55, z=0.72)),
             aspectmode="data",
         ),
@@ -252,7 +319,9 @@ def _(dynamic_case, dynamic_record, go, mo, phase_trajectories):
         f"""
         ### Reading the orbit
 
-        This projection compresses the multichannel graph state into its first three dynamical components. The selected orbit has a measured correlation dimension of **{dynamic_record['correlation_dimension']:.2f}**, recurrence determinism of **{dynamic_record['recurrence_determinism']:.2f}**, and a dominant period of **{dynamic_record['dominant_period']:.1f} generations**. Rotate and zoom the orbit to inspect whether it collapses, cycles, or continues to explore structured state space.
+        Each point is the complete molecular graph state at one generation after the 1,000-generation burn-in. Principal-component analysis compresses every atom and learned channel into three coordinates, so the path shows how the system revisits or explores its internal state space through time. A tight point indicates convergence, a closed loop indicates periodic motion, a torus-like path suggests quasiperiodicity, and a folded orbit that continues to explore nearby regions is compatible with complex or strange-attractor-like behaviour.
+
+        The selected orbit has a measured correlation dimension of **{dynamic_record['correlation_dimension']:.2f}**, recurrence determinism of **{dynamic_record['recurrence_determinism']:.2f}**, and a dominant period of **{dynamic_record['dominant_period']:.1f} generations**. Rotate and zoom the orbit, then switch systems to compare their geometry.
         """
     )
     mo.vstack([mo.ui.plotly(phase_figure, config={"displaylogo": False}), interpretation])
@@ -348,6 +417,21 @@ def _(alt, colour_metric, isoform, isoform_cohort, mo):
             ],
         )
         .properties(height=420, title=f"{isoform.value}: assay potency versus learned instability")
+        .configure(background="#050711")
+        .configure_view(stroke=None)
+        .configure_axis(
+            labelColor="#e9fbff",
+            titleColor="#e9fbff",
+            gridColor="#16243a",
+            domainColor="#91a9bd",
+            tickColor="#91a9bd",
+        )
+        .configure_title(color="#e9fbff")
+        .configure_legend(
+            labelColor="#e9fbff",
+            titleColor="#e9fbff",
+            gradientStrokeColor="#22f5ff",
+        )
         .interactive()
     )
     mo.ui.altair_chart(atlas_chart)
@@ -398,7 +482,7 @@ def _(mo):
 
 
 @app.cell
-def _(alt, mo, pd, regime_summary):
+def _(go, mo, pd, regime_summary):
     regime_order = regime_summary.copy()
     for column in (
         "adjusted_silhouette",
@@ -409,27 +493,43 @@ def _(alt, mo, pd, regime_summary):
     regime_order = regime_order.dropna(subset=["adjusted_silhouette"]).sort_values(
         "adjusted_silhouette", ascending=False
     )
-    regime_chart = (
-        alt.Chart(regime_order)
-        .mark_bar(cornerRadiusEnd=4)
-        .encode(
-            x=alt.X("adjusted_silhouette:Q", title="Adjusted CYP silhouette score"),
-            y=alt.Y("rule:N", sort="-x", title=None),
-            color=alt.Color(
-                "adjusted_silhouette:Q",
-                scale=alt.Scale(scheme="teals"),
-                legend=None,
+    regime_order["rule_label"] = regime_order["rule"].str.replace("_", " ").str.title()
+    regime_chart = go.Figure(
+        go.Bar(
+            x=regime_order["adjusted_silhouette"],
+            y=regime_order["rule_label"],
+            orientation="h",
+            marker=dict(
+                color=regime_order["adjusted_silhouette"],
+                colorscale=[[0, "#49566d"], [0.35, "#22f5ff"], [1, "#ff38c7"]],
+                line=dict(color="#dffcff", width=0.5),
             ),
-            tooltip=[
-                alt.Tooltip("rule:N", title="Transition rule"),
-                alt.Tooltip("adjusted_silhouette:Q", format=".3f"),
-                alt.Tooltip("adjusted_permutation_p:Q", title="Permutation p", format=".3g"),
-                alt.Tooltip("adjusted_n_molecules:Q", title="Molecules"),
-            ],
+            customdata=regime_order[["adjusted_permutation_p", "adjusted_n_molecules"]],
+            hovertemplate=(
+                "%{y}<br>adjusted silhouette %{x:.3f}"
+                "<br>permutation p %{customdata[0]:.3g}"
+                "<br>molecules %{customdata[1]:.0f}<extra></extra>"
+            ),
         )
-        .properties(height=330)
     )
-    mo.ui.altair_chart(regime_chart)
+    regime_chart.update_layout(
+        height=480,
+        paper_bgcolor="#050711",
+        plot_bgcolor="#050711",
+        font=dict(color="#e9fbff", family="monospace"),
+        margin=dict(l=220, r=35, t=25, b=65),
+        bargap=0.28,
+        xaxis=dict(
+            title="Adjusted CYP silhouette score",
+            gridcolor="#16243a",
+            zeroline=True,
+            zerolinecolor="#ffffff",
+            zerolinewidth=1,
+        ),
+        yaxis=dict(autorange="reversed", gridcolor="rgba(0,0,0,0)"),
+        showlegend=False,
+    )
+    mo.ui.plotly(regime_chart, config={"displaylogo": False})
     return
 
 
@@ -441,17 +541,18 @@ def _(descriptor_correlations, mo):
     strongest_feature = overall_correlations.loc[
         overall_correlations["spearman_rho"].abs().idxmax()
     ]
-    mo.callout(
-        mo.md(
-            f"""
-            ### Structural clue
-
-            The strongest univariate structural association with learned instability is **{strongest_feature['feature'].replace('_', ' ')}**, with Spearman ρ = **{strongest_feature['spearman_rho']:.3f}** across the held-out cohort.
-
-            This is an association within the learned system. Scaffold-grouped validation and frozen-model interventions provide the stronger tests shown in the next build.
-            """
-        ),
-        kind="success",
+    mo.Html(
+        f"""
+        <section class="obs-panel">
+          <div class="eyebrow">STRUCTURE CHANNEL // ASSOCIATION</div>
+          <h3>Structural clue</h3>
+          <p>The strongest univariate structural association with learned instability is
+          <strong class="accent">{strongest_feature['feature'].replace('_', ' ')}</strong>,
+          with Spearman ρ = <strong class="metric">{strongest_feature['spearman_rho']:.3f}</strong>
+          across the held-out cohort.</p>
+          <p>This association describes the learned system. Scaffold-grouped validation and frozen-model interventions provide stronger tests.</p>
+        </section>
+        """
     )
     return
 
@@ -479,8 +580,18 @@ def _(attractors, mo):
             "dominant_period": "Dominant period",
         }
     )
-    mo.md("## Long-horizon candidates")
-    mo.ui.table(attractor_view, selection=None, pagination=False)
+    attractor_html = attractor_view.to_html(
+        classes="obs-table",
+        border=0,
+        index=False,
+        float_format=lambda value: f"{value:.3f}",
+    )
+    mo.vstack(
+        [
+            mo.md("## Long-horizon candidates"),
+            mo.Html(f'<div class="obs-table-shell">{attractor_html}</div>'),
+        ]
+    )
     return
 
 
@@ -489,49 +600,48 @@ def _(interventions, mo):
     strongest_intervention = interventions.iloc[
         interventions["lyapunov_change"].abs().argmax()
     ]
-    mo.callout(
-        mo.md(
-            f"""
-            ## A controlled computational intervention
-
-            The largest frozen-model intervention in the current campaign occurs for **{strongest_intervention['molecule_id']}** at **{strongest_intervention['cyp_target']}**. Changing **{strongest_intervention['intervention']}** at `{strongest_intervention['target']}` shifts the largest Lyapunov exponent by **{strongest_intervention['lyapunov_change']:+.5f} per generation**.
-
-            Every learned parameter stays fixed during these interventions. The edit isolates how an encoded bond or atom-feature contribution controls the resulting graph-state instability.
-            """
-        ),
-        kind="warn",
+    mo.Html(
+        f"""
+        <section class="obs-panel">
+          <div class="eyebrow">FROZEN MODEL // CONTROLLED INTERVENTION</div>
+          <h2>A controlled computational intervention</h2>
+          <p>The largest intervention occurs for <strong class="accent">{strongest_intervention['molecule_id']}</strong>
+          at <strong>{strongest_intervention['cyp_target']}</strong>. Changing
+          <strong>{strongest_intervention['intervention']}</strong> at
+          <code>{strongest_intervention['target']}</code> shifts the largest Lyapunov exponent by
+          <strong class="metric">{strongest_intervention['lyapunov_change']:+.5f} per generation</strong>.</p>
+          <p>Every learned parameter stays fixed during the intervention. The edit isolates how an encoded bond or atom-feature contribution controls graph-state instability.</p>
+        </section>
+        """
     )
     return
 
 
 @app.cell
 def _(mo):
-    mo.callout(
-        mo.md(
-            r"""
-            ## Current answer
-
-            The learned graph dynamics contain reproducible structure associated with CYP conditioning, molecular connectivity, and chemically meaningful computational interventions. The present evidence supports a relationship between molecular constitution and the stability of the learned trajectories. The next stage will test whether this dynamical information improves within-scaffold explanation of assay variation and will expose atom-level trajectories through linked interactive views.
-
-            ### Interpretation boundary
-
-            These trajectories describe learned information propagation over molecular graphs. They do not simulate atomic motion, conformational sampling, binding kinetics, or enzyme structure.
-            """
-        ),
-        kind="neutral",
+    mo.Html(
+        """
+        <section class="obs-panel">
+          <div class="eyebrow">OBSERVATORY SYNTHESIS // CURRENT EVIDENCE</div>
+          <h2>Current answer</h2>
+          <p>The learned graph dynamics contain reproducible structure associated with CYP conditioning, molecular connectivity, and chemically meaningful computational interventions. The evidence supports a relationship between molecular constitution and the stability of the learned trajectories.</p>
+          <h3>Interpretation boundary</h3>
+          <p>These trajectories describe learned information propagation over molecular graphs. They do not simulate atomic motion, conformational sampling, binding kinetics, or enzyme structure.</p>
+        </section>
+        """
     )
     return
 
 
 @app.cell
 def _(mo):
-    mo.md(
-        r"""
-        ### Data provenance and AI disclosure
-
-        The assay measurements originate from the released OpenADMET CYP Inhibition Blind Challenge training data. The dynamical tables were generated by the Strange Matter Engine analysis pipeline from held-out molecule–CYP cases. Source files, preparation code, statistical outputs, and this notebook are version-controlled in the public GitHub repository.
-
-        OpenAI Codex assisted with notebook engineering, interface implementation, testing, and editorial refinement under human scientific direction. Scientific claims are tied to reproducible outputs and explicitly stated interpretation boundaries.
+    mo.Html(
+        """
+        <section class="obs-panel">
+          <h3>Data provenance and AI disclosure</h3>
+          <p>The assay measurements originate from the released OpenADMET CYP Inhibition Blind Challenge training data. The dynamical tables were generated by the Strange Matter Engine analysis pipeline from held-out molecule–CYP cases. Source files, preparation code, statistical outputs, and this notebook are version-controlled in the public GitHub repository.</p>
+          <p>OpenAI Codex assisted with notebook engineering, interface implementation, testing, and editorial refinement under human scientific direction. Scientific claims are tied to reproducible outputs and explicitly stated interpretation boundaries.</p>
+        </section>
         """
     )
     return
