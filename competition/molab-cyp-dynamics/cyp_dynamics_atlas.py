@@ -47,6 +47,9 @@ def _(pd):
     cohort = pd.read_csv(f"{raw_base}/cyp_dynamics_cohort.csv")
     regime_summary = pd.read_csv(f"{raw_base}/dynamical_regime_summary.csv")
     descriptor_correlations = pd.read_csv(f"{raw_base}/descriptor_correlations.csv")
+    descriptor_correlations["scope"] = descriptor_correlations["scope"].replace(
+        {"all": "overall"}
+    )
     interventions = pd.read_csv(f"{raw_base}/causal_interventions.csv")
     attractors = pd.read_csv(f"{raw_base}/attractor_screen.csv")
     return attractors, cohort, descriptor_correlations, interventions, regime_summary
@@ -191,8 +194,17 @@ def _(mo):
 
 
 @app.cell
-def _(alt, mo, regime_summary):
-    regime_order = regime_summary.sort_values("adjusted_silhouette", ascending=False)
+def _(alt, mo, pd, regime_summary):
+    regime_order = regime_summary.copy()
+    for column in (
+        "adjusted_silhouette",
+        "adjusted_permutation_p",
+        "adjusted_n_molecules",
+    ):
+        regime_order[column] = pd.to_numeric(regime_order[column], errors="coerce")
+    regime_order = regime_order.dropna(subset=["adjusted_silhouette"]).sort_values(
+        "adjusted_silhouette", ascending=False
+    )
     regime_chart = (
         alt.Chart(regime_order)
         .mark_bar(cornerRadiusEnd=4)
@@ -222,8 +234,8 @@ def _(descriptor_correlations, mo):
     overall_correlations = descriptor_correlations[
         descriptor_correlations["scope"] == "overall"
     ].copy()
-    strongest_feature = overall_correlations.iloc[
-        overall_correlations["spearman_rho"].abs().argmax()
+    strongest_feature = overall_correlations.loc[
+        overall_correlations["spearman_rho"].abs().idxmax()
     ]
     mo.callout(
         mo.md(
