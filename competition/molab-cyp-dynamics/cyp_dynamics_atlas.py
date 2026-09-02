@@ -117,6 +117,19 @@ def _(mo):
         .obs-table td { color: var(--ink) !important; background: #08111f !important;
           padding: .68rem; border-bottom: 1px solid rgba(145,169,189,.13); }
         .obs-table tr:hover td { background: #101b30 !important; }
+        .molecule-canvas { min-height: 340px; display: grid; place-items: center;
+          border: 1px solid rgba(34,245,255,.24); border-radius: 16px;
+          background: #f5f8fb; overflow: hidden; }
+        .molecule-canvas svg { width: 100%; height: auto; display: block; }
+        .profile-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .7rem; }
+        .profile-grid > div { display: flex; flex-direction: column; gap: .25rem;
+          padding: .8rem; border: 1px solid rgba(34,245,255,.17); border-radius: 10px;
+          background: #0c1728 !important; }
+        .profile-grid span, .smiles-line > span { color: var(--obs-muted) !important;
+          font: 700 .72rem/1.3 monospace; letter-spacing: .08em; text-transform: uppercase; }
+        .profile-grid strong { color: #ffffff !important; font: 700 1.05rem/1.3 monospace; }
+        .smiles-line { display: flex; flex-direction: column; gap: .35rem; margin-top: 1rem; }
+        .smiles-line code { overflow-wrap: anywhere; }
         footer, footer *, [data-testid="footer"], [data-testid="footer"] * {
           background: #050711 !important; color: var(--obs-muted) !important;
         }
@@ -190,6 +203,9 @@ def _(attractors, cascades, mo):
         [
             mo.md("## Enter the signal"),
             mo.hstack([dynamic_case, generation], widths=[2, 3], gap=2),
+            mo.md(
+                "_What this cell does: choose one precomputed molecule–CYP dynamical system and move the generation control to reveal how its learned atomic activity accumulates through time._"
+            ),
         ]
     )
     return available_cases, dynamic_case, generation
@@ -200,7 +216,7 @@ def _(available_cases, dynamic_case, generation, mo):
     dynamic_record = available_cases.loc[
         available_cases["case_id"] == dynamic_case.value
     ].iloc[0]
-    mo.Html(
+    signal_summary = mo.Html(
         f"""
         <div class="signal-card">
           <div class="eyebrow">ACTIVE TRANSMISSION // GENERATION {generation.value:04d}</div>
@@ -209,6 +225,14 @@ def _(available_cases, dynamic_case, generation, mo):
           <p>Late motion {dynamic_record['late_motion']:.3g} · correlation dimension {dynamic_record['correlation_dimension']:.2f} · spectral entropy {dynamic_record['spectral_entropy']:.2f}</p>
         </div>
         """
+    )
+    mo.vstack(
+        [
+            signal_summary,
+            mo.md(
+                "_What this cell shows: the identity and dynamical classification of the active trajectory, together with summary measurements of its late motion, dimensionality, and spectral complexity._"
+            ),
+        ]
     )
     return dynamic_record
 
@@ -282,7 +306,14 @@ def _(cascades, dynamic_case, generation, go, mo):
             aspectmode="data",
         ),
     )
-    mo.ui.plotly(cascade_figure, config={"displaylogo": False})
+    mo.vstack(
+        [
+            mo.ui.plotly(cascade_figure, config={"displaylogo": False}),
+            mo.md(
+                "_What this cell shows: every horizontal molecular slice is a sampled generation. Colour records learned atom activity from 0 to 100, while the descending spiral makes the history of information propagation visible. Drag to rotate, scroll to zoom, and move the generation control above to grow or contract the history._"
+            ),
+        ]
+    )
     return
 
 
@@ -346,7 +377,15 @@ def _(mo):
         value="Dynamical instability",
         label="Colour the atlas by",
     )
-    mo.hstack([isoform, colour_metric], justify="start", gap=2)
+    mo.vstack(
+        [
+            mo.md("## Potency and instability across the cohort"),
+            mo.hstack([isoform, colour_metric], justify="start", gap=2),
+            mo.md(
+                "_What this cell does: select a CYP isoform and choose the molecular or dynamical quantity used to colour the cohort atlas below._"
+            ),
+        ]
+    )
     return colour_metric, isoform
 
 
@@ -363,7 +402,14 @@ def _(cohort, isoform, mo):
         label="Inspect a molecule",
         searchable=True,
     )
-    molecule
+    mo.vstack(
+        [
+            molecule,
+            mo.md(
+                "_What this cell does: choose one assayed compound from the active CYP cohort for chemical and dynamical inspection._"
+            ),
+        ]
+    )
     return isoform_cohort, molecule
 
 
@@ -374,7 +420,7 @@ def _(cohort, isoform, mo):
     measured_cases = int(
         cohort.loc[cohort["cyp_target"] == isoform.value, "measured_pic50"].notna().sum()
     )
-    mo.hstack(
+    cohort_stats = mo.hstack(
         [
             mo.stat(value=f"{total_molecules:,}", label="Unique molecules"),
             mo.stat(value=f"{isoform_cases:,}", label=f"{isoform.value} trajectories"),
@@ -383,6 +429,14 @@ def _(cohort, isoform, mo):
         ],
         widths="equal",
         gap=1,
+    )
+    mo.vstack(
+        [
+            cohort_stats,
+            mo.md(
+                "_What this cell shows: the coverage of the competition cohort and the burn-in period discarded before long-horizon dynamical measurements were calculated._"
+            ),
+        ]
     )
     return
 
@@ -434,7 +488,14 @@ def _(alt, colour_metric, isoform, isoform_cohort, mo):
         )
         .interactive()
     )
-    mo.ui.altair_chart(atlas_chart)
+    mo.vstack(
+        [
+            mo.ui.altair_chart(atlas_chart),
+            mo.md(
+                "_What this cell shows: each point is one measured molecule–CYP case. Horizontal position is experimental inhibition potency, vertical position is learned instability, and colour is the descriptor selected above. Zoom and hover to inspect individual compounds._"
+            ),
+        ]
+    )
     return
 
 
@@ -449,23 +510,36 @@ def _(Chem, Draw, cohort, molecule, mo):
         subImgSize=(460, 330),
         useSVG=True,
     )
-    selected_facts = mo.md(
+    selected_facts = mo.Html(
         f"""
-        ### {selected_record['molecule_id']} · {selected_record['cyp_target']}
-
-        | Measurement | Value |
-        |:--|--:|
-        | Direct-inhibition pIC50 | **{selected_record['measured_pic50']:.2f}** |
-        | Largest Lyapunov exponent | **{selected_record['mean_lyapunov']:.5f}** |
-        | Molecular weight | {selected_record['molecular_weight']:.1f} |
-        | logP | {selected_record['logp']:.2f} |
-        | Topological polar surface area | {selected_record['tpsa']:.1f} Å² |
-        | Algebraic connectivity | {selected_record['algebraic_connectivity']:.4f} |
-
-        **SMILES:** `{selected_record['smiles']}`
+        <section class="obs-panel molecule-profile">
+          <div class="eyebrow">MOLECULAR PROFILE // {selected_record['cyp_target']}</div>
+          <h3>{selected_record['molecule_id']}</h3>
+          <div class="profile-grid">
+            <div><span>Direct-inhibition pIC50</span><strong>{selected_record['measured_pic50']:.2f}</strong></div>
+            <div><span>Largest Lyapunov exponent</span><strong>{selected_record['mean_lyapunov']:.5f}</strong></div>
+            <div><span>Molecular weight</span><strong>{selected_record['molecular_weight']:.1f}</strong></div>
+            <div><span>logP</span><strong>{selected_record['logp']:.2f}</strong></div>
+            <div><span>Polar surface area</span><strong>{selected_record['tpsa']:.1f} Å²</strong></div>
+            <div><span>Algebraic connectivity</span><strong>{selected_record['algebraic_connectivity']:.4f}</strong></div>
+          </div>
+          <p class="smiles-line"><span>SMILES</span><code>{selected_record['smiles']}</code></p>
+        </section>
         """
     )
-    mo.hstack([mo.Html(selected_svg), selected_facts], widths=[1, 1.25], gap=2)
+    molecule_view = mo.hstack(
+        [mo.Html(f'<div class="molecule-canvas">{selected_svg}</div>'), selected_facts],
+        widths=[1, 1.25],
+        gap=2,
+    )
+    mo.vstack(
+        [
+            molecule_view,
+            mo.md(
+                "_What this cell shows: the selected compound’s 2D chemical structure alongside its measured CYP potency, learned dynamical instability, and structural descriptors. These values are read-only measurements, rather than dropdown controls._"
+            ),
+        ]
+    )
     return
 
 
@@ -529,7 +603,14 @@ def _(go, mo, pd, regime_summary):
         yaxis=dict(autorange="reversed", gridcolor="rgba(0,0,0,0)"),
         showlegend=False,
     )
-    mo.ui.plotly(regime_chart, config={"displaylogo": False})
+    mo.vstack(
+        [
+            mo.ui.plotly(regime_chart, config={"displaylogo": False}),
+            mo.md(
+                "_What this cell shows: the adjusted silhouette score measures how distinctly each transition rule separates the four CYP-conditioned dynamical geometries after controlling for molecule-level summaries. Larger positive bars indicate clearer target-specific organization; values near zero indicate overlapping geometry._"
+            ),
+        ]
+    )
     return
 
 
@@ -541,7 +622,7 @@ def _(descriptor_correlations, mo):
     strongest_feature = overall_correlations.loc[
         overall_correlations["spearman_rho"].abs().idxmax()
     ]
-    mo.Html(
+    structural_panel = mo.Html(
         f"""
         <section class="obs-panel">
           <div class="eyebrow">STRUCTURE CHANNEL // ASSOCIATION</div>
@@ -553,6 +634,14 @@ def _(descriptor_correlations, mo):
           <p>This association describes the learned system. Scaffold-grouped validation and frozen-model interventions provide stronger tests.</p>
         </section>
         """
+    )
+    mo.vstack(
+        [
+            structural_panel,
+            mo.md(
+                "_What this cell shows: the single conventional molecular descriptor with the strongest monotonic association to learned instability across the combined held-out cohort. It is an association signal and does not establish causation._"
+            ),
+        ]
     )
     return
 
@@ -590,6 +679,9 @@ def _(attractors, mo):
         [
             mo.md("## Long-horizon candidates"),
             mo.Html(f'<div class="obs-table-shell">{attractor_html}</div>'),
+            mo.md(
+                "_What this cell shows: selected trajectories followed for 5,001 generations, with recurrence, dimensionality, entropy, and dominant-period evidence used to distinguish periodic, quasiperiodic, and persistent complex candidates._"
+            ),
         ]
     )
     return
@@ -600,7 +692,7 @@ def _(interventions, mo):
     strongest_intervention = interventions.iloc[
         interventions["lyapunov_change"].abs().argmax()
     ]
-    mo.Html(
+    intervention_panel = mo.Html(
         f"""
         <section class="obs-panel">
           <div class="eyebrow">FROZEN MODEL // CONTROLLED INTERVENTION</div>
@@ -614,12 +706,20 @@ def _(interventions, mo):
         </section>
         """
     )
+    mo.vstack(
+        [
+            intervention_panel,
+            mo.md(
+                "_What this cell shows: the largest observed change in dynamical instability after one controlled chemical-feature edit while all learned model parameters remained frozen._"
+            ),
+        ]
+    )
     return
 
 
 @app.cell
 def _(mo):
-    mo.Html(
+    answer_panel = mo.Html(
         """
         <section class="obs-panel">
           <div class="eyebrow">OBSERVATORY SYNTHESIS // CURRENT EVIDENCE</div>
@@ -630,12 +730,20 @@ def _(mo):
         </section>
         """
     )
+    mo.vstack(
+        [
+            answer_panel,
+            mo.md(
+                "_What this cell does: synthesizes the evidence developed above and states the scientific boundary required for interpreting learned graph dynamics responsibly._"
+            ),
+        ]
+    )
     return
 
 
 @app.cell
 def _(mo):
-    mo.Html(
+    provenance_panel = mo.Html(
         """
         <section class="obs-panel">
           <h3>Data provenance and AI disclosure</h3>
@@ -643,6 +751,14 @@ def _(mo):
           <p>OpenAI Codex assisted with notebook engineering, interface implementation, testing, and editorial refinement under human scientific direction. Scientific claims are tied to reproducible outputs and explicitly stated interpretation boundaries.</p>
         </section>
         """
+    )
+    mo.vstack(
+        [
+            provenance_panel,
+            mo.md(
+                "_What this cell records: the origin of the assay and dynamical data, the reproducibility path through the public repository, and the role of AI assistance in notebook engineering._"
+            ),
+        ]
     )
     return
 
