@@ -1,0 +1,10 @@
+# Graph-CA refinement score ledger
+
+| Date | Method | Sealed point MA-ST-RAE | RMSE, pIC50 | Status |
+|---|---|---:|---:|---|
+| 2 September 2026 | CIA-EA-CV-CYP-GCA | **0.748490** | **0.847738** | Current internal leader |
+| 2 September 2026 | PP-CIA-EA-CV-CYP-GCA | 0.760855 | 0.858781 | Experimental result |
+
+All entries use the same reserved scaffold holdout. Model and hyperparameter
+selection occur within the fitting pool; the reserved holdout is excluded from
+selection. Blind challenge labels are unavailable to the campaigns.

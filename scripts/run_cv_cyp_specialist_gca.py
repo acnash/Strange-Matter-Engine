@@ -40,6 +40,7 @@ STUDY = ROOT / "results" / STUDY_NAME
 ENDPOINT_ALIGNED = os.environ.get("SME_ENDPOINT_ALIGNED", "0") == "1"
 INTERVAL_REFINEMENT = os.environ.get("SME_INTERVAL_REFINEMENT", "0") == "1"
 PARTIAL_POOL_REFINEMENT = os.environ.get("SME_PARTIAL_POOL_REFINEMENT", "0") == "1"
+TEMPORAL_REFINEMENT = os.environ.get("SME_TEMPORAL_REFINEMENT", "0") == "1"
 INTERVAL_BETAS = (0.0, 0.25, 0.5, 0.75)
 POOL_WEIGHTS = (0.0, 0.05, 0.15, 0.30)
 PARENT_ENDPOINT_STUDY = (
@@ -60,6 +61,8 @@ TEST_CSV = ROOT / "data" / "openadmet-cyp-challenge-2026" / "cyp-challenge-TEST-
 
 
 def campaign_method() -> str:
+    if TEMPORAL_REFINEMENT:
+        return "TA-CIA-EA-CV-CYP-GCA"
     if PARTIAL_POOL_REFINEMENT:
         return "PP-CIA-EA-CV-CYP-GCA"
     if INTERVAL_REFINEMENT:
@@ -68,6 +71,8 @@ def campaign_method() -> str:
 
 
 def campaign_architecture() -> str:
+    if TEMPORAL_REFINEMENT:
+        return "temporal_attention_credible_interval_endpoint_graph_ca"
     if PARTIAL_POOL_REFINEMENT:
         return "partially_pooled_credible_interval_endpoint_graph_ca"
     if INTERVAL_REFINEMENT:
@@ -78,6 +83,8 @@ def campaign_architecture() -> str:
 
 
 def campaign_submission_name() -> str:
+    if TEMPORAL_REFINEMENT:
+        return "temporal_attention_credible_interval_ea_cv_cyp_gca_submission.csv"
     if PARTIAL_POOL_REFINEMENT:
         return "partially_pooled_credible_interval_ea_cv_cyp_gca_submission.csv"
     if INTERVAL_REFINEMENT:
@@ -156,6 +163,8 @@ def fit(worker: Path, stage, endpoint, rule, variant, config, seed, fold,
 
 
 def screen(worker: Path) -> dict:
+    if TEMPORAL_REFINEMENT:
+        return screen_temporal_refinement(worker)
     if PARTIAL_POOL_REFINEMENT:
         return screen_partial_pool_refinement(worker)
     if INTERVAL_REFINEMENT:
@@ -346,6 +355,80 @@ def screen_partial_pool_refinement(worker: Path) -> dict:
                 "fold_scores": values,
                 "interval_loss_beta": candidate.get("interval_loss_beta", 0.0),
                 "auxiliary_endpoint_weight": pool_weight,
+                "config": config,
+            })
+        selected[endpoint].sort(key=lambda item: item["screen_ma_st_rae"])
+    write_json(STUDY / "screening_summary.json", selected)
+    return selected
+
+
+def screen_temporal_refinement(worker: Path) -> dict:
+    """Compare fixed multiscale summaries with learned temporal attention."""
+    parent = json.loads(
+        (PARENT_INTERVAL_STUDY / "screening_summary.json").read_text(
+            encoding="utf-8"
+        )
+    )
+    pooling_modes = ("multiscale", "temporal_attention")
+    jobs = [
+        (endpoint, candidate, pooling, fold)
+        for endpoint in ENDPOINTS for candidate in parent[endpoint]
+        for pooling in pooling_modes for fold in SCREEN_FOLDS
+    ]
+    scores = {
+        (endpoint, candidate["rule"], pooling): []
+        for endpoint in ENDPOINTS for candidate in parent[endpoint]
+        for pooling in pooling_modes
+    }
+    durations = []
+    for number, (endpoint, candidate, pooling, fold) in enumerate(jobs, 1):
+        config = deepcopy(candidate["config"])
+        config.update({
+            "trajectory_pooling": pooling,
+            "specialist_objective": "endpoint_only",
+        })
+        suffix = "fixed" if pooling == "multiscale" else "attention"
+        variant = f"{candidate['variant']}_temporal_{suffix}"
+        progress(
+            "temporal_pooling_screen", completed=number - 1, total=len(jobs),
+            endpoint=endpoint, rule=candidate["rule"], pooling=pooling, fold=fold,
+            estimated_remaining_seconds=(
+                np.mean(durations) * (len(jobs) - number + 1)
+                if durations else None
+            ),
+        )
+        started = time.time()
+        metrics = fit(
+            worker, "screen", endpoint, candidate["rule"], variant,
+            config, 6101, fold, 22, 6,
+        )
+        durations.append(time.time() - started)
+        scores[(endpoint, candidate["rule"], pooling)].append(float(
+            metrics.get("restored_validation_point_ma_st_rae", np.inf)
+        ))
+
+    selected = {}
+    for endpoint in ENDPOINTS:
+        selected[endpoint] = []
+        for candidate in parent[endpoint]:
+            choices = []
+            for pooling in pooling_modes:
+                values = scores[(endpoint, candidate["rule"], pooling)]
+                choices.append((float(np.mean(values)), pooling, values))
+            score, pooling, values = min(choices)
+            config = deepcopy(candidate["config"])
+            config.update({
+                "trajectory_pooling": pooling,
+                "specialist_objective": "endpoint_only",
+            })
+            suffix = "fixed" if pooling == "multiscale" else "attention"
+            selected[endpoint].append({
+                "rule": candidate["rule"],
+                "variant": f"{candidate['variant']}_temporal_{suffix}",
+                "screen_ma_st_rae": score,
+                "fold_scores": values,
+                "interval_loss_beta": candidate.get("interval_loss_beta", 0.0),
+                "trajectory_pooling": pooling,
                 "config": config,
             })
         selected[endpoint].sort(key=lambda item: item["screen_ma_st_rae"])

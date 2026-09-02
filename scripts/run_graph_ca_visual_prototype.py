@@ -526,6 +526,8 @@ def train(extended_dynamics: bool = False) -> None:
             self.chem = nn.Linear(chem_dim, hidden, bias=False)
             self.context = nn.Linear(4, hidden, bias=False)
             self.bias = nn.Parameter(torch.zeros(hidden))
+            if TRAJECTORY_POOLING == "temporal_attention":
+                self.temporal_logits = nn.Parameter(torch.zeros(5))
             if RULE == "gated_residual":
                 self.gate = nn.Linear(hidden * 2 + chem_dim + 4, hidden)
             elif RULE == "inertial_reaction_diffusion":
@@ -757,7 +759,7 @@ def train(extended_dynamics: bool = False) -> None:
                 graph_mean = self._graph_mean(h, graph_index, graph_count, atom_counts_tensor)
                 graph_mean_sum += graph_mean
                 graph_mean_sq_sum += graph_mean.square()
-                if TRAJECTORY_POOLING == "multiscale" and step_index in checkpoint_steps:
+                if TRAJECTORY_POOLING in {"multiscale", "temporal_attention"} and step_index in checkpoint_steps:
                     checkpoint_summaries.append(graph_mean)
 
             final_mean = self._graph_mean(h, graph_index, graph_count, atom_counts_tensor)
@@ -775,6 +777,15 @@ def train(extended_dynamics: bool = False) -> None:
                 if len(checkpoint_summaries) != 5:
                     raise RuntimeError("Multiscale checkpoint collection is incomplete")
                 fingerprint = torch.cat((fingerprint, *checkpoint_summaries), dim=1)
+            elif TRAJECTORY_POOLING == "temporal_attention":
+                if len(checkpoint_summaries) != 5:
+                    raise RuntimeError("Temporal-attention checkpoints are incomplete")
+                checkpoints = torch.stack(checkpoint_summaries, dim=1)
+                weights = torch.softmax(self.temporal_logits, dim=0)
+                weighted_mean = (checkpoints * weights[None, :, None]).sum(dim=1)
+                weighted_var = ((checkpoints - weighted_mean[:, None, :]).square()
+                                * weights[None, :, None]).sum(dim=1)
+                fingerprint = torch.cat((fingerprint, weighted_mean, weighted_var), dim=1)
             fingerprint = self._readout_features(
                 fingerprint, [cyp for _, cyp in examples]
             )
@@ -917,7 +928,7 @@ def train(extended_dynamics: bool = False) -> None:
                 h = new_h
                 state_history.append(h)
                 states.append(h); means.append(h.mean(0))
-                if TRAJECTORY_POOLING == "multiscale" and step_index in checkpoint_steps:
+                if TRAJECTORY_POOLING in {"multiscale", "temporal_attention"} and step_index in checkpoint_steps:
                     checkpoint_summaries.append(h.mean(0))
             mean_series = torch.stack(means)
             fingerprint = torch.cat((
@@ -929,6 +940,15 @@ def train(extended_dynamics: bool = False) -> None:
                 if len(checkpoint_summaries) != 5:
                     raise RuntimeError("Multiscale checkpoint collection is incomplete")
                 fingerprint = torch.cat((fingerprint, *checkpoint_summaries))
+            elif TRAJECTORY_POOLING == "temporal_attention":
+                if len(checkpoint_summaries) != 5:
+                    raise RuntimeError("Temporal-attention checkpoints are incomplete")
+                checkpoints = torch.stack(checkpoint_summaries)
+                weights = torch.softmax(self.temporal_logits, dim=0)
+                weighted_mean = (checkpoints * weights[:, None]).sum(dim=0)
+                weighted_var = ((checkpoints - weighted_mean[None, :]).square()
+                                * weights[:, None]).sum(dim=0)
+                fingerprint = torch.cat((fingerprint, weighted_mean, weighted_var))
             fingerprint = self._readout_features(
                 fingerprint.unsqueeze(0), [cyp]
             ).squeeze(0)
