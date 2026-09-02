@@ -39,9 +39,14 @@ STUDY_NAME = os.environ.get(
 STUDY = ROOT / "results" / STUDY_NAME
 ENDPOINT_ALIGNED = os.environ.get("SME_ENDPOINT_ALIGNED", "0") == "1"
 INTERVAL_REFINEMENT = os.environ.get("SME_INTERVAL_REFINEMENT", "0") == "1"
+PARTIAL_POOL_REFINEMENT = os.environ.get("SME_PARTIAL_POOL_REFINEMENT", "0") == "1"
 INTERVAL_BETAS = (0.0, 0.25, 0.5, 0.75)
+POOL_WEIGHTS = (0.0, 0.05, 0.15, 0.30)
 PARENT_ENDPOINT_STUDY = (
     ROOT / "results" / "production_endpoint_aligned_cv_cyp_gca_v1"
+)
+PARENT_INTERVAL_STUDY = (
+    ROOT / "results" / "production_credible_interval_aligned_ea_cv_cyp_gca_v1"
 )
 RULES = previous.RULES
 ENDPOINTS = ensemble.ENDPOINTS
@@ -55,12 +60,16 @@ TEST_CSV = ROOT / "data" / "openadmet-cyp-challenge-2026" / "cyp-challenge-TEST-
 
 
 def campaign_method() -> str:
+    if PARTIAL_POOL_REFINEMENT:
+        return "PP-CIA-EA-CV-CYP-GCA"
     if INTERVAL_REFINEMENT:
         return "CIA-EA-CV-CYP-GCA"
     return "EA-CV-CYP-GCA" if ENDPOINT_ALIGNED else "CV-CYP-GCA"
 
 
 def campaign_architecture() -> str:
+    if PARTIAL_POOL_REFINEMENT:
+        return "partially_pooled_credible_interval_endpoint_graph_ca"
     if INTERVAL_REFINEMENT:
         return "credible_interval_aligned_endpoint_graph_ca"
     return ("endpoint_aligned_cross_validated_cyp_specialist_graph_ca"
@@ -69,6 +78,8 @@ def campaign_architecture() -> str:
 
 
 def campaign_submission_name() -> str:
+    if PARTIAL_POOL_REFINEMENT:
+        return "partially_pooled_credible_interval_ea_cv_cyp_gca_submission.csv"
     if INTERVAL_REFINEMENT:
         return "credible_interval_aligned_ea_cv_cyp_gca_submission.csv"
     return ("endpoint_aligned_cv_cyp_gca_submission.csv"
@@ -132,7 +143,9 @@ def run_path(label: str) -> Path:
 def fit(worker: Path, stage, endpoint, rule, variant, config, seed, fold,
         epochs, patience):
     config = deepcopy(config)
-    if ENDPOINT_ALIGNED:
+    if PARTIAL_POOL_REFINEMENT:
+        config["specialist_objective"] = "partial_pool"
+    elif ENDPOINT_ALIGNED:
         config["specialist_objective"] = "endpoint_only"
     label = run_label(stage, endpoint, rule, variant, seed, fold)
     return production.run_fit(
@@ -143,6 +156,8 @@ def fit(worker: Path, stage, endpoint, rule, variant, config, seed, fold,
 
 
 def screen(worker: Path) -> dict:
+    if PARTIAL_POOL_REFINEMENT:
+        return screen_partial_pool_refinement(worker)
     if INTERVAL_REFINEMENT:
         return screen_interval_refinement(worker)
     jobs = [(endpoint, rule, variant, fold)
@@ -256,6 +271,81 @@ def screen_interval_refinement(worker: Path) -> dict:
                 "screen_ma_st_rae": score,
                 "fold_scores": values,
                 "interval_loss_beta": beta,
+                "config": config,
+            })
+        selected[endpoint].sort(key=lambda item: item["screen_ma_st_rae"])
+    write_json(STUDY / "screening_summary.json", selected)
+    return selected
+
+
+def screen_partial_pool_refinement(worker: Path) -> dict:
+    """Tune controlled auxiliary-CYP supervision around CIA specialists."""
+    parent = json.loads(
+        (PARENT_INTERVAL_STUDY / "screening_summary.json").read_text(
+            encoding="utf-8"
+        )
+    )
+    jobs = [
+        (endpoint, candidate, pool_weight, fold)
+        for endpoint in ENDPOINTS
+        for candidate in parent[endpoint]
+        for pool_weight in POOL_WEIGHTS
+        for fold in SCREEN_FOLDS
+    ]
+    scores = {
+        (endpoint, candidate["rule"], pool_weight): []
+        for endpoint in ENDPOINTS
+        for candidate in parent[endpoint]
+        for pool_weight in POOL_WEIGHTS
+    }
+    durations = []
+    for number, (endpoint, candidate, pool_weight, fold) in enumerate(jobs, 1):
+        config = deepcopy(candidate["config"])
+        config.update({
+            "specialist_objective": "partial_pool",
+            "auxiliary_endpoint_weight": pool_weight,
+        })
+        variant = f"{candidate['variant']}_pool_{int(pool_weight * 100):02d}"
+        progress(
+            "partial_pool_screen", completed=number - 1, total=len(jobs),
+            endpoint=endpoint, rule=candidate["rule"],
+            auxiliary_endpoint_weight=pool_weight, fold=fold,
+            estimated_remaining_seconds=(
+                np.mean(durations) * (len(jobs) - number + 1)
+                if durations else None
+            ),
+        )
+        started = time.time()
+        metrics = fit(
+            worker, "screen", endpoint, candidate["rule"], variant,
+            config, 6101, fold, 22, 6,
+        )
+        durations.append(time.time() - started)
+        scores[(endpoint, candidate["rule"], pool_weight)].append(float(
+            metrics.get("restored_validation_point_ma_st_rae", np.inf)
+        ))
+
+    selected = {}
+    for endpoint in ENDPOINTS:
+        selected[endpoint] = []
+        for candidate in parent[endpoint]:
+            choices = []
+            for pool_weight in POOL_WEIGHTS:
+                values = scores[(endpoint, candidate["rule"], pool_weight)]
+                choices.append((float(np.mean(values)), pool_weight, values))
+            score, pool_weight, values = min(choices)
+            config = deepcopy(candidate["config"])
+            config.update({
+                "specialist_objective": "partial_pool",
+                "auxiliary_endpoint_weight": pool_weight,
+            })
+            selected[endpoint].append({
+                "rule": candidate["rule"],
+                "variant": f"{candidate['variant']}_pool_{int(pool_weight * 100):02d}",
+                "screen_ma_st_rae": score,
+                "fold_scores": values,
+                "interval_loss_beta": candidate.get("interval_loss_beta", 0.0),
+                "auxiliary_endpoint_weight": pool_weight,
                 "config": config,
             })
         selected[endpoint].sort(key=lambda item: item["screen_ma_st_rae"])

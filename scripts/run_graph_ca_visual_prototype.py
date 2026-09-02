@@ -75,12 +75,15 @@ if ACTIVE_CYP and ACTIVE_CYP not in CYPS:
     raise ValueError(f"SME_ACTIVE_CYP must be one of {CYPS}, received {ACTIVE_CYP!r}")
 ACTIVE_CYP_INDEX = CYPS.index(ACTIVE_CYP) if ACTIVE_CYP else None
 SPECIALIST_OBJECTIVE = os.environ.get("SME_SPECIALIST_OBJECTIVE", "shared")
-if SPECIALIST_OBJECTIVE not in {"shared", "endpoint_only"}:
+if SPECIALIST_OBJECTIVE not in {"shared", "endpoint_only", "partial_pool"}:
     raise ValueError(
-        "SME_SPECIALIST_OBJECTIVE must be 'shared' or 'endpoint_only'"
+        "SME_SPECIALIST_OBJECTIVE must be 'shared', 'endpoint_only', or 'partial_pool'"
     )
-if SPECIALIST_OBJECTIVE == "endpoint_only" and ACTIVE_CYP_INDEX is None:
-    raise ValueError("endpoint_only training requires SME_ACTIVE_CYP")
+if SPECIALIST_OBJECTIVE in {"endpoint_only", "partial_pool"} and ACTIVE_CYP_INDEX is None:
+    raise ValueError(f"{SPECIALIST_OBJECTIVE} training requires SME_ACTIVE_CYP")
+AUXILIARY_ENDPOINT_WEIGHT = float(os.environ.get("SME_AUXILIARY_ENDPOINT_WEIGHT", "0.15"))
+if not 0.0 <= AUXILIARY_ENDPOINT_WEIGHT <= 1.0:
+    raise ValueError("SME_AUXILIARY_ENDPOINT_WEIGHT must lie in [0, 1]")
 LABEL_COLS = tuple(f"{c}_pIC50_direct_inhibition" for c in CYPS)
 LABEL_HIGH_COLS = tuple(f"{col}_conf_high" for col in LABEL_COLS)
 LABEL_LOW_COLS = tuple(f"{col}_conf_low" for col in LABEL_COLS)
@@ -1140,7 +1143,12 @@ def train(extended_dynamics: bool = False) -> None:
 
     interval_normalizers = {}
     for cyp_index in range(len(CYPS)):
-        endpoint_pairs = [(i, y) for i, c, y in fit_pairs if c == cyp_index]
+        endpoint_pairs = [
+            (i, float(record["labels"][cyp_index]))
+            for i in fit_indices
+            for record in [data["train"][i]]
+            if np.isfinite(record["labels"][cyp_index])
+        ]
         if not endpoint_pairs:
             interval_normalizers[cyp_index] = 1.0
             continue
@@ -1287,14 +1295,26 @@ def train(extended_dynamics: bool = False) -> None:
             preds = differentiable_ridge_predict(
                 fingerprints[len(support_batch):], ridge_state
             )
+            query_endpoints = torch.tensor(
+                [c for _, c, _ in query_batch], dtype=torch.long, device=device
+            )
+            if SPECIALIST_OBJECTIVE == "partial_pool":
+                auxiliary_per_endpoint = AUXILIARY_ENDPOINT_WEIGHT / (len(CYPS) - 1)
+                query_weights = torch.where(
+                    query_endpoints == ACTIVE_CYP_INDEX,
+                    torch.ones_like(preds),
+                    torch.full_like(preds, auxiliary_per_endpoint),
+                )
+            else:
+                query_weights = torch.ones_like(preds)
             if LOSS_MODE == "mse":
-                prediction_loss = ((preds - targets) ** 2).mean()
+                squared_error = (preds - targets) ** 2
+                prediction_loss = ((squared_error * query_weights).sum()
+                                   / query_weights.sum().clamp_min(1e-8))
             elif LOSS_MODE == "hybrid_interval":
                 endpoint_losses = []
                 endpoint_mse = []
-                query_endpoints = torch.tensor(
-                    [c for _, c, _ in query_batch], dtype=torch.long, device=device
-                )
+                endpoint_weights = []
                 query_lows = torch.tensor([
                     data["train"][i]["label_conf_low"][c]
                     for i, c, _ in query_batch
@@ -1315,8 +1335,19 @@ def train(extended_dynamics: bool = False) -> None:
                             outside[selected].mean() / interval_normalizers[cyp_index]
                         )
                         endpoint_mse.append(((preds[selected] - targets[selected]) ** 2).mean())
-                balanced_interval = torch.stack(endpoint_losses).mean()
-                balanced_mse = torch.stack(endpoint_mse).mean()
+                        endpoint_weights.append(
+                            1.0 if SPECIALIST_OBJECTIVE != "partial_pool"
+                            or cyp_index == ACTIVE_CYP_INDEX
+                            else AUXILIARY_ENDPOINT_WEIGHT / (len(CYPS) - 1)
+                        )
+                endpoint_weight_tensor = torch.tensor(
+                    endpoint_weights, dtype=preds.dtype, device=device
+                )
+                endpoint_weight_tensor /= endpoint_weight_tensor.sum().clamp_min(1e-8)
+                balanced_interval = (torch.stack(endpoint_losses)
+                                     * endpoint_weight_tensor).sum()
+                balanced_mse = (torch.stack(endpoint_mse)
+                                * endpoint_weight_tensor).sum()
                 prediction_loss = ((1.0 - INTERVAL_LOSS_BETA) * balanced_mse
                                    + INTERVAL_LOSS_BETA * balanced_interval)
             else:
@@ -1369,6 +1400,7 @@ def train(extended_dynamics: bool = False) -> None:
                 "ridge_mode": RIDGE_MODE,
                 "loss_mode": LOSS_MODE,
                 "specialist_objective": SPECIALIST_OBJECTIVE,
+                "auxiliary_endpoint_weight": AUXILIARY_ENDPOINT_WEIGHT,
                 "interval_loss_beta": INTERVAL_LOSS_BETA,
                 "interval_temperature": INTERVAL_TEMPERATURE,
                 "ridge_state": {k: v.detach().cpu() for k, v in final_ridge_state.items()},
