@@ -158,19 +158,19 @@ The follow-up [structure–dynamics campaign](results/structure_dynamics_publica
 
 ## Reproducibility and artifacts
 
-The current candidate artifacts are retained in [`results/production_endpoint_aligned_cv_cyp_gca_v1`](results/production_endpoint_aligned_cv_cyp_gca_v1). Important files include:
+The current candidate artifacts are retained in [`results/production_credible_interval_aligned_ea_cv_cyp_gca_v1`](results/production_credible_interval_aligned_ea_cv_cyp_gca_v1). Important files include:
 
-- [`endpoint_aligned_cv_cyp_gca_submission.csv`](results/production_endpoint_aligned_cv_cyp_gca_v1/endpoint_aligned_cv_cyp_gca_submission.csv), the challenge-ready regression file;
-- [`blind_predictions_long.csv`](results/production_endpoint_aligned_cv_cyp_gca_v1/blind_predictions_long.csv), the auditable rule-level and final predictions;
-- [`study_summary.json`](results/production_endpoint_aligned_cv_cyp_gca_v1/study_summary.json), the cross-validation selection parameters and validation report;
-- [`inference_manifest.json`](results/production_endpoint_aligned_cv_cyp_gca_v1/inference_manifest.json), the frozen inference and schema-validation record; and
+- [`credible_interval_aligned_ea_cv_cyp_gca_submission.csv`](results/production_credible_interval_aligned_ea_cv_cyp_gca_v1/credible_interval_aligned_ea_cv_cyp_gca_submission.csv), the challenge-ready regression file;
+- [`blind_predictions_long.csv`](results/production_credible_interval_aligned_ea_cv_cyp_gca_v1/blind_predictions_long.csv), the auditable rule-level and final predictions;
+- [`study_summary.json`](results/production_credible_interval_aligned_ea_cv_cyp_gca_v1/study_summary.json), the cross-validation selection parameters and sealed validation report;
+- [`inference_manifest.json`](results/production_credible_interval_aligned_ea_cv_cyp_gca_v1/inference_manifest.json), the frozen inference and schema-validation record; and
 - [`scripts/run_cv_cyp_specialist_gca.py`](scripts/run_cv_cyp_specialist_gca.py), the resumable training, validation, and inference runner.
 
 Production training and inference used an NVIDIA GeForce RTX 5070 Ti through CUDA. The shared implementation also supports CPU execution for inspection and forward-only analysis. Environment files, training scripts, saved checkpoints, validation tables, figures, and PDF reports are committed in this repository.
 
 ## Limitations
 
-The validation estimates arise from one challenge dataset and its scaffold-aware partitions. CYP2D6 remains the weakest endpoint by ST-RAE. The preceding blind results demonstrate that local validation can substantially overestimate performance on the challenge distribution. EA-CV-CYP-GCA provides point predictions rather than predictive uncertainty intervals, and its improvement requires organiser evaluation on the hidden test labels.
+The validation estimates arise from one challenge dataset and its scaffold-aware partitions. CYP2D6 remains the weakest endpoint by ST-RAE. The preceding blind results demonstrate that local validation can substantially overestimate performance on the challenge distribution. CIA-EA-CV-CYP-GCA produced sealed point MA-ST-RAE 0.748490 and RMSE 0.847738 pIC50, compared with 0.754503 and 0.852280 for EA-CV-CYP-GCA. It provides point predictions, and its measured improvement requires organiser evaluation on the hidden test labels.
 
 ## Update history
 
@@ -180,3 +180,4 @@ The validation estimates arise from one challenge dataset and its scaffold-aware
 | 29 August 2026 | CFT-DS-GCAE v1 candidate | Added nested target-specific ridge stacking after the first blind result; generated a new label-free submission candidate. |
 | 31 August 2026 | CV-CYP-GCA v1 candidate | Trained independent nonlinear Graph-CA systems for each CYP, selected sparse transition-rule subsets, and generated a validated blind regression submission. |
 | 1 September 2026 | EA-CV-CYP-GCA v1 candidate | Aligned recurrent backpropagation and differentiable ridge batches with the active CYP, reran all ten rules, improved sealed validation, and generated a validated blind submission. |
+| 2 September 2026 | CIA-EA-CV-CYP-GCA v1 candidate | Aligned recurrent training with experimental credible intervals, improved sealed MA-ST-RAE to 0.748490 and RMSE to 0.847738 pIC50, and generated a label-blind submission. |

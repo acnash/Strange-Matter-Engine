@@ -38,6 +38,11 @@ STUDY_NAME = os.environ.get(
 )
 STUDY = ROOT / "results" / STUDY_NAME
 ENDPOINT_ALIGNED = os.environ.get("SME_ENDPOINT_ALIGNED", "0") == "1"
+INTERVAL_REFINEMENT = os.environ.get("SME_INTERVAL_REFINEMENT", "0") == "1"
+INTERVAL_BETAS = (0.0, 0.25, 0.5, 0.75)
+PARENT_ENDPOINT_STUDY = (
+    ROOT / "results" / "production_endpoint_aligned_cv_cyp_gca_v1"
+)
 RULES = previous.RULES
 ENDPOINTS = ensemble.ENDPOINTS
 SCREEN_FOLDS = (0, 1)
@@ -47,6 +52,27 @@ PENALTIES = meta.RIDGE_PENALTIES
 RUNNER = ROOT / "scripts" / "run_graph_ca_visual_prototype.py"
 BLIND_CACHE = ROOT / "tmp" / "strange_matter_graph_ca_graphs_with_blind.pkl"
 TEST_CSV = ROOT / "data" / "openadmet-cyp-challenge-2026" / "cyp-challenge-TEST-BLINDED.csv"
+
+
+def campaign_method() -> str:
+    if INTERVAL_REFINEMENT:
+        return "CIA-EA-CV-CYP-GCA"
+    return "EA-CV-CYP-GCA" if ENDPOINT_ALIGNED else "CV-CYP-GCA"
+
+
+def campaign_architecture() -> str:
+    if INTERVAL_REFINEMENT:
+        return "credible_interval_aligned_endpoint_graph_ca"
+    return ("endpoint_aligned_cross_validated_cyp_specialist_graph_ca"
+            if ENDPOINT_ALIGNED else
+            "cross_validated_cyp_specialist_graph_ca")
+
+
+def campaign_submission_name() -> str:
+    if INTERVAL_REFINEMENT:
+        return "credible_interval_aligned_ea_cv_cyp_gca_submission.csv"
+    return ("endpoint_aligned_cv_cyp_gca_submission.csv"
+            if ENDPOINT_ALIGNED else "cv_cyp_gca_submission.csv")
 
 
 def write_json(path: Path, value) -> None:
@@ -117,6 +143,8 @@ def fit(worker: Path, stage, endpoint, rule, variant, config, seed, fold,
 
 
 def screen(worker: Path) -> dict:
+    if INTERVAL_REFINEMENT:
+        return screen_interval_refinement(worker)
     jobs = [(endpoint, rule, variant, fold)
             for endpoint in ENDPOINTS for rule in RULES
             for variant in ("base", "specialist") for fold in SCREEN_FOLDS]
@@ -150,6 +178,87 @@ def screen(worker: Path) -> dict:
                         else specialist_config(rule, endpoint))}
             for score, rule, variant, values in sorted(best_by_rule.values())[:3]
         ]
+    write_json(STUDY / "screening_summary.json", selected)
+    return selected
+
+
+def screen_interval_refinement(worker: Path) -> dict:
+    """Tune smooth credible-interval loss around the selected EA specialists."""
+    parent = json.loads(
+        (PARENT_ENDPOINT_STUDY / "screening_summary.json").read_text(
+            encoding="utf-8"
+        )
+    )
+    jobs = [
+        (endpoint, candidate, beta, fold)
+        for endpoint in ENDPOINTS
+        for candidate in parent[endpoint]
+        for beta in INTERVAL_BETAS
+        for fold in SCREEN_FOLDS
+    ]
+    scores = {
+        (endpoint, candidate["rule"], beta): []
+        for endpoint in ENDPOINTS
+        for candidate in parent[endpoint]
+        for beta in INTERVAL_BETAS
+    }
+    durations = []
+    for number, (endpoint, candidate, beta, fold) in enumerate(jobs, 1):
+        config = deepcopy(candidate["config"])
+        if beta > 0:
+            config.update({
+                "loss_mode": "hybrid_interval",
+                "interval_loss_beta": beta,
+                "interval_temperature": 0.05,
+            })
+        else:
+            config.update({"loss_mode": "mse", "interval_loss_beta": 0.0})
+        variant = f"{candidate['variant']}_loss_{int(beta * 100):02d}"
+        progress(
+            "interval_loss_screen", completed=number - 1, total=len(jobs),
+            endpoint=endpoint, rule=candidate["rule"], beta=beta, fold=fold,
+            estimated_remaining_seconds=(
+                np.mean(durations) * (len(jobs) - number + 1)
+                if durations else None
+            ),
+        )
+        started = time.time()
+        metrics = fit(
+            worker, "screen", endpoint, candidate["rule"], variant,
+            config, 6101, fold, 22, 6,
+        )
+        durations.append(time.time() - started)
+        scores[(endpoint, candidate["rule"], beta)].append(float(
+            metrics.get("restored_validation_point_ma_st_rae", np.inf)
+        ))
+
+    selected = {}
+    for endpoint in ENDPOINTS:
+        selected[endpoint] = []
+        for candidate in parent[endpoint]:
+            choices = []
+            for beta in INTERVAL_BETAS:
+                values = scores[(endpoint, candidate["rule"], beta)]
+                choices.append((float(np.mean(values)), beta, values))
+            score, beta, values = min(choices)
+            config = deepcopy(candidate["config"])
+            if beta > 0:
+                config.update({
+                    "loss_mode": "hybrid_interval",
+                    "interval_loss_beta": beta,
+                    "interval_temperature": 0.05,
+                })
+            else:
+                config.update({"loss_mode": "mse", "interval_loss_beta": 0.0})
+            selected[endpoint].append({
+                "rule": candidate["rule"],
+                "variant": f"{candidate['variant']}_loss_{int(beta * 100):02d}",
+                "screen_ma_st_rae": score,
+                "fold_scores": values,
+                "interval_loss_beta": beta,
+                "config": config,
+            })
+        selected[endpoint].sort(key=lambda item: item["screen_ma_st_rae"])
     write_json(STUDY / "screening_summary.json", selected)
     return selected
 
@@ -313,10 +422,8 @@ def assemble(selected: dict) -> dict:
         output.append(item)
     write_csv(STUDY / "reserved_holdout_predictions.csv", output)
     summary = {
-        "method": ("EA-CV-CYP-GCA" if ENDPOINT_ALIGNED else "CV-CYP-GCA"),
-        "architecture": ("endpoint_aligned_cross_validated_cyp_specialist_graph_ca"
-                         if ENDPOINT_ALIGNED else
-                         "cross_validated_cyp_specialist_graph_ca"),
+        "method": campaign_method(),
+        "architecture": campaign_architecture(),
         "specialisation_stage": "nonlinear_ca_backpropagation_and_ridge_readout",
         "screened_rules_per_endpoint": len(RULES), "selected_candidates": selected,
         "final_models": models, "reserved_holdout_point_ma_st_rae": point,
@@ -400,8 +507,7 @@ def generate_blind(worker: Path, selected: dict, summary: dict) -> None:
         wide_rows.append(wide)
     fields = ["SMILES", "Molecule_Name"] + [
         f"{endpoint}_pIC50_direct_inhibition" for endpoint in ENDPOINTS]
-    submission_name = ("endpoint_aligned_cv_cyp_gca_submission.csv"
-                       if ENDPOINT_ALIGNED else "cv_cyp_gca_submission.csv")
+    submission_name = campaign_submission_name()
     submission = STUDY / submission_name
     write_csv(submission, wide_rows, fields)
     long_fields = list(dict.fromkeys(
@@ -409,7 +515,7 @@ def generate_blind(worker: Path, selected: dict, summary: dict) -> None:
     ))
     write_csv(STUDY / "blind_predictions_long.csv", long_rows, long_fields)
     manifest = {
-        "method": ("EA-CV-CYP-GCA" if ENDPOINT_ALIGNED else "CV-CYP-GCA"),
+        "method": campaign_method(),
         "submission": str(submission.relative_to(ROOT)),
         "rows": len(wide_rows), "columns": fields,
         "finite_predictions": int(len(wide_rows) * len(ENDPOINTS)),
@@ -442,8 +548,7 @@ def main() -> None:
         summary = assemble(selected)
     generate_blind(worker, selected, summary)
     progress("complete", summary=summary,
-             submission=("endpoint_aligned_cv_cyp_gca_submission.csv"
-                         if ENDPOINT_ALIGNED else "cv_cyp_gca_submission.csv"))
+             submission=campaign_submission_name())
     print(json.dumps(meta.serialise(summary), indent=2))
 
 
