@@ -67,7 +67,7 @@ def _(mo):
             "Aromatic atom fraction": "aromatic_atom_fraction",
             "Graph connectivity": "algebraic_connectivity",
         },
-        value="mean_lyapunov",
+        value="Dynamical instability",
         label="Colour the atlas by",
     )
     mo.hstack([isoform, colour_metric], justify="start", gap=2)
@@ -83,7 +83,7 @@ def _(cohort, isoform, mo):
     }
     molecule = mo.ui.dropdown(
         options=molecule_options,
-        value=next(iter(molecule_options.values())),
+        value=next(iter(molecule_options)),
         label="Inspect a molecule",
         searchable=True,
     )
