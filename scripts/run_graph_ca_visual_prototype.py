@@ -69,6 +69,8 @@ RIDGE_MODE = os.environ.get("SME_RIDGE_MODE", "shared")
 LOSS_MODE = os.environ.get("SME_LOSS_MODE", "mse")
 INTERVAL_LOSS_BETA = float(os.environ.get("SME_INTERVAL_LOSS_BETA", "0.5"))
 INTERVAL_TEMPERATURE = float(os.environ.get("SME_INTERVAL_TEMPERATURE", "0.05"))
+PERTURBATION_CONSISTENCY_WEIGHT = float(os.environ.get("SME_PERTURBATION_CONSISTENCY_WEIGHT", "0.0"))
+PERTURBATION_CONSISTENCY_EPSILON = float(os.environ.get("SME_PERTURBATION_CONSISTENCY_EPSILON", "0.001"))
 SEED = int(os.environ.get("SME_SEED", "1701"))
 CYPS = ("CYP1A2", "CYP2C9", "CYP2D6", "CYP3A4")
 ACTIVE_CYP = os.environ.get("SME_ACTIVE_CYP", "").strip()
@@ -1385,6 +1387,24 @@ def train(extended_dynamics: bool = False) -> None:
                                    + INTERVAL_LOSS_BETA * balanced_interval)
             else:
                 raise ValueError(f"Unknown loss mode: {LOSS_MODE}")
+            if PERTURBATION_CONSISTENCY_WEIGHT > 0:
+                perturbations = [
+                    PERTURBATION_CONSISTENCY_EPSILON * torch.randn(
+                        (len(data["train"][i]["x"]), HIDDEN_CHANNELS),
+                        dtype=preds.dtype, device=device,
+                    )
+                    for i, _, _ in query_batch
+                ]
+                perturbed_fingerprints = model.forward_batch(
+                    [(data["train"][i], c) for i, c, _ in query_batch],
+                    initial_perturbations=perturbations,
+                )
+                perturbed_preds = differentiable_ridge_predict(
+                    perturbed_fingerprints, ridge_state
+                )
+                consistency_loss = ((perturbed_preds - preds) ** 2).mean()
+                prediction_loss = (prediction_loss
+                                   + PERTURBATION_CONSISTENCY_WEIGHT * consistency_loss)
             ca_penalty = CA_L2 * sum((p ** 2).sum() for p in ca_params)
             loss = prediction_loss + ca_penalty
             loss.backward()
@@ -1431,6 +1451,8 @@ def train(extended_dynamics: bool = False) -> None:
                 "residual_alpha": residual_alpha if residual_mode else None,
                 "trajectory_pooling": TRAJECTORY_POOLING,
                 "chemical_feature_gating": CHEMICAL_FEATURE_GATING,
+                "perturbation_consistency_weight": PERTURBATION_CONSISTENCY_WEIGHT,
+                "perturbation_consistency_epsilon": PERTURBATION_CONSISTENCY_EPSILON,
                 "ridge_mode": RIDGE_MODE,
                 "loss_mode": LOSS_MODE,
                 "specialist_objective": SPECIALIST_OBJECTIVE,

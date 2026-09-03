@@ -5,6 +5,7 @@
 | 2 September 2026 | CIA-EA-CV-CYP-GCA | **0.748490** | **0.847738** | Current internal leader |
 | 2 September 2026 | PP-CIA-EA-CV-CYP-GCA | 0.760855 | 0.858781 | Experimental result |
 | 3 September 2026 | TA-CIA-EA-CV-CYP-GCA | 0.755021 | 0.850082 | Experimental result |
+| 3 September 2026 | FG-CIA-EA-CV-CYP-GCA | 0.751384 | 0.848686 | Experimental result |
 
 All entries use the same reserved scaffold holdout. Model and hyperparameter
 selection occur within the fitting pool; the reserved holdout is excluded from
