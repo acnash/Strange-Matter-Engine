@@ -41,6 +41,7 @@ ENDPOINT_ALIGNED = os.environ.get("SME_ENDPOINT_ALIGNED", "0") == "1"
 INTERVAL_REFINEMENT = os.environ.get("SME_INTERVAL_REFINEMENT", "0") == "1"
 PARTIAL_POOL_REFINEMENT = os.environ.get("SME_PARTIAL_POOL_REFINEMENT", "0") == "1"
 TEMPORAL_REFINEMENT = os.environ.get("SME_TEMPORAL_REFINEMENT", "0") == "1"
+FEATURE_GATE_REFINEMENT = os.environ.get("SME_FEATURE_GATE_REFINEMENT", "0") == "1"
 INTERVAL_BETAS = (0.0, 0.25, 0.5, 0.75)
 POOL_WEIGHTS = (0.0, 0.05, 0.15, 0.30)
 PARENT_ENDPOINT_STUDY = (
@@ -61,6 +62,8 @@ TEST_CSV = ROOT / "data" / "openadmet-cyp-challenge-2026" / "cyp-challenge-TEST-
 
 
 def campaign_method() -> str:
+    if FEATURE_GATE_REFINEMENT:
+        return "FG-CIA-EA-CV-CYP-GCA"
     if TEMPORAL_REFINEMENT:
         return "TA-CIA-EA-CV-CYP-GCA"
     if PARTIAL_POOL_REFINEMENT:
@@ -71,6 +74,8 @@ def campaign_method() -> str:
 
 
 def campaign_architecture() -> str:
+    if FEATURE_GATE_REFINEMENT:
+        return "feature_gated_credible_interval_endpoint_graph_ca"
     if TEMPORAL_REFINEMENT:
         return "temporal_attention_credible_interval_endpoint_graph_ca"
     if PARTIAL_POOL_REFINEMENT:
@@ -83,6 +88,8 @@ def campaign_architecture() -> str:
 
 
 def campaign_submission_name() -> str:
+    if FEATURE_GATE_REFINEMENT:
+        return "feature_gated_credible_interval_ea_cv_cyp_gca_submission.csv"
     if TEMPORAL_REFINEMENT:
         return "temporal_attention_credible_interval_ea_cv_cyp_gca_submission.csv"
     if PARTIAL_POOL_REFINEMENT:
@@ -163,6 +170,8 @@ def fit(worker: Path, stage, endpoint, rule, variant, config, seed, fold,
 
 
 def screen(worker: Path) -> dict:
+    if FEATURE_GATE_REFINEMENT:
+        return screen_feature_gate_refinement(worker)
     if TEMPORAL_REFINEMENT:
         return screen_temporal_refinement(worker)
     if PARTIAL_POOL_REFINEMENT:
@@ -429,6 +438,81 @@ def screen_temporal_refinement(worker: Path) -> dict:
                 "fold_scores": values,
                 "interval_loss_beta": candidate.get("interval_loss_beta", 0.0),
                 "trajectory_pooling": pooling,
+                "config": config,
+            })
+        selected[endpoint].sort(key=lambda item: item["screen_ma_st_rae"])
+    write_json(STUDY / "screening_summary.json", selected)
+    return selected
+
+
+def screen_feature_gate_refinement(worker: Path) -> dict:
+    """Compare direct chemical inputs with learned descriptor gates."""
+    parent = json.loads(
+        (PARENT_INTERVAL_STUDY / "screening_summary.json").read_text(
+            encoding="utf-8"
+        )
+    )
+    gate_modes = (False, True)
+    jobs = [
+        (endpoint, candidate, gated, fold)
+        for endpoint in ENDPOINTS for candidate in parent[endpoint]
+        for gated in gate_modes for fold in SCREEN_FOLDS
+    ]
+    scores = {
+        (endpoint, candidate["rule"], gated): []
+        for endpoint in ENDPOINTS for candidate in parent[endpoint]
+        for gated in gate_modes
+    }
+    durations = []
+    for number, (endpoint, candidate, gated, fold) in enumerate(jobs, 1):
+        config = deepcopy(candidate["config"])
+        config.update({
+            "chemical_feature_gating": gated,
+            "specialist_objective": "endpoint_only",
+        })
+        suffix = "gated" if gated else "direct"
+        variant = f"{candidate['variant']}_features_{suffix}"
+        progress(
+            "chemical_feature_gate_screen", completed=number - 1,
+            total=len(jobs), endpoint=endpoint, rule=candidate["rule"],
+            chemical_feature_gating=gated, fold=fold,
+            estimated_remaining_seconds=(
+                np.mean(durations) * (len(jobs) - number + 1)
+                if durations else None
+            ),
+        )
+        started = time.time()
+        metrics = fit(
+            worker, "screen", endpoint, candidate["rule"], variant,
+            config, 6101, fold, 22, 6,
+        )
+        durations.append(time.time() - started)
+        scores[(endpoint, candidate["rule"], gated)].append(float(
+            metrics.get("restored_validation_point_ma_st_rae", np.inf)
+        ))
+
+    selected = {}
+    for endpoint in ENDPOINTS:
+        selected[endpoint] = []
+        for candidate in parent[endpoint]:
+            choices = []
+            for gated in gate_modes:
+                values = scores[(endpoint, candidate["rule"], gated)]
+                choices.append((float(np.mean(values)), gated, values))
+            score, gated, values = min(choices)
+            config = deepcopy(candidate["config"])
+            config.update({
+                "chemical_feature_gating": gated,
+                "specialist_objective": "endpoint_only",
+            })
+            suffix = "gated" if gated else "direct"
+            selected[endpoint].append({
+                "rule": candidate["rule"],
+                "variant": f"{candidate['variant']}_features_{suffix}",
+                "screen_ma_st_rae": score,
+                "fold_scores": values,
+                "interval_loss_beta": candidate.get("interval_loss_beta", 0.0),
+                "chemical_feature_gating": gated,
                 "config": config,
             })
         selected[endpoint].sort(key=lambda item: item["screen_ma_st_rae"])

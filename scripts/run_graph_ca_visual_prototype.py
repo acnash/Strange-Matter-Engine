@@ -64,6 +64,7 @@ PATIENCE_LIMIT = int(os.environ.get("SME_PATIENCE", "20"))
 MIN_DELTA = float(os.environ.get("SME_MIN_DELTA", "0.005"))
 TUNING_ONLY = os.environ.get("SME_TUNING_ONLY", "0") == "1"
 TRAJECTORY_POOLING = os.environ.get("SME_TRAJECTORY_POOLING", "legacy")
+CHEMICAL_FEATURE_GATING = os.environ.get("SME_CHEMICAL_FEATURE_GATING", "0") == "1"
 RIDGE_MODE = os.environ.get("SME_RIDGE_MODE", "shared")
 LOSS_MODE = os.environ.get("SME_LOSS_MODE", "mse")
 INTERVAL_LOSS_BETA = float(os.environ.get("SME_INTERVAL_LOSS_BETA", "0.5"))
@@ -414,7 +415,7 @@ def prepare() -> None:
 def train(extended_dynamics: bool = False) -> None:
     global RULE, GENERATIONS, UPDATE_SCALE, INIT_SCALE, INITIAL_NOISE
     global SUPPORT_FRACTION, BOND_TEMPERATURE, DYN_A, DYN_B, DYN_C, DYN_D
-    global TRAJECTORY_POOLING, RIDGE_MODE
+    global TRAJECTORY_POOLING, RIDGE_MODE, CHEMICAL_FEATURE_GATING
     import torch
     from torch import nn
 
@@ -488,6 +489,7 @@ def train(extended_dynamics: bool = False) -> None:
         DYN_D = float(hyperparameters["dyn_d"])
         TRAJECTORY_POOLING = checkpoint.get("trajectory_pooling", "legacy")
         RIDGE_MODE = checkpoint.get("ridge_mode", "shared")
+        CHEMICAL_FEATURE_GATING = bool(checkpoint.get("chemical_feature_gating", False))
     feature_profile = (checkpoint.get("atom_feature_profile", "baseline")
                        if checkpoint is not None
                        else os.environ.get("SME_ATOM_FEATURE_PROFILE", "baseline"))
@@ -526,6 +528,8 @@ def train(extended_dynamics: bool = False) -> None:
             self.chem = nn.Linear(chem_dim, hidden, bias=False)
             self.context = nn.Linear(4, hidden, bias=False)
             self.bias = nn.Parameter(torch.zeros(hidden))
+            if CHEMICAL_FEATURE_GATING:
+                self.feature_gate_logits = nn.Parameter(torch.full((chem_dim,), 2.0))
             if TRAJECTORY_POOLING == "temporal_attention":
                 self.temporal_logits = nn.Parameter(torch.zeros(5))
             if RULE == "gated_residual":
@@ -586,6 +590,11 @@ def train(extended_dynamics: bool = False) -> None:
             blocks = fingerprint[:, None, :] * one_hot[:, :, None]
             return torch.cat((one_hot, blocks.flatten(1)), dim=1)
 
+        def _chemical_features(self, x):
+            if not CHEMICAL_FEATURE_GATING:
+                return x
+            return x * torch.sigmoid(self.feature_gate_logits)[None, :]
+
         def forward_batch(self, examples, initial_perturbations=None,
                           return_node_trajectory=False):
             """Evaluate independent molecule-CYP graphs as one disconnected graph."""
@@ -606,6 +615,7 @@ def train(extended_dynamics: bool = False) -> None:
                     edges.append(torch.as_tensor(rec["edge"], device=device))
                 offset += atom_count
             x = torch.cat(xs)
+            x = self._chemical_features(x)
             graph_index = torch.cat(graph_ids)
             c = torch.cat(contexts)
             atom_counts_tensor = torch.tensor(atom_counts, dtype=x.dtype, device=device)
@@ -796,6 +806,7 @@ def train(extended_dynamics: bool = False) -> None:
         def forward_one(self, rec, cyp: int, return_trajectory=False,
                         initial_perturbation=None):
             x = torch.as_tensor(rec["x"], device=device)
+            x = self._chemical_features(x)
             src = torch.as_tensor(rec["src"], device=device)
             dst = torch.as_tensor(rec["dst"], device=device)
             edge = torch.as_tensor(rec["edge"], device=device)
@@ -961,6 +972,7 @@ def train(extended_dynamics: bool = False) -> None:
             """Return the learned initial CA state for dynamical analysis."""
             dtype = next(self.parameters()).dtype
             x = torch.as_tensor(rec["x"], device=device, dtype=dtype)
+            x = self._chemical_features(x)
             return torch.tanh(INIT_SCALE * self.init(x))
 
         def kuramoto_step(self, rec, cyp: int, h):
@@ -968,6 +980,7 @@ def train(extended_dynamics: bool = False) -> None:
             if RULE != "kuramoto_sakaguchi":
                 raise ValueError("kuramoto_step is only defined for the Kuramoto-Sakaguchi rule")
             x = torch.as_tensor(rec["x"], device=device, dtype=h.dtype)
+            x = self._chemical_features(x)
             src = torch.as_tensor(rec["src"], device=device)
             dst = torch.as_tensor(rec["dst"], device=device)
             edge = torch.as_tensor(rec["edge"], device=device, dtype=h.dtype)
@@ -1417,6 +1430,7 @@ def train(extended_dynamics: bool = False) -> None:
                 "prediction_mode": "residual_ca" if residual_mode else "direct",
                 "residual_alpha": residual_alpha if residual_mode else None,
                 "trajectory_pooling": TRAJECTORY_POOLING,
+                "chemical_feature_gating": CHEMICAL_FEATURE_GATING,
                 "ridge_mode": RIDGE_MODE,
                 "loss_mode": LOSS_MODE,
                 "specialist_objective": SPECIALIST_OBJECTIVE,
