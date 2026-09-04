@@ -71,6 +71,7 @@ INTERVAL_LOSS_BETA = float(os.environ.get("SME_INTERVAL_LOSS_BETA", "0.5"))
 INTERVAL_TEMPERATURE = float(os.environ.get("SME_INTERVAL_TEMPERATURE", "0.05"))
 PERTURBATION_CONSISTENCY_WEIGHT = float(os.environ.get("SME_PERTURBATION_CONSISTENCY_WEIGHT", "0.0"))
 PERTURBATION_CONSISTENCY_EPSILON = float(os.environ.get("SME_PERTURBATION_CONSISTENCY_EPSILON", "0.001"))
+INITIAL_STATE_ANCHOR = os.environ.get("SME_INITIAL_STATE_ANCHOR", "0") == "1"
 SEED = int(os.environ.get("SME_SEED", "1701"))
 CYPS = ("CYP1A2", "CYP2C9", "CYP2D6", "CYP3A4")
 ACTIVE_CYP = os.environ.get("SME_ACTIVE_CYP", "").strip()
@@ -632,6 +633,9 @@ def train(extended_dynamics: bool = False) -> None:
                 h = h + INITIAL_NOISE * torch.randn_like(h)
             if initial_perturbations is not None:
                 h = h + torch.cat(initial_perturbations)
+            initial_mean = self._graph_mean(h, graph_index, graph_count, atom_counts_tensor)
+            initial_second = self._graph_mean(h.square(), graph_index, graph_count, atom_counts_tensor)
+            initial_var = (initial_second - initial_mean.square()).clamp_min(0.0)
             velocity = torch.zeros_like(h)
             state_history = [h]
             node_states = [h] if return_node_trajectory else None
@@ -785,6 +789,8 @@ def train(extended_dynamics: bool = False) -> None:
             series_var = (graph_mean_sq_sum / float(GENERATIONS + 1) - series_mean.square()).clamp_min(0.0)
             energy_mean = self._graph_mean(step_energy, graph_index, graph_count, atom_counts_tensor)
             fingerprint = torch.cat((final_mean, final_var, temporal_mean, series_var, energy_mean), dim=1)
+            if INITIAL_STATE_ANCHOR:
+                fingerprint = torch.cat((fingerprint, initial_mean, initial_var), dim=1)
             if TRAJECTORY_POOLING == "multiscale":
                 if len(checkpoint_summaries) != 5:
                     raise RuntimeError("Multiscale checkpoint collection is incomplete")
@@ -816,6 +822,8 @@ def train(extended_dynamics: bool = False) -> None:
             h = torch.tanh(INIT_SCALE * self.init(x))
             if initial_perturbation is not None:
                 h = h + initial_perturbation
+            initial_mean = h.mean(0)
+            initial_var = h.var(0, unbiased=False)
             velocity = torch.zeros_like(h)
             state_history = [h]
             states = [h]
@@ -949,6 +957,8 @@ def train(extended_dynamics: bool = False) -> None:
                 torch.stack(states).mean((0, 1)),
                 mean_series.var(0, unbiased=False), step_energy,
             ))
+            if INITIAL_STATE_ANCHOR:
+                fingerprint = torch.cat((fingerprint, initial_mean, initial_var))
             if TRAJECTORY_POOLING == "multiscale":
                 if len(checkpoint_summaries) != 5:
                     raise RuntimeError("Multiscale checkpoint collection is incomplete")

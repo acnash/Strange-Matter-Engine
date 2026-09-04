@@ -43,6 +43,7 @@ PARTIAL_POOL_REFINEMENT = os.environ.get("SME_PARTIAL_POOL_REFINEMENT", "0") == 
 TEMPORAL_REFINEMENT = os.environ.get("SME_TEMPORAL_REFINEMENT", "0") == "1"
 FEATURE_GATE_REFINEMENT = os.environ.get("SME_FEATURE_GATE_REFINEMENT", "0") == "1"
 PERTURBATION_REFINEMENT = os.environ.get("SME_PERTURBATION_REFINEMENT", "0") == "1"
+INITIAL_ANCHOR_REFINEMENT = os.environ.get("SME_INITIAL_ANCHOR_REFINEMENT", "0") == "1"
 INTERVAL_BETAS = (0.0, 0.25, 0.5, 0.75)
 POOL_WEIGHTS = (0.0, 0.05, 0.15, 0.30)
 PARENT_ENDPOINT_STUDY = (
@@ -63,6 +64,8 @@ TEST_CSV = ROOT / "data" / "openadmet-cyp-challenge-2026" / "cyp-challenge-TEST-
 
 
 def campaign_method() -> str:
+    if INITIAL_ANCHOR_REFINEMENT:
+        return "ISA-CIA-EA-CV-CYP-GCA"
     if PERTURBATION_REFINEMENT:
         return "PC-CIA-EA-CV-CYP-GCA"
     if FEATURE_GATE_REFINEMENT:
@@ -77,6 +80,8 @@ def campaign_method() -> str:
 
 
 def campaign_architecture() -> str:
+    if INITIAL_ANCHOR_REFINEMENT:
+        return "initial_state_anchored_credible_interval_endpoint_graph_ca"
     if PERTURBATION_REFINEMENT:
         return "perturbation_consistent_credible_interval_endpoint_graph_ca"
     if FEATURE_GATE_REFINEMENT:
@@ -93,6 +98,8 @@ def campaign_architecture() -> str:
 
 
 def campaign_submission_name() -> str:
+    if INITIAL_ANCHOR_REFINEMENT:
+        return "initial_state_anchored_credible_interval_ea_cv_cyp_gca_submission.csv"
     if PERTURBATION_REFINEMENT:
         return "perturbation_consistent_credible_interval_ea_cv_cyp_gca_submission.csv"
     if FEATURE_GATE_REFINEMENT:
@@ -177,6 +184,8 @@ def fit(worker: Path, stage, endpoint, rule, variant, config, seed, fold,
 
 
 def screen(worker: Path) -> dict:
+    if INITIAL_ANCHOR_REFINEMENT:
+        return screen_initial_anchor_refinement(worker)
     if PERTURBATION_REFINEMENT:
         return screen_perturbation_refinement(worker)
     if FEATURE_GATE_REFINEMENT:
@@ -522,6 +531,80 @@ def screen_feature_gate_refinement(worker: Path) -> dict:
                 "fold_scores": values,
                 "interval_loss_beta": candidate.get("interval_loss_beta", 0.0),
                 "chemical_feature_gating": gated,
+                "config": config,
+            })
+        selected[endpoint].sort(key=lambda item: item["screen_ma_st_rae"])
+    write_json(STUDY / "screening_summary.json", selected)
+    return selected
+
+
+def screen_initial_anchor_refinement(worker: Path) -> dict:
+    """Compare trajectory-only fingerprints with an initial-state anchor."""
+    parent = json.loads(
+        (PARENT_INTERVAL_STUDY / "screening_summary.json").read_text(
+            encoding="utf-8"
+        )
+    )
+    anchor_modes = (False, True)
+    jobs = [
+        (endpoint, candidate, anchored, fold)
+        for endpoint in ENDPOINTS for candidate in parent[endpoint]
+        for anchored in anchor_modes for fold in SCREEN_FOLDS
+    ]
+    scores = {
+        (endpoint, candidate["rule"], anchored): []
+        for endpoint in ENDPOINTS for candidate in parent[endpoint]
+        for anchored in anchor_modes
+    }
+    durations = []
+    for number, (endpoint, candidate, anchored, fold) in enumerate(jobs, 1):
+        config = deepcopy(candidate["config"])
+        config.update({
+            "initial_state_anchor": anchored,
+            "specialist_objective": "endpoint_only",
+        })
+        suffix = "anchored" if anchored else "trajectory_only"
+        variant = f"{candidate['variant']}_initial_{suffix}"
+        progress(
+            "initial_state_anchor_screen", completed=number - 1,
+            total=len(jobs), endpoint=endpoint, rule=candidate["rule"],
+            initial_state_anchor=anchored, fold=fold,
+            estimated_remaining_seconds=(
+                np.mean(durations) * (len(jobs) - number + 1)
+                if durations else None
+            ),
+        )
+        started = time.time()
+        metrics = fit(
+            worker, "screen", endpoint, candidate["rule"], variant,
+            config, 6101, fold, 22, 6,
+        )
+        durations.append(time.time() - started)
+        scores[(endpoint, candidate["rule"], anchored)].append(float(
+            metrics.get("restored_validation_point_ma_st_rae", np.inf)
+        ))
+    selected = {}
+    for endpoint in ENDPOINTS:
+        selected[endpoint] = []
+        for candidate in parent[endpoint]:
+            choices = []
+            for anchored in anchor_modes:
+                values = scores[(endpoint, candidate["rule"], anchored)]
+                choices.append((float(np.mean(values)), anchored, values))
+            score, anchored, values = min(choices)
+            config = deepcopy(candidate["config"])
+            config.update({
+                "initial_state_anchor": anchored,
+                "specialist_objective": "endpoint_only",
+            })
+            suffix = "anchored" if anchored else "trajectory_only"
+            selected[endpoint].append({
+                "rule": candidate["rule"],
+                "variant": f"{candidate['variant']}_initial_{suffix}",
+                "screen_ma_st_rae": score,
+                "fold_scores": values,
+                "interval_loss_beta": candidate.get("interval_loss_beta", 0.0),
+                "initial_state_anchor": anchored,
                 "config": config,
             })
         selected[endpoint].sort(key=lambda item: item["screen_ma_st_rae"])
