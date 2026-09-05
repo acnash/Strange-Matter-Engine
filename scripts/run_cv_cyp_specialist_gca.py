@@ -730,6 +730,10 @@ def evaluate_holdouts(worker: Path, selected: dict) -> None:
             "SME_DEVICE": "cuda", "SME_EVALUATE_CHECKPOINT": "1",
             "SME_ACTIVE_CYP": endpoint, "SME_CV_FOLD": str(fold),
             "SME_CV_FOLDS": str(len(FOLDS)),
+            "SME_INITIAL_STATE_ANCHOR": (
+                "1" if candidate["config"].get("initial_state_anchor", False)
+                else "0"
+            ),
         })
         with (run_dir / "checkpoint_evaluation.log").open("w", encoding="utf-8") as log:
             subprocess.run([str(worker), str(RUNNER), "train"], cwd=ROOT, env=env,
@@ -872,6 +876,10 @@ def blind_member(worker: Path, endpoint: str, candidate: dict,
         "SME_CHECKPOINT": str(run_path(label) / "model.pt"),
         "SME_RUN_NAME": f"{STUDY_NAME}/blind_members/{label}",
         "SME_DEVICE": "cuda", "SME_ACTIVE_CYP": endpoint,
+        "SME_INITIAL_STATE_ANCHOR": (
+            "1" if candidate["config"].get("initial_state_anchor", False)
+            else "0"
+        ),
     })
     with (output_dir / "console.log").open("w", encoding="utf-8") as log:
         subprocess.run([str(worker), str(RUNNER), "predict"], cwd=ROOT, env=env,
