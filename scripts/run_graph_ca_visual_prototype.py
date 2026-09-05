@@ -72,6 +72,7 @@ INTERVAL_TEMPERATURE = float(os.environ.get("SME_INTERVAL_TEMPERATURE", "0.05"))
 PERTURBATION_CONSISTENCY_WEIGHT = float(os.environ.get("SME_PERTURBATION_CONSISTENCY_WEIGHT", "0.0"))
 PERTURBATION_CONSISTENCY_EPSILON = float(os.environ.get("SME_PERTURBATION_CONSISTENCY_EPSILON", "0.001"))
 INITIAL_STATE_ANCHOR = os.environ.get("SME_INITIAL_STATE_ANCHOR", "0") == "1"
+DYNAMIC_OBSERVABLES = os.environ.get("SME_DYNAMIC_OBSERVABLES", "0") == "1"
 SEED = int(os.environ.get("SME_SEED", "1701"))
 CYPS = ("CYP1A2", "CYP2C9", "CYP2D6", "CYP3A4")
 ACTIVE_CYP = os.environ.get("SME_ACTIVE_CYP", "").strip()
@@ -636,6 +637,8 @@ def train(extended_dynamics: bool = False) -> None:
             initial_mean = self._graph_mean(h, graph_index, graph_count, atom_counts_tensor)
             initial_second = self._graph_mean(h.square(), graph_index, graph_count, atom_counts_tensor)
             initial_var = (initial_second - initial_mean.square()).clamp_min(0.0)
+            previous_graph_mean = initial_mean
+            lag_product_sum = torch.zeros_like(initial_mean)
             velocity = torch.zeros_like(h)
             state_history = [h]
             node_states = [h] if return_node_trajectory else None
@@ -773,6 +776,8 @@ def train(extended_dynamics: bool = False) -> None:
                     node_states.append(h)
                 temporal_atom_sum += h
                 graph_mean = self._graph_mean(h, graph_index, graph_count, atom_counts_tensor)
+                lag_product_sum += graph_mean * previous_graph_mean
+                previous_graph_mean = graph_mean
                 graph_mean_sum += graph_mean
                 graph_mean_sq_sum += graph_mean.square()
                 if TRAJECTORY_POOLING in {"multiscale", "temporal_attention"} and step_index in checkpoint_steps:
@@ -789,6 +794,11 @@ def train(extended_dynamics: bool = False) -> None:
             series_var = (graph_mean_sq_sum / float(GENERATIONS + 1) - series_mean.square()).clamp_min(0.0)
             energy_mean = self._graph_mean(step_energy, graph_index, graph_count, atom_counts_tensor)
             fingerprint = torch.cat((final_mean, final_var, temporal_mean, series_var, energy_mean), dim=1)
+            if DYNAMIC_OBSERVABLES:
+                lag_covariance = lag_product_sum / float(GENERATIONS) - series_mean.square()
+                lag_correlation = (lag_covariance / series_var.clamp_min(1e-6)).clamp(-5.0, 5.0)
+                displacement = final_mean - initial_mean
+                fingerprint = torch.cat((fingerprint, displacement, lag_correlation), dim=1)
             if INITIAL_STATE_ANCHOR:
                 fingerprint = torch.cat((fingerprint, initial_mean, initial_var), dim=1)
             if TRAJECTORY_POOLING == "multiscale":
@@ -957,6 +967,14 @@ def train(extended_dynamics: bool = False) -> None:
                 torch.stack(states).mean((0, 1)),
                 mean_series.var(0, unbiased=False), step_energy,
             ))
+            if DYNAMIC_OBSERVABLES:
+                lagged = (mean_series[1:] * mean_series[:-1]).mean(0)
+                series_mean = mean_series.mean(0)
+                series_var = mean_series.var(0, unbiased=False)
+                lag_correlation = ((lagged - series_mean.square()) /
+                                   series_var.clamp_min(1e-6)).clamp(-5.0, 5.0)
+                displacement = h.mean(0) - initial_mean
+                fingerprint = torch.cat((fingerprint, displacement, lag_correlation))
             if INITIAL_STATE_ANCHOR:
                 fingerprint = torch.cat((fingerprint, initial_mean, initial_var))
             if TRAJECTORY_POOLING == "multiscale":
