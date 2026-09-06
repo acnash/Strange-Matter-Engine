@@ -73,6 +73,7 @@ PERTURBATION_CONSISTENCY_WEIGHT = float(os.environ.get("SME_PERTURBATION_CONSIST
 PERTURBATION_CONSISTENCY_EPSILON = float(os.environ.get("SME_PERTURBATION_CONSISTENCY_EPSILON", "0.001"))
 INITIAL_STATE_ANCHOR = os.environ.get("SME_INITIAL_STATE_ANCHOR", "0") == "1"
 DYNAMIC_OBSERVABLES = os.environ.get("SME_DYNAMIC_OBSERVABLES", "0") == "1"
+ACTIVITY_BALANCE_STRENGTH = float(os.environ.get("SME_ACTIVITY_BALANCE_STRENGTH", "0.0"))
 SEED = int(os.environ.get("SME_SEED", "1701"))
 CYPS = ("CYP1A2", "CYP2C9", "CYP2D6", "CYP3A4")
 ACTIVE_CYP = os.environ.get("SME_ACTIVE_CYP", "").strip()
@@ -1205,6 +1206,8 @@ def train(extended_dynamics: bool = False) -> None:
     val_pairs = observed_pairs(validation_indices)
 
     interval_normalizers = {}
+    activity_centres = {}
+    activity_scales = {}
     for cyp_index in range(len(CYPS)):
         endpoint_pairs = [
             (i, float(record["labels"][cyp_index]))
@@ -1216,6 +1219,8 @@ def train(extended_dynamics: bool = False) -> None:
             interval_normalizers[cyp_index] = 1.0
             continue
         endpoint_targets = np.asarray([y for _, y in endpoint_pairs], dtype=float)
+        activity_centres[cyp_index] = float(np.median(endpoint_targets))
+        activity_scales[cyp_index] = max(float(np.std(endpoint_targets)), 1e-3)
         baseline = float(endpoint_targets.mean())
         endpoint_errors = []
         for i, _ in endpoint_pairs:
@@ -1370,10 +1375,23 @@ def train(extended_dynamics: bool = False) -> None:
                 )
             else:
                 query_weights = torch.ones_like(preds)
+            activity_weights = torch.ones_like(preds)
+            if ACTIVITY_BALANCE_STRENGTH > 0:
+                centres = torch.tensor(
+                    [activity_centres[c] for _, c, _ in query_batch],
+                    dtype=preds.dtype, device=device,
+                )
+                scales = torch.tensor(
+                    [activity_scales[c] for _, c, _ in query_batch],
+                    dtype=preds.dtype, device=device,
+                )
+                activity_weights = (1.0 + ACTIVITY_BALANCE_STRENGTH
+                                    * (targets - centres).abs() / scales).clamp(max=3.0)
             if LOSS_MODE == "mse":
                 squared_error = (preds - targets) ** 2
-                prediction_loss = ((squared_error * query_weights).sum()
-                                   / query_weights.sum().clamp_min(1e-8))
+                combined_weights = query_weights * activity_weights
+                prediction_loss = ((squared_error * combined_weights).sum()
+                                   / combined_weights.sum().clamp_min(1e-8))
             elif LOSS_MODE == "hybrid_interval":
                 endpoint_losses = []
                 endpoint_mse = []
@@ -1395,9 +1413,15 @@ def train(extended_dynamics: bool = False) -> None:
                     selected = query_endpoints == cyp_index
                     if selected.any():
                         endpoint_losses.append(
-                            outside[selected].mean() / interval_normalizers[cyp_index]
+                            (outside[selected] * activity_weights[selected]).sum()
+                            / activity_weights[selected].sum().clamp_min(1e-8)
+                            / interval_normalizers[cyp_index]
                         )
-                        endpoint_mse.append(((preds[selected] - targets[selected]) ** 2).mean())
+                        endpoint_mse.append(
+                            (((preds[selected] - targets[selected]) ** 2
+                              * activity_weights[selected]).sum()
+                             / activity_weights[selected].sum().clamp_min(1e-8))
+                        )
                         endpoint_weights.append(
                             1.0 if SPECIALIST_OBJECTIVE != "partial_pool"
                             or cyp_index == ACTIVE_CYP_INDEX

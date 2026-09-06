@@ -8,6 +8,7 @@
 | 3 September 2026 | FG-CIA-EA-CV-CYP-GCA | 0.751384 | 0.848686 | Experimental result |
 | 4 September 2026 | PC-CIA-EA-CV-CYP-GCA | 0.759449 | 0.852318 | Experimental result |
 | 5 September 2026 | ISA-CIA-EA-CV-CYP-GCA | 0.757657 | 0.853247 | Experimental result |
+| 6 September 2026 | TDO-CIA-EA-CV-CYP-GCA | 0.755675 | 0.851798 | Experimental result |
 
 All entries use the same reserved scaffold holdout. Model and hyperparameter
 selection occur within the fitting pool; the reserved holdout is excluded from

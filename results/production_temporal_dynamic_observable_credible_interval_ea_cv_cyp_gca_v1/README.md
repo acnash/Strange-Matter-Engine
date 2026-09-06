@@ -15,3 +15,13 @@ explicit recurrent generations, backpropagation, differentiable ridge
 regression, scaffold-safe selection, sealed evaluation, and blind-label
 exclusion. CIA-EA-CV-CYP-GCA is the comparison leader at point MA-ST-RAE
 0.748490 and RMSE 0.847738 pIC50.
+
+## Completed result
+
+The campaign completed sealed evaluation on 6 September 2026. Point
+MA-ST-RAE was 0.755675 and RMSE was 0.851798 pIC50. Endpoint point ST-RAE was
+0.811986 for CYP1A2, 0.725530 for CYP2C9, 0.943604 for CYP2D6, and 0.541581
+for CYP3A4. Dynamic observables were selected for Gray–Scott on CYP1A2,
+Gray–Scott and conservative graph flux on CYP2C9, and FitzHugh–Nagumo on
+CYP3A4. The common sealed score remained behind CIA-EA-CV-CYP-GCA, which
+remains the internal leader.
