@@ -47,6 +47,7 @@ INITIAL_ANCHOR_REFINEMENT = os.environ.get("SME_INITIAL_ANCHOR_REFINEMENT", "0")
 DYNAMIC_OBSERVABLE_REFINEMENT = os.environ.get("SME_DYNAMIC_OBSERVABLE_REFINEMENT", "0") == "1"
 ACTIVITY_BALANCE_REFINEMENT = os.environ.get("SME_ACTIVITY_BALANCE_REFINEMENT", "0") == "1"
 BOND_DROPOUT_REFINEMENT = os.environ.get("SME_BOND_DROPOUT_REFINEMENT", "0") == "1"
+DEGREE_NORM_REFINEMENT = os.environ.get("SME_DEGREE_NORM_REFINEMENT", "0") == "1"
 INTERVAL_BETAS = (0.0, 0.25, 0.5, 0.75)
 POOL_WEIGHTS = (0.0, 0.05, 0.15, 0.30)
 PARENT_ENDPOINT_STUDY = (
@@ -67,6 +68,8 @@ TEST_CSV = ROOT / "data" / "openadmet-cyp-challenge-2026" / "cyp-challenge-TEST-
 
 
 def campaign_method() -> str:
+    if DEGREE_NORM_REFINEMENT:
+        return "DNC-CIA-EA-CV-CYP-GCA"
     if BOND_DROPOUT_REFINEMENT:
         return "BMR-CIA-EA-CV-CYP-GCA"
     if ACTIVITY_BALANCE_REFINEMENT:
@@ -89,6 +92,8 @@ def campaign_method() -> str:
 
 
 def campaign_architecture() -> str:
+    if DEGREE_NORM_REFINEMENT:
+        return "degree_normalised_credible_interval_endpoint_graph_ca"
     if BOND_DROPOUT_REFINEMENT:
         return "bond_message_regularised_credible_interval_endpoint_graph_ca"
     if ACTIVITY_BALANCE_REFINEMENT:
@@ -113,6 +118,8 @@ def campaign_architecture() -> str:
 
 
 def campaign_submission_name() -> str:
+    if DEGREE_NORM_REFINEMENT:
+        return "degree_normalised_credible_interval_ea_cv_cyp_gca_submission.csv"
     if BOND_DROPOUT_REFINEMENT:
         return "bond_message_regularised_credible_interval_ea_cv_cyp_gca_submission.csv"
     if ACTIVITY_BALANCE_REFINEMENT:
@@ -205,6 +212,8 @@ def fit(worker: Path, stage, endpoint, rule, variant, config, seed, fold,
 
 
 def screen(worker: Path) -> dict:
+    if DEGREE_NORM_REFINEMENT:
+        return screen_degree_norm_refinement(worker)
     if BOND_DROPOUT_REFINEMENT:
         return screen_bond_dropout_refinement(worker)
     if ACTIVITY_BALANCE_REFINEMENT:
@@ -558,6 +567,78 @@ def screen_feature_gate_refinement(worker: Path) -> dict:
                 "fold_scores": values,
                 "interval_loss_beta": candidate.get("interval_loss_beta", 0.0),
                 "chemical_feature_gating": gated,
+                "config": config,
+            })
+        selected[endpoint].sort(key=lambda item: item["screen_ma_st_rae"])
+    write_json(STUDY / "screening_summary.json", selected)
+    return selected
+
+
+def screen_degree_norm_refinement(worker: Path) -> dict:
+    """Compare mean aggregation with softer square-root degree normalisation."""
+    parent = json.loads(
+        (PARENT_INTERVAL_STUDY / "screening_summary.json").read_text(
+            encoding="utf-8"
+        )
+    )
+    powers = (1.0, 0.5)
+    jobs = [
+        (endpoint, candidate, power, fold)
+        for endpoint in ENDPOINTS for candidate in parent[endpoint]
+        for power in powers for fold in SCREEN_FOLDS
+    ]
+    scores = {
+        (endpoint, candidate["rule"], power): []
+        for endpoint in ENDPOINTS for candidate in parent[endpoint]
+        for power in powers
+    }
+    durations = []
+    for number, (endpoint, candidate, power, fold) in enumerate(jobs, 1):
+        config = deepcopy(candidate["config"])
+        config.update({
+            "degree_normalization_power": power,
+            "specialist_objective": "endpoint_only",
+        })
+        variant = f"{candidate['variant']}_degree_{int(power * 100):03d}"
+        progress(
+            "degree_normalization_screen", completed=number - 1,
+            total=len(jobs), endpoint=endpoint, rule=candidate["rule"],
+            degree_normalization_power=power, fold=fold,
+            estimated_remaining_seconds=(
+                np.mean(durations) * (len(jobs) - number + 1)
+                if durations else None
+            ),
+        )
+        started = time.time()
+        metrics = fit(
+            worker, "screen", endpoint, candidate["rule"], variant,
+            config, 6101, fold, 22, 6,
+        )
+        durations.append(time.time() - started)
+        scores[(endpoint, candidate["rule"], power)].append(float(
+            metrics.get("restored_validation_point_ma_st_rae", np.inf)
+        ))
+    selected = {}
+    for endpoint in ENDPOINTS:
+        selected[endpoint] = []
+        for candidate in parent[endpoint]:
+            choices = []
+            for power in powers:
+                values = scores[(endpoint, candidate["rule"], power)]
+                choices.append((float(np.mean(values)), power, values))
+            score, power, values = min(choices)
+            config = deepcopy(candidate["config"])
+            config.update({
+                "degree_normalization_power": power,
+                "specialist_objective": "endpoint_only",
+            })
+            selected[endpoint].append({
+                "rule": candidate["rule"],
+                "variant": f"{candidate['variant']}_degree_{int(power * 100):03d}",
+                "screen_ma_st_rae": score,
+                "fold_scores": values,
+                "interval_loss_beta": candidate.get("interval_loss_beta", 0.0),
+                "degree_normalization_power": power,
                 "config": config,
             })
         selected[endpoint].sort(key=lambda item: item["screen_ma_st_rae"])

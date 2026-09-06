@@ -75,6 +75,7 @@ INITIAL_STATE_ANCHOR = os.environ.get("SME_INITIAL_STATE_ANCHOR", "0") == "1"
 DYNAMIC_OBSERVABLES = os.environ.get("SME_DYNAMIC_OBSERVABLES", "0") == "1"
 ACTIVITY_BALANCE_STRENGTH = float(os.environ.get("SME_ACTIVITY_BALANCE_STRENGTH", "0.0"))
 BOND_MESSAGE_DROPOUT = float(os.environ.get("SME_BOND_MESSAGE_DROPOUT", "0.0"))
+DEGREE_NORMALIZATION_POWER = float(os.environ.get("SME_DEGREE_NORMALIZATION_POWER", "1.0"))
 SEED = int(os.environ.get("SME_SEED", "1701"))
 CYPS = ("CYP1A2", "CYP2C9", "CYP2D6", "CYP3A4")
 ACTIVE_CYP = os.environ.get("SME_ACTIVE_CYP", "").strip()
@@ -665,7 +666,7 @@ def train(extended_dynamics: bool = False) -> None:
                     agg.index_add_(0, dst, msg)
                     neighbour_mean.index_add_(0, dst, h[src])
                     degree.index_add_(0, dst, torch.ones((dst.numel(), 1), device=device))
-                    agg = agg / degree.clamp_min(1.0)
+                    agg = agg / degree.clamp_min(1.0).pow(DEGREE_NORMALIZATION_POWER)
                     neighbour_mean = neighbour_mean / degree.clamp_min(1.0)
                 reaction = torch.tanh(self.self_layer(h) + agg + self.chem(x) +
                                       self.context(c) + self.bias)
@@ -860,7 +861,7 @@ def train(extended_dynamics: bool = False) -> None:
                     agg.index_add_(0, dst, msg)
                     neighbour_mean.index_add_(0, dst, h[src])
                     degree.index_add_(0, dst, torch.ones((dst.numel(), 1), device=device))
-                    agg = agg / degree.clamp_min(1.0)
+                    agg = agg / degree.clamp_min(1.0).pow(DEGREE_NORMALIZATION_POWER)
                     neighbour_mean = neighbour_mean / degree.clamp_min(1.0)
                 c = context.expand(h.shape[0], -1)
                 reaction = torch.tanh(self.self_layer(h) + agg + self.chem(x) +
