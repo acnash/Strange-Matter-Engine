@@ -74,6 +74,7 @@ PERTURBATION_CONSISTENCY_EPSILON = float(os.environ.get("SME_PERTURBATION_CONSIS
 INITIAL_STATE_ANCHOR = os.environ.get("SME_INITIAL_STATE_ANCHOR", "0") == "1"
 DYNAMIC_OBSERVABLES = os.environ.get("SME_DYNAMIC_OBSERVABLES", "0") == "1"
 ACTIVITY_BALANCE_STRENGTH = float(os.environ.get("SME_ACTIVITY_BALANCE_STRENGTH", "0.0"))
+BOND_MESSAGE_DROPOUT = float(os.environ.get("SME_BOND_MESSAGE_DROPOUT", "0.0"))
 SEED = int(os.environ.get("SME_SEED", "1701"))
 CYPS = ("CYP1A2", "CYP2C9", "CYP2D6", "CYP3A4")
 ACTIVE_CYP = os.environ.get("SME_ACTIVE_CYP", "").strip()
@@ -657,6 +658,9 @@ def train(extended_dynamics: bool = False) -> None:
                 degree = torch.zeros((h.shape[0], 1), device=device)
                 if src.numel():
                     edge_gate = torch.sigmoid(self.bond_gate(edge) / BOND_TEMPERATURE)
+                    if self.training and BOND_MESSAGE_DROPOUT > 0:
+                        keep = (torch.rand_like(edge_gate[:, :1]) >= BOND_MESSAGE_DROPOUT)
+                        edge_gate = edge_gate * keep / (1.0 - BOND_MESSAGE_DROPOUT)
                     msg = edge_gate * self.neighbour(h[src]) + self.bond(edge)
                     agg.index_add_(0, dst, msg)
                     neighbour_mean.index_add_(0, dst, h[src])
@@ -849,6 +853,9 @@ def train(extended_dynamics: bool = False) -> None:
                 degree = torch.zeros((h.shape[0], 1), device=device)
                 if src.numel():
                     edge_gate = torch.sigmoid(self.bond_gate(edge) / BOND_TEMPERATURE)
+                    if self.training and BOND_MESSAGE_DROPOUT > 0:
+                        keep = (torch.rand_like(edge_gate[:, :1]) >= BOND_MESSAGE_DROPOUT)
+                        edge_gate = edge_gate * keep / (1.0 - BOND_MESSAGE_DROPOUT)
                     msg = edge_gate * self.neighbour(h[src]) + self.bond(edge)
                     agg.index_add_(0, dst, msg)
                     neighbour_mean.index_add_(0, dst, h[src])

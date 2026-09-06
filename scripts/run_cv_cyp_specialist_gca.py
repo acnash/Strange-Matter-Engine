@@ -46,6 +46,7 @@ PERTURBATION_REFINEMENT = os.environ.get("SME_PERTURBATION_REFINEMENT", "0") == 
 INITIAL_ANCHOR_REFINEMENT = os.environ.get("SME_INITIAL_ANCHOR_REFINEMENT", "0") == "1"
 DYNAMIC_OBSERVABLE_REFINEMENT = os.environ.get("SME_DYNAMIC_OBSERVABLE_REFINEMENT", "0") == "1"
 ACTIVITY_BALANCE_REFINEMENT = os.environ.get("SME_ACTIVITY_BALANCE_REFINEMENT", "0") == "1"
+BOND_DROPOUT_REFINEMENT = os.environ.get("SME_BOND_DROPOUT_REFINEMENT", "0") == "1"
 INTERVAL_BETAS = (0.0, 0.25, 0.5, 0.75)
 POOL_WEIGHTS = (0.0, 0.05, 0.15, 0.30)
 PARENT_ENDPOINT_STUDY = (
@@ -66,6 +67,8 @@ TEST_CSV = ROOT / "data" / "openadmet-cyp-challenge-2026" / "cyp-challenge-TEST-
 
 
 def campaign_method() -> str:
+    if BOND_DROPOUT_REFINEMENT:
+        return "BMR-CIA-EA-CV-CYP-GCA"
     if ACTIVITY_BALANCE_REFINEMENT:
         return "AB-CIA-EA-CV-CYP-GCA"
     if DYNAMIC_OBSERVABLE_REFINEMENT:
@@ -86,6 +89,8 @@ def campaign_method() -> str:
 
 
 def campaign_architecture() -> str:
+    if BOND_DROPOUT_REFINEMENT:
+        return "bond_message_regularised_credible_interval_endpoint_graph_ca"
     if ACTIVITY_BALANCE_REFINEMENT:
         return "activity_balanced_credible_interval_endpoint_graph_ca"
     if DYNAMIC_OBSERVABLE_REFINEMENT:
@@ -108,6 +113,8 @@ def campaign_architecture() -> str:
 
 
 def campaign_submission_name() -> str:
+    if BOND_DROPOUT_REFINEMENT:
+        return "bond_message_regularised_credible_interval_ea_cv_cyp_gca_submission.csv"
     if ACTIVITY_BALANCE_REFINEMENT:
         return "activity_balanced_credible_interval_ea_cv_cyp_gca_submission.csv"
     if DYNAMIC_OBSERVABLE_REFINEMENT:
@@ -198,6 +205,8 @@ def fit(worker: Path, stage, endpoint, rule, variant, config, seed, fold,
 
 
 def screen(worker: Path) -> dict:
+    if BOND_DROPOUT_REFINEMENT:
+        return screen_bond_dropout_refinement(worker)
     if ACTIVITY_BALANCE_REFINEMENT:
         return screen_activity_balance_refinement(worker)
     if DYNAMIC_OBSERVABLE_REFINEMENT:
@@ -549,6 +558,78 @@ def screen_feature_gate_refinement(worker: Path) -> dict:
                 "fold_scores": values,
                 "interval_loss_beta": candidate.get("interval_loss_beta", 0.0),
                 "chemical_feature_gating": gated,
+                "config": config,
+            })
+        selected[endpoint].sort(key=lambda item: item["screen_ma_st_rae"])
+    write_json(STUDY / "screening_summary.json", selected)
+    return selected
+
+
+def screen_bond_dropout_refinement(worker: Path) -> dict:
+    """Compare full message passing with low-rate bond-message dropout."""
+    parent = json.loads(
+        (PARENT_INTERVAL_STUDY / "screening_summary.json").read_text(
+            encoding="utf-8"
+        )
+    )
+    rates = (0.0, 0.05)
+    jobs = [
+        (endpoint, candidate, rate, fold)
+        for endpoint in ENDPOINTS for candidate in parent[endpoint]
+        for rate in rates for fold in SCREEN_FOLDS
+    ]
+    scores = {
+        (endpoint, candidate["rule"], rate): []
+        for endpoint in ENDPOINTS for candidate in parent[endpoint]
+        for rate in rates
+    }
+    durations = []
+    for number, (endpoint, candidate, rate, fold) in enumerate(jobs, 1):
+        config = deepcopy(candidate["config"])
+        config.update({
+            "bond_message_dropout": rate,
+            "specialist_objective": "endpoint_only",
+        })
+        variant = f"{candidate['variant']}_bond_dropout_{int(rate * 100):02d}"
+        progress(
+            "bond_message_dropout_screen", completed=number - 1,
+            total=len(jobs), endpoint=endpoint, rule=candidate["rule"],
+            bond_message_dropout=rate, fold=fold,
+            estimated_remaining_seconds=(
+                np.mean(durations) * (len(jobs) - number + 1)
+                if durations else None
+            ),
+        )
+        started = time.time()
+        metrics = fit(
+            worker, "screen", endpoint, candidate["rule"], variant,
+            config, 6101, fold, 22, 6,
+        )
+        durations.append(time.time() - started)
+        scores[(endpoint, candidate["rule"], rate)].append(float(
+            metrics.get("restored_validation_point_ma_st_rae", np.inf)
+        ))
+    selected = {}
+    for endpoint in ENDPOINTS:
+        selected[endpoint] = []
+        for candidate in parent[endpoint]:
+            choices = []
+            for rate in rates:
+                values = scores[(endpoint, candidate["rule"], rate)]
+                choices.append((float(np.mean(values)), rate, values))
+            score, rate, values = min(choices)
+            config = deepcopy(candidate["config"])
+            config.update({
+                "bond_message_dropout": rate,
+                "specialist_objective": "endpoint_only",
+            })
+            selected[endpoint].append({
+                "rule": candidate["rule"],
+                "variant": f"{candidate['variant']}_bond_dropout_{int(rate * 100):02d}",
+                "screen_ma_st_rae": score,
+                "fold_scores": values,
+                "interval_loss_beta": candidate.get("interval_loss_beta", 0.0),
+                "bond_message_dropout": rate,
                 "config": config,
             })
         selected[endpoint].sort(key=lambda item: item["screen_ma_st_rae"])
