@@ -50,6 +50,7 @@ BOND_DROPOUT_REFINEMENT = os.environ.get("SME_BOND_DROPOUT_REFINEMENT", "0") == 
 DEGREE_NORM_REFINEMENT = os.environ.get("SME_DEGREE_NORM_REFINEMENT", "0") == "1"
 SUPPORT_BALANCE_REFINEMENT = os.environ.get("SME_SUPPORT_BALANCE_REFINEMENT", "0") == "1"
 BOND_TEMPERATURE_REFINEMENT = os.environ.get("SME_BOND_TEMPERATURE_REFINEMENT", "0") == "1"
+HIDDEN_WIDTH_REFINEMENT = os.environ.get("SME_HIDDEN_WIDTH_REFINEMENT", "0") == "1"
 INTERVAL_BETAS = (0.0, 0.25, 0.5, 0.75)
 POOL_WEIGHTS = (0.0, 0.05, 0.15, 0.30)
 PARENT_ENDPOINT_STUDY = (
@@ -70,6 +71,8 @@ TEST_CSV = ROOT / "data" / "openadmet-cyp-challenge-2026" / "cyp-challenge-TEST-
 
 
 def campaign_method() -> str:
+    if HIDDEN_WIDTH_REFINEMENT:
+        return "HWR-CIA-EA-CV-CYP-GCA"
     if BOND_TEMPERATURE_REFINEMENT:
         return "BTS-CIA-EA-CV-CYP-GCA"
     if SUPPORT_BALANCE_REFINEMENT:
@@ -98,6 +101,8 @@ def campaign_method() -> str:
 
 
 def campaign_architecture() -> str:
+    if HIDDEN_WIDTH_REFINEMENT:
+        return "hidden_width_refined_credible_interval_endpoint_graph_ca"
     if BOND_TEMPERATURE_REFINEMENT:
         return "bond_temperature_scaled_credible_interval_endpoint_graph_ca"
     if SUPPORT_BALANCE_REFINEMENT:
@@ -128,6 +133,8 @@ def campaign_architecture() -> str:
 
 
 def campaign_submission_name() -> str:
+    if HIDDEN_WIDTH_REFINEMENT:
+        return "hidden_width_refined_credible_interval_ea_cv_cyp_gca_submission.csv"
     if BOND_TEMPERATURE_REFINEMENT:
         return "bond_temperature_scaled_credible_interval_ea_cv_cyp_gca_submission.csv"
     if SUPPORT_BALANCE_REFINEMENT:
@@ -226,6 +233,8 @@ def fit(worker: Path, stage, endpoint, rule, variant, config, seed, fold,
 
 
 def screen(worker: Path) -> dict:
+    if HIDDEN_WIDTH_REFINEMENT:
+        return screen_hidden_width_refinement(worker)
     if BOND_TEMPERATURE_REFINEMENT:
         return screen_bond_temperature_refinement(worker)
     if SUPPORT_BALANCE_REFINEMENT:
@@ -805,6 +814,81 @@ def screen_bond_temperature_refinement(worker: Path) -> dict:
                 "interval_loss_beta": candidate.get("interval_loss_beta", 0.0),
                 "bond_temperature_scale": scale,
                 "bond_temperature": temperature,
+                "config": config,
+            })
+        selected[endpoint].sort(key=lambda item: item["screen_ma_st_rae"])
+    write_json(STUDY / "screening_summary.json", selected)
+    return selected
+
+
+def screen_hidden_width_refinement(worker: Path) -> dict:
+    """Test additional CA state capacity without changing graph dynamics."""
+    parent = json.loads(
+        (PARENT_INTERVAL_STUDY / "screening_summary.json").read_text(
+            encoding="utf-8"
+        )
+    )
+    scales = (1.0, 1.5)
+    jobs = [
+        (endpoint, candidate, scale, fold)
+        for endpoint in ENDPOINTS for candidate in parent[endpoint]
+        for scale in scales for fold in SCREEN_FOLDS
+    ]
+    scores = {
+        (endpoint, candidate["rule"], scale): []
+        for endpoint in ENDPOINTS for candidate in parent[endpoint]
+        for scale in scales
+    }
+    durations = []
+    for number, (endpoint, candidate, scale, fold) in enumerate(jobs, 1):
+        config = deepcopy(candidate["config"])
+        width = max(4, int(round(float(config.get("hidden_channels", 8)) * scale)))
+        config.update({
+            "hidden_channels": width,
+            "specialist_objective": "endpoint_only",
+        })
+        variant = f"{candidate['variant']}_width_{width:03d}"
+        progress(
+            "hidden_width_screen", completed=number - 1,
+            total=len(jobs), endpoint=endpoint, rule=candidate["rule"],
+            hidden_width_scale=scale, hidden_channels=width, fold=fold,
+            estimated_remaining_seconds=(
+                np.mean(durations) * (len(jobs) - number + 1)
+                if durations else None
+            ),
+        )
+        started = time.time()
+        metrics = fit(
+            worker, "screen", endpoint, candidate["rule"], variant,
+            config, 6101, fold, 22, 6,
+        )
+        durations.append(time.time() - started)
+        scores[(endpoint, candidate["rule"], scale)].append(float(
+            metrics.get("restored_validation_point_ma_st_rae", np.inf)
+        ))
+    selected = {}
+    for endpoint in ENDPOINTS:
+        selected[endpoint] = []
+        for candidate in parent[endpoint]:
+            choices = []
+            for scale in scales:
+                values = scores[(endpoint, candidate["rule"], scale)]
+                choices.append((float(np.mean(values)), scale, values))
+            score, scale, values = min(choices)
+            config = deepcopy(candidate["config"])
+            width = max(4, int(round(float(config.get("hidden_channels", 8)) * scale)))
+            config.update({
+                "hidden_channels": width,
+                "specialist_objective": "endpoint_only",
+            })
+            selected[endpoint].append({
+                "rule": candidate["rule"],
+                "variant": f"{candidate['variant']}_width_{width:03d}",
+                "screen_ma_st_rae": score,
+                "fold_scores": values,
+                "interval_loss_beta": candidate.get("interval_loss_beta", 0.0),
+                "hidden_width_scale": scale,
+                "hidden_channels": width,
                 "config": config,
             })
         selected[endpoint].sort(key=lambda item: item["screen_ma_st_rae"])

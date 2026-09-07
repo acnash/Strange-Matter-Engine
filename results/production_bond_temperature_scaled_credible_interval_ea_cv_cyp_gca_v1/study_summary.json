@@ -1,0 +1,726 @@
+{
+  "method": "BTS-CIA-EA-CV-CYP-GCA",
+  "architecture": "bond_temperature_scaled_credible_interval_endpoint_graph_ca",
+  "specialisation_stage": "nonlinear_ca_backpropagation_and_ridge_readout",
+  "screened_rules_per_endpoint": 10,
+  "selected_candidates": {
+    "CYP1A2": [
+      {
+        "rule": "conservative_graph_flux",
+        "variant": "specialist_loss_00_bondtemp_075",
+        "screen_ma_st_rae": 0.8818964633150527,
+        "fold_scores": [
+          0.8198833171155052,
+          0.9439096095146001
+        ],
+        "interval_loss_beta": 0.0,
+        "bond_temperature_scale": 0.75,
+        "bond_temperature": 0.375,
+        "config": {
+          "generations": 125,
+          "hidden_channels": 16,
+          "ca_lr": 0.003,
+          "ridge": 0.1,
+          "ca_l2": 1e-06,
+          "gradient_clip": 2.0,
+          "batch_molecules": 128,
+          "update_scale": 0.15,
+          "init_scale": 1.5,
+          "initial_noise": 0.0,
+          "support_fraction": 0.85,
+          "bond_temperature": 0.375,
+          "dyn_a": 0.5,
+          "dyn_b": 0.2,
+          "dyn_c": 0.5,
+          "dyn_d": 0.05,
+          "atom_feature_profile": "electronic_local",
+          "trajectory_pooling": "multiscale",
+          "ridge_mode": "shared",
+          "loss_mode": "mse",
+          "interval_loss_beta": 0.0,
+          "specialist_objective": "endpoint_only"
+        }
+      },
+      {
+        "rule": "gray_scott",
+        "variant": "base_loss_75_bondtemp_075",
+        "screen_ma_st_rae": 0.8872734643306283,
+        "fold_scores": [
+          0.8483563510765979,
+          0.9261905775846586
+        ],
+        "interval_loss_beta": 0.75,
+        "bond_temperature_scale": 0.75,
+        "bond_temperature": 1.5,
+        "config": {
+          "generations": 125,
+          "hidden_channels": 16,
+          "ca_lr": 0.003,
+          "ridge": 1.0,
+          "ca_l2": 1e-06,
+          "gradient_clip": 1.0,
+          "batch_molecules": 128,
+          "update_scale": 0.4,
+          "init_scale": 0.5,
+          "initial_noise": 0.0,
+          "support_fraction": 0.75,
+          "bond_temperature": 1.5,
+          "dyn_a": 0.5,
+          "dyn_b": 0.5,
+          "dyn_c": 0.2,
+          "dyn_d": 0.3,
+          "atom_feature_profile": "periodic_electronic",
+          "trajectory_pooling": "multiscale",
+          "ridge_mode": "shared",
+          "loss_mode": "hybrid_interval",
+          "interval_loss_beta": 0.75,
+          "interval_temperature": 0.05,
+          "specialist_objective": "endpoint_only"
+        }
+      },
+      {
+        "rule": "fitzhugh_nagumo",
+        "variant": "base_loss_50_bondtemp_075",
+        "screen_ma_st_rae": 0.9033969514764697,
+        "fold_scores": [
+          0.8672317300504142,
+          0.9395621729025253
+        ],
+        "interval_loss_beta": 0.5,
+        "bond_temperature_scale": 0.75,
+        "bond_temperature": 0.75,
+        "config": {
+          "generations": 125,
+          "hidden_channels": 8,
+          "ca_lr": 0.003,
+          "ridge": 0.1,
+          "ca_l2": 0.0001,
+          "gradient_clip": 0.5,
+          "batch_molecules": 64,
+          "update_scale": 0.08,
+          "init_scale": 0.5,
+          "initial_noise": 0.005,
+          "support_fraction": 0.75,
+          "bond_temperature": 0.75,
+          "dyn_a": 0.5,
+          "dyn_b": 0.2,
+          "dyn_c": 0.8,
+          "dyn_d": 0.15,
+          "atom_feature_profile": "periodic",
+          "trajectory_pooling": "multiscale",
+          "ridge_mode": "per_endpoint",
+          "loss_mode": "hybrid_interval",
+          "interval_loss_beta": 0.5,
+          "interval_temperature": 0.05,
+          "specialist_objective": "endpoint_only"
+        }
+      }
+    ],
+    "CYP2C9": [
+      {
+        "rule": "damped_symplectic",
+        "variant": "base_loss_00_bondtemp_100",
+        "screen_ma_st_rae": 0.7187707993705148,
+        "fold_scores": [
+          0.7145585793730515,
+          0.722983019367978
+        ],
+        "interval_loss_beta": 0.0,
+        "bond_temperature_scale": 1.0,
+        "bond_temperature": 1.0,
+        "config": {
+          "generations": 16,
+          "hidden_channels": 16,
+          "ca_lr": 0.003,
+          "ridge": 1.0,
+          "ca_l2": 1e-06,
+          "gradient_clip": 1.0,
+          "batch_molecules": 64,
+          "update_scale": 0.25,
+          "init_scale": 1.5,
+          "initial_noise": 0.0,
+          "support_fraction": 0.6,
+          "bond_temperature": 1.0,
+          "dyn_a": 0.5,
+          "dyn_b": 0.2,
+          "dyn_c": 0.2,
+          "dyn_d": 0.15,
+          "atom_feature_profile": "local_environment",
+          "trajectory_pooling": "multiscale",
+          "ridge_mode": "shared",
+          "loss_mode": "mse",
+          "interval_loss_beta": 0.0,
+          "specialist_objective": "endpoint_only"
+        }
+      },
+      {
+        "rule": "gray_scott",
+        "variant": "specialist_loss_75_bondtemp_125",
+        "screen_ma_st_rae": 0.7415542829660391,
+        "fold_scores": [
+          0.716848017953578,
+          0.7662605479785001
+        ],
+        "interval_loss_beta": 0.75,
+        "bond_temperature_scale": 1.25,
+        "bond_temperature": 2.5,
+        "config": {
+          "generations": 250,
+          "hidden_channels": 16,
+          "ca_lr": 0.003,
+          "ridge": 0.1,
+          "ca_l2": 1e-06,
+          "gradient_clip": 1.0,
+          "batch_molecules": 128,
+          "update_scale": 0.4,
+          "init_scale": 0.5,
+          "initial_noise": 0.0,
+          "support_fraction": 0.75,
+          "bond_temperature": 2.5,
+          "dyn_a": 0.5,
+          "dyn_b": 0.5,
+          "dyn_c": 0.2,
+          "dyn_d": 0.3,
+          "atom_feature_profile": "comprehensive",
+          "trajectory_pooling": "multiscale",
+          "ridge_mode": "shared",
+          "loss_mode": "hybrid_interval",
+          "interval_loss_beta": 0.75,
+          "interval_temperature": 0.05,
+          "specialist_objective": "endpoint_only"
+        }
+      },
+      {
+        "rule": "conservative_graph_flux",
+        "variant": "base_loss_75_bondtemp_075",
+        "screen_ma_st_rae": 0.7722759839506366,
+        "fold_scores": [
+          0.7991561889768782,
+          0.7453957789243949
+        ],
+        "interval_loss_beta": 0.75,
+        "bond_temperature_scale": 0.75,
+        "bond_temperature": 0.375,
+        "config": {
+          "generations": 250,
+          "hidden_channels": 16,
+          "ca_lr": 0.003,
+          "ridge": 1.0,
+          "ca_l2": 1e-06,
+          "gradient_clip": 2.0,
+          "batch_molecules": 128,
+          "update_scale": 0.15,
+          "init_scale": 1.5,
+          "initial_noise": 0.0,
+          "support_fraction": 0.85,
+          "bond_temperature": 0.375,
+          "dyn_a": 0.5,
+          "dyn_b": 0.2,
+          "dyn_c": 0.5,
+          "dyn_d": 0.05,
+          "atom_feature_profile": "comprehensive",
+          "trajectory_pooling": "multiscale",
+          "ridge_mode": "shared",
+          "loss_mode": "hybrid_interval",
+          "interval_loss_beta": 0.75,
+          "interval_temperature": 0.05,
+          "specialist_objective": "endpoint_only"
+        }
+      }
+    ],
+    "CYP2D6": [
+      {
+        "rule": "delayed_memory",
+        "variant": "specialist_loss_00_bondtemp_125",
+        "screen_ma_st_rae": 0.9246490882791543,
+        "fold_scores": [
+          0.8973865359018838,
+          0.9519116406564248
+        ],
+        "interval_loss_beta": 0.0,
+        "bond_temperature_scale": 1.25,
+        "bond_temperature": 2.5,
+        "config": {
+          "generations": 16,
+          "hidden_channels": 16,
+          "ca_lr": 0.003,
+          "ridge": 10.0,
+          "ca_l2": 1e-06,
+          "gradient_clip": 2.0,
+          "batch_molecules": 64,
+          "update_scale": 0.08,
+          "init_scale": 0.5,
+          "initial_noise": 0.0,
+          "support_fraction": 0.6,
+          "bond_temperature": 2.5,
+          "dyn_a": 0.2,
+          "dyn_b": 0.2,
+          "dyn_c": 0.8,
+          "dyn_d": 0.15,
+          "atom_feature_profile": "valence_electronic",
+          "trajectory_pooling": "multiscale",
+          "ridge_mode": "shared",
+          "loss_mode": "mse",
+          "interval_loss_beta": 0.0,
+          "specialist_objective": "endpoint_only"
+        }
+      },
+      {
+        "rule": "fitzhugh_nagumo",
+        "variant": "base_loss_75_bondtemp_125",
+        "screen_ma_st_rae": 0.9330503051080887,
+        "fold_scores": [
+          0.9133188037179196,
+          0.9527818064982577
+        ],
+        "interval_loss_beta": 0.75,
+        "bond_temperature_scale": 1.25,
+        "bond_temperature": 1.25,
+        "config": {
+          "generations": 125,
+          "hidden_channels": 8,
+          "ca_lr": 0.003,
+          "ridge": 0.1,
+          "ca_l2": 0.0001,
+          "gradient_clip": 0.5,
+          "batch_molecules": 64,
+          "update_scale": 0.08,
+          "init_scale": 0.5,
+          "initial_noise": 0.005,
+          "support_fraction": 0.75,
+          "bond_temperature": 1.25,
+          "dyn_a": 0.5,
+          "dyn_b": 0.2,
+          "dyn_c": 0.8,
+          "dyn_d": 0.15,
+          "atom_feature_profile": "periodic",
+          "trajectory_pooling": "multiscale",
+          "ridge_mode": "per_endpoint",
+          "loss_mode": "hybrid_interval",
+          "interval_loss_beta": 0.75,
+          "interval_temperature": 0.05,
+          "specialist_objective": "endpoint_only"
+        }
+      },
+      {
+        "rule": "inertial_reaction_diffusion",
+        "variant": "base_loss_75_bondtemp_125",
+        "screen_ma_st_rae": 0.9344591817940291,
+        "fold_scores": [
+          0.9091513091351364,
+          0.9597670544529217
+        ],
+        "interval_loss_beta": 0.75,
+        "bond_temperature_scale": 1.25,
+        "bond_temperature": 0.625,
+        "config": {
+          "generations": 125,
+          "hidden_channels": 8,
+          "ca_lr": 0.001,
+          "ridge": 1.0,
+          "ca_l2": 1e-06,
+          "gradient_clip": 2.0,
+          "batch_molecules": 128,
+          "update_scale": 0.08,
+          "init_scale": 0.5,
+          "initial_noise": 0.01,
+          "support_fraction": 0.85,
+          "bond_temperature": 0.625,
+          "dyn_a": 0.5,
+          "dyn_b": 0.8,
+          "dyn_c": 0.8,
+          "dyn_d": 0.15,
+          "atom_feature_profile": "electronic_local",
+          "trajectory_pooling": "multiscale",
+          "ridge_mode": "per_endpoint",
+          "loss_mode": "hybrid_interval",
+          "interval_loss_beta": 0.75,
+          "interval_temperature": 0.05,
+          "specialist_objective": "endpoint_only"
+        }
+      }
+    ],
+    "CYP3A4": [
+      {
+        "rule": "damped_symplectic",
+        "variant": "specialist_loss_00_bondtemp_100",
+        "screen_ma_st_rae": 0.6365947989584657,
+        "fold_scores": [
+          0.6444166817141377,
+          0.6287729162027937
+        ],
+        "interval_loss_beta": 0.0,
+        "bond_temperature_scale": 1.0,
+        "bond_temperature": 1.0,
+        "config": {
+          "generations": 32,
+          "hidden_channels": 16,
+          "ca_lr": 0.003,
+          "ridge": 0.1,
+          "ca_l2": 1e-06,
+          "gradient_clip": 1.0,
+          "batch_molecules": 64,
+          "update_scale": 0.25,
+          "init_scale": 1.5,
+          "initial_noise": 0.0,
+          "support_fraction": 0.6,
+          "bond_temperature": 1.0,
+          "dyn_a": 0.5,
+          "dyn_b": 0.2,
+          "dyn_c": 0.2,
+          "dyn_d": 0.15,
+          "atom_feature_profile": "periodic_electronic",
+          "trajectory_pooling": "multiscale",
+          "ridge_mode": "shared",
+          "loss_mode": "mse",
+          "interval_loss_beta": 0.0,
+          "specialist_objective": "endpoint_only"
+        }
+      },
+      {
+        "rule": "delayed_memory",
+        "variant": "specialist_loss_50_bondtemp_125",
+        "screen_ma_st_rae": 0.6427886190396799,
+        "fold_scores": [
+          0.6260094007402814,
+          0.6595678373390784
+        ],
+        "interval_loss_beta": 0.5,
+        "bond_temperature_scale": 1.25,
+        "bond_temperature": 2.5,
+        "config": {
+          "generations": 64,
+          "hidden_channels": 16,
+          "ca_lr": 0.003,
+          "ridge": 0.1,
+          "ca_l2": 1e-06,
+          "gradient_clip": 2.0,
+          "batch_molecules": 64,
+          "update_scale": 0.08,
+          "init_scale": 0.5,
+          "initial_noise": 0.0,
+          "support_fraction": 0.6,
+          "bond_temperature": 2.5,
+          "dyn_a": 0.2,
+          "dyn_b": 0.2,
+          "dyn_c": 0.8,
+          "dyn_d": 0.15,
+          "atom_feature_profile": "periodic_electronic",
+          "trajectory_pooling": "multiscale",
+          "ridge_mode": "shared",
+          "loss_mode": "hybrid_interval",
+          "interval_loss_beta": 0.5,
+          "interval_temperature": 0.05,
+          "specialist_objective": "endpoint_only"
+        }
+      },
+      {
+        "rule": "fitzhugh_nagumo",
+        "variant": "specialist_loss_50_bondtemp_100",
+        "screen_ma_st_rae": 0.6820545038276646,
+        "fold_scores": [
+          0.6870296106655287,
+          0.6770793969898006
+        ],
+        "interval_loss_beta": 0.5,
+        "bond_temperature_scale": 1.0,
+        "bond_temperature": 1.0,
+        "config": {
+          "generations": 250,
+          "hidden_channels": 8,
+          "ca_lr": 0.003,
+          "ridge": 0.010000000000000002,
+          "ca_l2": 0.0001,
+          "gradient_clip": 0.5,
+          "batch_molecules": 64,
+          "update_scale": 0.08,
+          "init_scale": 0.5,
+          "initial_noise": 0.005,
+          "support_fraction": 0.75,
+          "bond_temperature": 1.0,
+          "dyn_a": 0.5,
+          "dyn_b": 0.2,
+          "dyn_c": 0.8,
+          "dyn_d": 0.15,
+          "atom_feature_profile": "periodic_electronic",
+          "trajectory_pooling": "multiscale",
+          "ridge_mode": "shared",
+          "loss_mode": "hybrid_interval",
+          "interval_loss_beta": 0.5,
+          "interval_temperature": 0.05,
+          "specialist_objective": "endpoint_only"
+        }
+      }
+    ]
+  },
+  "final_models": {
+    "CYP1A2": {
+      "score": 0.8488038771076412,
+      "columns": [
+        0,
+        2
+      ],
+      "penalty": 100.0,
+      "ridge": {
+        "feature_mean": [
+          4.980647729473684,
+          4.98150075013158
+        ],
+        "feature_scale": [
+          0.4846618536336615,
+          0.4872717015306485
+        ],
+        "coefficients": [
+          0.16508703454502602,
+          0.30193371065000923
+        ],
+        "intercept": 4.981324786929824,
+        "penalty": 100.0
+      },
+      "rules": [
+        "conservative_graph_flux",
+        "fitzhugh_nagumo"
+      ]
+    },
+    "CYP2C9": {
+      "score": 0.6890613588905288,
+      "columns": [
+        0,
+        1
+      ],
+      "penalty": 100.0,
+      "ridge": {
+        "feature_mean": [
+          4.5816924632139395,
+          4.569651044046467
+        ],
+        "feature_scale": [
+          0.4746512163382342,
+          0.4825736269264838
+        ],
+        "coefficients": [
+          0.2434875633318827,
+          0.19891302852370113
+        ],
+        "intercept": 4.573003272991287,
+        "penalty": 100.0
+      },
+      "rules": [
+        "damped_symplectic",
+        "gray_scott"
+      ]
+    },
+    "CYP2D6": {
+      "score": 0.9141599384858109,
+      "columns": [
+        0,
+        1
+      ],
+      "penalty": 1000.0,
+      "ridge": {
+        "feature_mean": [
+          4.801333533732877,
+          4.803837635231164
+        ],
+        "feature_scale": [
+          0.3254576509627362,
+          0.3417080321158878
+        ],
+        "coefficients": [
+          0.10344972974433493,
+          0.11947179926824998
+        ],
+        "intercept": 4.796978045890412,
+        "penalty": 1000.0
+      },
+      "rules": [
+        "delayed_memory",
+        "fitzhugh_nagumo"
+      ]
+    },
+    "CYP3A4": {
+      "score": 0.6279794424097745,
+      "columns": [
+        0,
+        1,
+        2
+      ],
+      "penalty": 10.0,
+      "ridge": {
+        "feature_mean": [
+          4.0939986992133335,
+          4.0951250229093334,
+          4.103518425968001
+        ],
+        "feature_scale": [
+          0.7637601698813494,
+          0.7698669201104636,
+          0.7197988011860313
+        ],
+        "coefficients": [
+          0.5008466484587292,
+          0.3451636879418085,
+          -0.0976448979420728
+        ],
+        "intercept": 4.088260361493334,
+        "penalty": 10.0
+      },
+      "rules": [
+        "damped_symplectic",
+        "delayed_memory",
+        "fitzhugh_nagumo"
+      ]
+    }
+  },
+  "reserved_holdout_point_ma_st_rae": 0.7551497043325275,
+  "reserved_holdout_rmse": 0.8491110365263539,
+  "reserved_holdout_st_rae_by_cyp": {
+    "CYP1A2": 0.8242295512016237,
+    "CYP2C9": 0.7222795073468619,
+    "CYP2D6": 0.9394195153833107,
+    "CYP3A4": 0.5346702433983137
+  },
+  "reserved_holdout_bootstrap_metrics": {
+    "n_bootstrap_samples": 1000,
+    "seed": 0,
+    "macro": {
+      "st_rae": {
+        "mean": 0.7557902301850266,
+        "ci_low": 0.7156392426138067,
+        "ci_high": 0.7989725615533211
+      },
+      "mae": {
+        "mean": 0.6210403980813031,
+        "ci_low": 0.5877815171243292,
+        "ci_high": 0.6545708350955255
+      },
+      "r2": {
+        "mean": 0.2918304183177039,
+        "ci_low": 0.2499082550838867,
+        "ci_high": 0.3283981357464353
+      },
+      "spearman_rho": {
+        "mean": 0.5368878855750099,
+        "ci_low": 0.489835980152405,
+        "ci_high": 0.5801171573892433
+      },
+      "kendall_tau": {
+        "mean": 0.384602800703328,
+        "ci_low": 0.34975642065018375,
+        "ci_high": 0.41815188864298
+      }
+    },
+    "per_endpoint": {
+      "CYP1A2": {
+        "st_rae": {
+          "mean": 0.8258497048311628,
+          "ci_low": 0.7318173506422552,
+          "ci_high": 0.9342443578726825
+        },
+        "mae": {
+          "mean": 0.7071221086399251,
+          "ci_low": 0.6287777775964041,
+          "ci_high": 0.7875394398884867
+        },
+        "r2": {
+          "mean": 0.20981591321518997,
+          "ci_low": 0.10991748076317709,
+          "ci_high": 0.3043217251880374
+        },
+        "spearman_rho": {
+          "mean": 0.4470661700145502,
+          "ci_low": 0.342519583645803,
+          "ci_high": 0.5449979135642838
+        },
+        "kendall_tau": {
+          "mean": 0.31177634520224884,
+          "ci_low": 0.23581344163910406,
+          "ci_high": 0.38462732540890265
+        }
+      },
+      "CYP2C9": {
+        "st_rae": {
+          "mean": 0.7229367798810137,
+          "ci_low": 0.6287096950463315,
+          "ci_high": 0.8275195346580647
+        },
+        "mae": {
+          "mean": 0.5156866741948116,
+          "ci_low": 0.4614130457249529,
+          "ci_high": 0.5692728234291069
+        },
+        "r2": {
+          "mean": 0.3208359393441119,
+          "ci_low": 0.21275567493948674,
+          "ci_high": 0.41091010188348426
+        },
+        "spearman_rho": {
+          "mean": 0.6038056777094007,
+          "ci_low": 0.5130589645382096,
+          "ci_high": 0.6884595878239691
+        },
+        "kendall_tau": {
+          "mean": 0.4378602653797849,
+          "ci_low": 0.3659347556318528,
+          "ci_high": 0.5041821191533326
+        }
+      },
+      "CYP2D6": {
+        "st_rae": {
+          "mean": 0.9393698174974108,
+          "ci_low": 0.8949644373955165,
+          "ci_high": 0.9877006859670922
+        },
+        "mae": {
+          "mean": 0.6721008716645073,
+          "ci_low": 0.5939590756429399,
+          "ci_high": 0.7459450985629066
+        },
+        "r2": {
+          "mean": 0.10203719132316663,
+          "ci_low": 0.06576520422850789,
+          "ci_high": 0.13805957074000633
+        },
+        "spearman_rho": {
+          "mean": 0.33280189101581836,
+          "ci_low": 0.22658946526209434,
+          "ci_high": 0.4211303195949984
+        },
+        "kendall_tau": {
+          "mean": 0.2269133632683642,
+          "ci_low": 0.15348975557496136,
+          "ci_high": 0.28709184775740687
+        }
+      },
+      "CYP3A4": {
+        "st_rae": {
+          "mean": 0.5350046185305186,
+          "ci_low": 0.4746073968818288,
+          "ci_high": 0.5973759498859649
+        },
+        "mae": {
+          "mean": 0.5892519378259686,
+          "ci_low": 0.5485197284734279,
+          "ci_high": 0.6330168623863874
+        },
+        "r2": {
+          "mean": 0.5346326293883472,
+          "ci_low": 0.47306098405093155,
+          "ci_high": 0.5895727331765682
+        },
+        "spearman_rho": {
+          "mean": 0.7638778035602706,
+          "ci_low": 0.7222729705529246,
+          "ci_high": 0.8029647325123855
+        },
+        "kendall_tau": {
+          "mean": 0.561861228962914,
+          "ci_low": 0.5248463323379082,
+          "ci_high": 0.5979117759406124
+        }
+      }
+    }
+  },
+  "reserved_holdout_used_for_selection": false,
+  "blind_labels_loaded": false
+}
