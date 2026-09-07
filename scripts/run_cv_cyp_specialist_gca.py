@@ -48,6 +48,7 @@ DYNAMIC_OBSERVABLE_REFINEMENT = os.environ.get("SME_DYNAMIC_OBSERVABLE_REFINEMEN
 ACTIVITY_BALANCE_REFINEMENT = os.environ.get("SME_ACTIVITY_BALANCE_REFINEMENT", "0") == "1"
 BOND_DROPOUT_REFINEMENT = os.environ.get("SME_BOND_DROPOUT_REFINEMENT", "0") == "1"
 DEGREE_NORM_REFINEMENT = os.environ.get("SME_DEGREE_NORM_REFINEMENT", "0") == "1"
+SUPPORT_BALANCE_REFINEMENT = os.environ.get("SME_SUPPORT_BALANCE_REFINEMENT", "0") == "1"
 INTERVAL_BETAS = (0.0, 0.25, 0.5, 0.75)
 POOL_WEIGHTS = (0.0, 0.05, 0.15, 0.30)
 PARENT_ENDPOINT_STUDY = (
@@ -68,6 +69,8 @@ TEST_CSV = ROOT / "data" / "openadmet-cyp-challenge-2026" / "cyp-challenge-TEST-
 
 
 def campaign_method() -> str:
+    if SUPPORT_BALANCE_REFINEMENT:
+        return "SBR-CIA-EA-CV-CYP-GCA"
     if DEGREE_NORM_REFINEMENT:
         return "DNC-CIA-EA-CV-CYP-GCA"
     if BOND_DROPOUT_REFINEMENT:
@@ -92,6 +95,8 @@ def campaign_method() -> str:
 
 
 def campaign_architecture() -> str:
+    if SUPPORT_BALANCE_REFINEMENT:
+        return "support_balanced_credible_interval_endpoint_graph_ca"
     if DEGREE_NORM_REFINEMENT:
         return "degree_normalised_credible_interval_endpoint_graph_ca"
     if BOND_DROPOUT_REFINEMENT:
@@ -118,6 +123,8 @@ def campaign_architecture() -> str:
 
 
 def campaign_submission_name() -> str:
+    if SUPPORT_BALANCE_REFINEMENT:
+        return "support_balanced_credible_interval_ea_cv_cyp_gca_submission.csv"
     if DEGREE_NORM_REFINEMENT:
         return "degree_normalised_credible_interval_ea_cv_cyp_gca_submission.csv"
     if BOND_DROPOUT_REFINEMENT:
@@ -212,6 +219,8 @@ def fit(worker: Path, stage, endpoint, rule, variant, config, seed, fold,
 
 
 def screen(worker: Path) -> dict:
+    if SUPPORT_BALANCE_REFINEMENT:
+        return screen_support_balance_refinement(worker)
     if DEGREE_NORM_REFINEMENT:
         return screen_degree_norm_refinement(worker)
     if BOND_DROPOUT_REFINEMENT:
@@ -639,6 +648,78 @@ def screen_degree_norm_refinement(worker: Path) -> dict:
                 "fold_scores": values,
                 "interval_loss_beta": candidate.get("interval_loss_beta", 0.0),
                 "degree_normalization_power": power,
+                "config": config,
+            })
+        selected[endpoint].sort(key=lambda item: item["screen_ma_st_rae"])
+    write_json(STUDY / "screening_summary.json", selected)
+    return selected
+
+
+def screen_support_balance_refinement(worker: Path) -> dict:
+    """Tune the differentiable-ridge support/query split used in CA training."""
+    parent = json.loads(
+        (PARENT_INTERVAL_STUDY / "screening_summary.json").read_text(
+            encoding="utf-8"
+        )
+    )
+    fractions = (0.60, 0.75, 0.85)
+    jobs = [
+        (endpoint, candidate, fraction, fold)
+        for endpoint in ENDPOINTS for candidate in parent[endpoint]
+        for fraction in fractions for fold in SCREEN_FOLDS
+    ]
+    scores = {
+        (endpoint, candidate["rule"], fraction): []
+        for endpoint in ENDPOINTS for candidate in parent[endpoint]
+        for fraction in fractions
+    }
+    durations = []
+    for number, (endpoint, candidate, fraction, fold) in enumerate(jobs, 1):
+        config = deepcopy(candidate["config"])
+        config.update({
+            "support_fraction": fraction,
+            "specialist_objective": "endpoint_only",
+        })
+        variant = f"{candidate['variant']}_support_{int(fraction * 100):03d}"
+        progress(
+            "support_balance_screen", completed=number - 1,
+            total=len(jobs), endpoint=endpoint, rule=candidate["rule"],
+            support_fraction=fraction, fold=fold,
+            estimated_remaining_seconds=(
+                np.mean(durations) * (len(jobs) - number + 1)
+                if durations else None
+            ),
+        )
+        started = time.time()
+        metrics = fit(
+            worker, "screen", endpoint, candidate["rule"], variant,
+            config, 6101, fold, 22, 6,
+        )
+        durations.append(time.time() - started)
+        scores[(endpoint, candidate["rule"], fraction)].append(float(
+            metrics.get("restored_validation_point_ma_st_rae", np.inf)
+        ))
+    selected = {}
+    for endpoint in ENDPOINTS:
+        selected[endpoint] = []
+        for candidate in parent[endpoint]:
+            choices = []
+            for fraction in fractions:
+                values = scores[(endpoint, candidate["rule"], fraction)]
+                choices.append((float(np.mean(values)), fraction, values))
+            score, fraction, values = min(choices)
+            config = deepcopy(candidate["config"])
+            config.update({
+                "support_fraction": fraction,
+                "specialist_objective": "endpoint_only",
+            })
+            selected[endpoint].append({
+                "rule": candidate["rule"],
+                "variant": f"{candidate['variant']}_support_{int(fraction * 100):03d}",
+                "screen_ma_st_rae": score,
+                "fold_scores": values,
+                "interval_loss_beta": candidate.get("interval_loss_beta", 0.0),
+                "support_fraction": fraction,
                 "config": config,
             })
         selected[endpoint].sort(key=lambda item: item["screen_ma_st_rae"])
