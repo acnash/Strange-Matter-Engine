@@ -11,6 +11,7 @@
 | 6 September 2026 | TDO-CIA-EA-CV-CYP-GCA | 0.755675 | 0.851798 | Experimental result |
 | 6 September 2026 | AB-CIA-EA-CV-CYP-GCA | 0.750740 | 0.849659 | Experimental result |
 | 6 September 2026 | BMR-CIA-EA-CV-CYP-GCA | 0.755994 | 0.852721 | Experimental result |
+| 7 September 2026 | DNC-CIA-EA-CV-CYP-GCA | 1.223519 | 1.293131 | Rejected; degree softening degraded generalisation |
 
 All entries use the same reserved scaffold holdout. Model and hyperparameter
 selection occur within the fitting pool; the reserved holdout is excluded from

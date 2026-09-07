@@ -13,3 +13,11 @@ trajectory fingerprints, backpropagation, differentiable ridge regression,
 scaffold-safe selection, sealed evaluation, and blind-label exclusion.
 CIA-EA-CV-CYP-GCA is the comparison leader at point MA-ST-RAE 0.748490 and
 RMSE 0.847738 pIC50.
+
+## Completed result
+
+The sealed scaffold holdout produced point MA-ST-RAE **1.223519** and RMSE
+**1.293131 pIC50**. This is 0.475029 MA-ST-RAE and 0.445393 pIC50 RMSE behind
+the CIA-EA-CV-CYP-GCA leader. Degree softening was therefore rejected and the
+leader remains unchanged. Blind labels were excluded throughout selection and
+evaluation.
