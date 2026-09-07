@@ -1,10 +1,14 @@
 # Molecule Space-Time: Predicting Cytochrome P450 Inhibition with a Nonlinear Graph Cellular Automaton
 
-**Anthony Nash**
+**Anthony Nash, PhD**
+
+**Independent Researcher, Warwickshire, United Kingdom**
+
+**info@acnash.co.uk**
 
 ## Abstract
 
-Cytochrome P450 (CYP) inhibition is a major consideration in drug discovery because it can alter drug metabolism and contribute to clinically significant drug–drug interactions. The OpenADMET CYP Inhibition Challenge provides a blinded setting in which to evaluate computational prediction of direct-inhibition pIC50 across four CYP isoforms. Here, we introduce a molecular graph cellular automaton that represents atoms as cells, chemical bonds as local neighbourhoods, and molecular computation as the repeated evolution of a shared, learned transition rule. Our approach retains the complete sequence of atom states and uses its transient and terminal properties to predict CYP inhibition. We call this evolving representation **molecule space-time**: the joint description of molecular structure and its learned progression through computational time. The latest Credible-Interval-Aligned Endpoint-Aligned Cross-Validated CYP-Specialist Graph Cellular Automata system, CIA-EA-CV-CYP-GCA, combined isoform-specific recurrent training with a smooth experimental-interval loss and achieved sealed-holdout MA-ST-RAE 0.7485 and RMSE 0.8477 pIC50. The preceding EA-CV-CYP-GCA OpenADMET blind evaluation returned MA-ST-RAE 1.0071, macro MAE 1.0778, macro R-squared -0.0715, macro Spearman rho 0.5345, and macro Kendall tau 0.3750. As a secondary objective, we investigated the nonlinear dynamics contained within molecule space-time by extending selected trajectories over thousands of generations and examining convergence, recurrence, periodicity, perturbation sensitivity, strange-attractor candidates, and possible chaotic behaviour. This analysis confirmed two bounded Kuramoto–Sakaguchi trajectories with continually regenerated positive Lyapunov exponents and multidirectional expansion. The framework treats prediction and dynamical exploration as complementary views of the same learned molecular process, offering a route toward CYP inhibition models whose internal evolution can be measured, visualised, and studied as a nonlinear system.
+Cytochrome P450 (CYP) inhibition is a major consideration in drug discovery because it can alter drug metabolism and contribute to clinically significant drug–drug interactions. The 2026 OpenADMET CYP Inhibition Challenge provides a blinded setting in which to evaluate computational prediction of direct-inhibition pIC50 across four CYP isoforms. Here, we introduce a molecular graph cellular automaton that represents atoms as cells, chemical bonds as local neighbourhoods, and molecular computation as the repeated evolution of a shared, learned transition rule. Our approach retains the complete sequence of atom states and uses its transient and terminal properties to predict CYP inhibition. We call this evolving representation **molecule space-time**: the joint description of molecular structure and its learned progression through computational time. The latest Credible-Interval-Aligned Endpoint-Aligned Cross-Validated CYP-Specialist Graph Cellular Automata system, CIA-EA-CV-CYP-GCA, combined isoform-specific recurrent training with a smooth experimental-interval loss and achieved sealed-holdout MA-ST-RAE 0.7485 and RMSE 0.8477 pIC50. The preceding EA-CV-CYP-GCA OpenADMET blind evaluation returned MA-ST-RAE 1.0071, macro MAE 1.0778, macro R-squared -0.0715, macro Spearman rho 0.5345, and macro Kendall tau 0.3750. As a secondary objective, we investigated the nonlinear dynamics contained within molecule space-time by extending selected trajectories over thousands of generations and examining convergence, recurrence, periodicity, perturbation sensitivity, strange-attractor candidates, and possible chaotic behaviour. This analysis confirmed two bounded Kuramoto–Sakaguchi trajectories with continually regenerated positive Lyapunov exponents and multidirectional expansion. The framework treats prediction and dynamical exploration as complementary views of the same learned molecular process, offering a route toward CYP inhibition models whose internal evolution can be measured, visualised, and studied as a nonlinear system.
 
 ## Introduction
 
@@ -36,7 +40,7 @@ The response matrix was incomplete because compounds were not necessarily measur
 | CYP3A4 | 2,335 |
 | **Total** | **6,525** |
 
-Each observed compound–CYP pair constituted one supervised regression example. DS-GCAE and CFT-DS-GCAE learned a shared CYP-conditioned mapping. CV-CYP-GCA used independent endpoint models with shared four-endpoint supervision inside recurrent training batches. EA-CV-CYP-GCA aligned each independent nonlinear Graph-CA system with one isoform throughout recurrent backpropagation, differentiable ridge fitting, validation, and checkpoint selection. CIA-EA-CV-CYP-GCA retained this endpoint alignment and additionally trained selected cellular-automata experts against the experimental credible intervals used by the challenge metric. Missing endpoint values were retained as missing and contributed neither targets nor loss terms. The single-concentration, time-dependent-inhibition, and Emax datasets distributed with the challenge were outside the scope of this direct-inhibition study.
+Each observed compound–CYP pair constituted one supervised regression example. DS-GCAE and CFT-DS-GCAE learned a shared CYP-conditioned mapping. CV-CYP-GCA used independent endpoint models with shared four-endpoint supervision inside recurrent training batches. EA-CV-CYP-GCA aligned each independent nonlinear Graph-CA system with one isoform throughout recurrent backpropagation, differentiable ridge fitting, validation, and checkpoint selection. CIA-EA-CV-CYP-GCA retained this endpoint alignment and additionally trained selected cellular-automata experts against the experimental credible intervals used by the challenge metric. Missing endpoint **(what is a missing endpoint?)** values were retained as missing and contributed neither targets nor loss terms. The single-concentration, time-dependent-inhibition, and Emax datasets distributed with the challenge were outside the scope of this direct-inhibition study.
 
 To assess generalisation beyond closely related chemistry, compounds were grouped by their standardised Bemis–Murcko scaffold before data partitioning. A fixed 20% subset of scaffold groups was reserved as a sealed holdout, leaving 5,216 observed compound–CYP pairs for model fitting and internal selection and 1,309 pairs for final validation. No scaffold group occurred in both partitions. Hyperparameter selection was conducted within the fitting pool, while the reserved scaffold holdout remained unused until final evaluation.
 
@@ -44,9 +48,9 @@ The challenge test set contained 750 additional compounds for which all direct-i
 
 ### Molecular Graph Representation
 
-SMILES strings were cleaned with RDKit, reduced to the largest organic fragment, sanitized, and converted to canonical isomeric SMILES. Each standardized molecule was represented as a graph $G=(V,E)$, where every heavy atom $i\in V$ was a cellular-automata cell and every covalent bond defined two directed message-passing edges, $j\rightarrow i$ and $i\rightarrow j$. Molecular geometry was absent from the predictive input.
+SMILES strings were cleaned with RDKit **(What do you mean by cleaned?)**, reduced to the largest organic fragment, sanitized, and converted to canonical isomeric SMILES. Each standardized molecule was represented as a graph $G=(V,E)$, where every heavy atom $i\in V$ was a cellular-automata cell and every covalent bond defined two directed message-passing edges, $j\rightarrow i$ and $i\rightarrow j$. Molecular geometry was absent from the predictive input **(what is the predictive input?)**.
 
-The baseline atom encoding contained one-hot element identity for H, C, N, O, F, P, S, Cl, Br, I, and other elements; formal charge; aromaticity; sp, sp2, sp3, and other hybridization states; degree; total attached hydrogens; ring membership; hydrogen-bond donor and acceptor status; and tetrahedral chirality. Training-only model selection could extend this encoding with five chemically organized feature groups:
+The baseline atom encoding contained one-hot element identity for H, C, N, O, F, P, S, Cl, Br, I, and other elements **(give an example of one-hot element identity encoding)**; formal charge; aromaticity; sp, sp2, sp3, and other hybridization states; degree; total attached hydrogens; ring membership; hydrogen-bond donor and acceptor status; and tetrahedral chirality. Training-only model selection **(What is a training-only model selection?)** could extend this encoding with five chemically organized feature groups:
 
 | Feature group | Atom-level quantities |
 |---|---|
@@ -58,11 +62,11 @@ The baseline atom encoding contained one-hot element identity for H, C, N, O, F,
 
 The selected feature profile was stored with every frozen checkpoint, preserving the exact feature names and order required for inference. Continuous quantities were scaled by fixed chemically meaningful constants during graph construction. Bond vector $e_{ji}$ contained one-hot single, double, triple, or aromatic identity, conjugation, ring membership, and three stereochemical indicators. The same bond vector was attached to both directed representations of an undirected bond.
 
-The four CYP endpoints were represented by a one-hot context vector $c$. Consequently, a molecule retained one chemical graph while its cellular-automata trajectory and readout were conditioned on CYP1A2, CYP2C9, CYP2D6, or CYP3A4. Independent molecule–CYP graphs were combined as disconnected components during batched GPU evaluation, so message passing remained confined to atoms belonging to the same molecule.
+The four CYP endpoints **(What is a CYP endpoint?)** were represented by a one-hot context vector $c$. Consequently, a molecule retained one chemical graph while its cellular-automata trajectory and readout were conditioned on CYP1A2, CYP2C9, CYP2D6, or CYP3A4. Independent molecule–CYP graphs were combined as disconnected components during batched GPU evaluation, so message passing remained confined to atoms belonging to the same molecule **(This sentence is unclear. I don't know what it means)**.
 
 ### Nonlinear Graph Cellular Automaton
 
-For atom $i$, chemical input $x_i$ was mapped to an initial state with $H$ dynamical channels:
+For atom $i$, chemical input $x_i$ **()** was mapped to an initial state with $H$ dynamical channels:
 
 $$
 h_i^{(0)}=\tanh\!\left(s_0 W_{\mathrm{init}}x_i\right),
@@ -401,3 +405,19 @@ We represented drug molecules as connected graph cellular automata in which atom
 The retained cellular-automata histories also exposed several forms of emergent molecular information dynamics. Across 13,090 screened trajectories we observed contraction towards a point attractor, period-two oscillator candidates, persistent complex motion, and two Kuramoto–Sakaguchi trajectories that satisfied our operational tests for hyperchaotic strange attractors. Their perturbation sensitivity was continually regenerated after renormalization, their leading Lyapunov spectra contained several positive exponents, and perturbed initial conditions remained bounded while approaching the same attracting distribution. Structural association and intervention experiments further indicated that molecular connectivity and bond identity influence the strength of this instability.
 
 The present predictive results leave considerable scope for improved calibration and generalisation, while the dynamical findings establish a practical framework for studying how local chemical interactions generate global computational behaviour. Future development will refine the predictive ensemble, expand confirmatory testing across more molecules and transition rules, and examine whether particular scaffolds, bond arrangements, or chemical encodings reproducibly select point, periodic, complex, or strange-attractor regimes. This combination of molecular prediction and measurable nonlinear dynamics offers a distinctive way to investigate the flow of chemical information through molecular graphs.
+
+### Author contributions
+
+A.N conceived the study, developed and implemented the computational methodology, conducted the experiments, analysed and interpreted the results, prepared the figures, and wrote and revised the manuscript. AI was used to prepare the code. 
+
+### Funding
+
+This research received no external funding.
+
+### Data availability
+
+The dataset analysed in this study were provided through the 2026 OpenADMET CYP Inhibition Challenge and are available subject to the challenge organiser's access conditions. 
+
+### Code availability
+
+Source code, trained model configurations and scripts required to reproduce the reported analyses are available at https://github.com/acnash/Strange-Matter-Engine.git
