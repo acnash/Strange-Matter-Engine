@@ -49,6 +49,7 @@ ACTIVITY_BALANCE_REFINEMENT = os.environ.get("SME_ACTIVITY_BALANCE_REFINEMENT", 
 BOND_DROPOUT_REFINEMENT = os.environ.get("SME_BOND_DROPOUT_REFINEMENT", "0") == "1"
 DEGREE_NORM_REFINEMENT = os.environ.get("SME_DEGREE_NORM_REFINEMENT", "0") == "1"
 SUPPORT_BALANCE_REFINEMENT = os.environ.get("SME_SUPPORT_BALANCE_REFINEMENT", "0") == "1"
+BOND_TEMPERATURE_REFINEMENT = os.environ.get("SME_BOND_TEMPERATURE_REFINEMENT", "0") == "1"
 INTERVAL_BETAS = (0.0, 0.25, 0.5, 0.75)
 POOL_WEIGHTS = (0.0, 0.05, 0.15, 0.30)
 PARENT_ENDPOINT_STUDY = (
@@ -69,6 +70,8 @@ TEST_CSV = ROOT / "data" / "openadmet-cyp-challenge-2026" / "cyp-challenge-TEST-
 
 
 def campaign_method() -> str:
+    if BOND_TEMPERATURE_REFINEMENT:
+        return "BTS-CIA-EA-CV-CYP-GCA"
     if SUPPORT_BALANCE_REFINEMENT:
         return "SBR-CIA-EA-CV-CYP-GCA"
     if DEGREE_NORM_REFINEMENT:
@@ -95,6 +98,8 @@ def campaign_method() -> str:
 
 
 def campaign_architecture() -> str:
+    if BOND_TEMPERATURE_REFINEMENT:
+        return "bond_temperature_scaled_credible_interval_endpoint_graph_ca"
     if SUPPORT_BALANCE_REFINEMENT:
         return "support_balanced_credible_interval_endpoint_graph_ca"
     if DEGREE_NORM_REFINEMENT:
@@ -123,6 +128,8 @@ def campaign_architecture() -> str:
 
 
 def campaign_submission_name() -> str:
+    if BOND_TEMPERATURE_REFINEMENT:
+        return "bond_temperature_scaled_credible_interval_ea_cv_cyp_gca_submission.csv"
     if SUPPORT_BALANCE_REFINEMENT:
         return "support_balanced_credible_interval_ea_cv_cyp_gca_submission.csv"
     if DEGREE_NORM_REFINEMENT:
@@ -219,6 +226,8 @@ def fit(worker: Path, stage, endpoint, rule, variant, config, seed, fold,
 
 
 def screen(worker: Path) -> dict:
+    if BOND_TEMPERATURE_REFINEMENT:
+        return screen_bond_temperature_refinement(worker)
     if SUPPORT_BALANCE_REFINEMENT:
         return screen_support_balance_refinement(worker)
     if DEGREE_NORM_REFINEMENT:
@@ -720,6 +729,82 @@ def screen_support_balance_refinement(worker: Path) -> dict:
                 "fold_scores": values,
                 "interval_loss_beta": candidate.get("interval_loss_beta", 0.0),
                 "support_fraction": fraction,
+                "config": config,
+            })
+        selected[endpoint].sort(key=lambda item: item["screen_ma_st_rae"])
+    write_json(STUDY / "screening_summary.json", selected)
+    return selected
+
+
+def screen_bond_temperature_refinement(worker: Path) -> dict:
+    """Tune typed-bond gate sharpness while preserving the bonded Graph-CA."""
+    parent = json.loads(
+        (PARENT_INTERVAL_STUDY / "screening_summary.json").read_text(
+            encoding="utf-8"
+        )
+    )
+    scales = (0.75, 1.0, 1.25)
+    jobs = [
+        (endpoint, candidate, scale, fold)
+        for endpoint in ENDPOINTS for candidate in parent[endpoint]
+        for scale in scales for fold in SCREEN_FOLDS
+    ]
+    scores = {
+        (endpoint, candidate["rule"], scale): []
+        for endpoint in ENDPOINTS for candidate in parent[endpoint]
+        for scale in scales
+    }
+    durations = []
+    for number, (endpoint, candidate, scale, fold) in enumerate(jobs, 1):
+        config = deepcopy(candidate["config"])
+        base_temperature = float(config.get("bond_temperature", 1.0))
+        temperature = base_temperature * scale
+        config.update({
+            "bond_temperature": temperature,
+            "specialist_objective": "endpoint_only",
+        })
+        variant = f"{candidate['variant']}_bondtemp_{int(scale * 100):03d}"
+        progress(
+            "bond_temperature_screen", completed=number - 1,
+            total=len(jobs), endpoint=endpoint, rule=candidate["rule"],
+            bond_temperature_scale=scale, bond_temperature=temperature, fold=fold,
+            estimated_remaining_seconds=(
+                np.mean(durations) * (len(jobs) - number + 1)
+                if durations else None
+            ),
+        )
+        started = time.time()
+        metrics = fit(
+            worker, "screen", endpoint, candidate["rule"], variant,
+            config, 6101, fold, 22, 6,
+        )
+        durations.append(time.time() - started)
+        scores[(endpoint, candidate["rule"], scale)].append(float(
+            metrics.get("restored_validation_point_ma_st_rae", np.inf)
+        ))
+    selected = {}
+    for endpoint in ENDPOINTS:
+        selected[endpoint] = []
+        for candidate in parent[endpoint]:
+            choices = []
+            for scale in scales:
+                values = scores[(endpoint, candidate["rule"], scale)]
+                choices.append((float(np.mean(values)), scale, values))
+            score, scale, values = min(choices)
+            config = deepcopy(candidate["config"])
+            temperature = float(config.get("bond_temperature", 1.0)) * scale
+            config.update({
+                "bond_temperature": temperature,
+                "specialist_objective": "endpoint_only",
+            })
+            selected[endpoint].append({
+                "rule": candidate["rule"],
+                "variant": f"{candidate['variant']}_bondtemp_{int(scale * 100):03d}",
+                "screen_ma_st_rae": score,
+                "fold_scores": values,
+                "interval_loss_beta": candidate.get("interval_loss_beta", 0.0),
+                "bond_temperature_scale": scale,
+                "bond_temperature": temperature,
                 "config": config,
             })
         selected[endpoint].sort(key=lambda item: item["screen_ma_st_rae"])
