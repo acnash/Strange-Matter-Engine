@@ -15,6 +15,7 @@
 | 7 September 2026 | SBR-CIA-EA-CV-CYP-GCA | 0.755412 | 0.852409 | Experimental result; support/query rebalancing did not improve leader |
 | 8 September 2026 | BTS-CIA-EA-CV-CYP-GCA | 0.755150 | 0.849111 | Experimental result; typed-bond temperature scaling did not improve leader |
 | 8 September 2026 | HWR-CIA-EA-CV-CYP-GCA | 0.751954 | 0.851544 | Experimental result; wider cellular state did not improve leader |
+| 8 September 2026 | GDR-CIA-EA-CV-CYP-GCA | 0.752414 | 0.848947 | Experimental result; longer recurrent evolution did not improve leader |
 
 All entries use the same reserved scaffold holdout. Model and hyperparameter
 selection occur within the fitting pool; the reserved holdout is excluded from

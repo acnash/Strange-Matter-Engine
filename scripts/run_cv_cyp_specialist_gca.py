@@ -52,6 +52,7 @@ SUPPORT_BALANCE_REFINEMENT = os.environ.get("SME_SUPPORT_BALANCE_REFINEMENT", "0
 BOND_TEMPERATURE_REFINEMENT = os.environ.get("SME_BOND_TEMPERATURE_REFINEMENT", "0") == "1"
 HIDDEN_WIDTH_REFINEMENT = os.environ.get("SME_HIDDEN_WIDTH_REFINEMENT", "0") == "1"
 GENERATION_DEPTH_REFINEMENT = os.environ.get("SME_GENERATION_DEPTH_REFINEMENT", "0") == "1"
+UPDATE_SCALE_REFINEMENT = os.environ.get("SME_UPDATE_SCALE_REFINEMENT", "0") == "1"
 INTERVAL_BETAS = (0.0, 0.25, 0.5, 0.75)
 POOL_WEIGHTS = (0.0, 0.05, 0.15, 0.30)
 PARENT_ENDPOINT_STUDY = (
@@ -72,6 +73,8 @@ TEST_CSV = ROOT / "data" / "openadmet-cyp-challenge-2026" / "cyp-challenge-TEST-
 
 
 def campaign_method() -> str:
+    if UPDATE_SCALE_REFINEMENT:
+        return "USR-CIA-EA-CV-CYP-GCA"
     if GENERATION_DEPTH_REFINEMENT:
         return "GDR-CIA-EA-CV-CYP-GCA"
     if HIDDEN_WIDTH_REFINEMENT:
@@ -104,6 +107,8 @@ def campaign_method() -> str:
 
 
 def campaign_architecture() -> str:
+    if UPDATE_SCALE_REFINEMENT:
+        return "update_scale_refined_credible_interval_endpoint_graph_ca"
     if GENERATION_DEPTH_REFINEMENT:
         return "generation_depth_refined_credible_interval_endpoint_graph_ca"
     if HIDDEN_WIDTH_REFINEMENT:
@@ -138,6 +143,8 @@ def campaign_architecture() -> str:
 
 
 def campaign_submission_name() -> str:
+    if UPDATE_SCALE_REFINEMENT:
+        return "update_scale_refined_credible_interval_ea_cv_cyp_gca_submission.csv"
     if GENERATION_DEPTH_REFINEMENT:
         return "generation_depth_refined_credible_interval_ea_cv_cyp_gca_submission.csv"
     if HIDDEN_WIDTH_REFINEMENT:
@@ -240,6 +247,8 @@ def fit(worker: Path, stage, endpoint, rule, variant, config, seed, fold,
 
 
 def screen(worker: Path) -> dict:
+    if UPDATE_SCALE_REFINEMENT:
+        return screen_update_scale_refinement(worker)
     if GENERATION_DEPTH_REFINEMENT:
         return screen_generation_depth_refinement(worker)
     if HIDDEN_WIDTH_REFINEMENT:
@@ -973,6 +982,81 @@ def screen_generation_depth_refinement(worker: Path) -> dict:
                 "interval_loss_beta": candidate.get("interval_loss_beta", 0.0),
                 "generation_depth_scale": scale,
                 "generations": generations,
+                "config": config,
+            })
+        selected[endpoint].sort(key=lambda item: item["screen_ma_st_rae"])
+    write_json(STUDY / "screening_summary.json", selected)
+    return selected
+
+
+def screen_update_scale_refinement(worker: Path) -> dict:
+    """Tune the recurrent Graph-CA state-transition step magnitude."""
+    parent = json.loads(
+        (PARENT_INTERVAL_STUDY / "screening_summary.json").read_text(
+            encoding="utf-8"
+        )
+    )
+    scales = (0.75, 1.0, 1.25)
+    jobs = [
+        (endpoint, candidate, scale, fold)
+        for endpoint in ENDPOINTS for candidate in parent[endpoint]
+        for scale in scales for fold in SCREEN_FOLDS
+    ]
+    scores = {
+        (endpoint, candidate["rule"], scale): []
+        for endpoint in ENDPOINTS for candidate in parent[endpoint]
+        for scale in scales
+    }
+    durations = []
+    for number, (endpoint, candidate, scale, fold) in enumerate(jobs, 1):
+        config = deepcopy(candidate["config"])
+        update_scale = float(config.get("update_scale", 0.25)) * scale
+        config.update({
+            "update_scale": update_scale,
+            "specialist_objective": "endpoint_only",
+        })
+        variant = f"{candidate['variant']}_updatescale_{int(scale * 100):03d}"
+        progress(
+            "update_scale_screen", completed=number - 1,
+            total=len(jobs), endpoint=endpoint, rule=candidate["rule"],
+            update_scale_multiplier=scale, update_scale=update_scale, fold=fold,
+            estimated_remaining_seconds=(
+                np.mean(durations) * (len(jobs) - number + 1)
+                if durations else None
+            ),
+        )
+        started = time.time()
+        metrics = fit(
+            worker, "screen", endpoint, candidate["rule"], variant,
+            config, 6101, fold, 22, 6,
+        )
+        durations.append(time.time() - started)
+        scores[(endpoint, candidate["rule"], scale)].append(float(
+            metrics.get("restored_validation_point_ma_st_rae", np.inf)
+        ))
+    selected = {}
+    for endpoint in ENDPOINTS:
+        selected[endpoint] = []
+        for candidate in parent[endpoint]:
+            choices = []
+            for scale in scales:
+                values = scores[(endpoint, candidate["rule"], scale)]
+                choices.append((float(np.mean(values)), scale, values))
+            score, scale, values = min(choices)
+            config = deepcopy(candidate["config"])
+            update_scale = float(config.get("update_scale", 0.25)) * scale
+            config.update({
+                "update_scale": update_scale,
+                "specialist_objective": "endpoint_only",
+            })
+            selected[endpoint].append({
+                "rule": candidate["rule"],
+                "variant": f"{candidate['variant']}_updatescale_{int(scale * 100):03d}",
+                "screen_ma_st_rae": score,
+                "fold_scores": values,
+                "interval_loss_beta": candidate.get("interval_loss_beta", 0.0),
+                "update_scale_multiplier": scale,
+                "update_scale": update_scale,
                 "config": config,
             })
         selected[endpoint].sort(key=lambda item: item["screen_ma_st_rae"])
