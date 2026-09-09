@@ -97,8 +97,9 @@ a_i^{(t)}=\frac{1}{|N(i)|}\sum_{j\in N(i)}m_{ji}^{(t)},
 \qquad
 \bar h_i^{(t)}=\frac{1}{|N(i)|}\sum_{j\in N(i)}h_j^{(t)}.
 $$
-
-Chemical identity and CYP context entered every generation through a common reaction drive:
+**(What is N_i?)**
+**(Wha is the difference between h_i^t with a line above it, and just h_i^t?)**
+Chemical identity and CYP context entered every generation through a common reaction drive **(what does "common reaction drive" mean?)**:
 
 $$
 r_i^{(t)}=\tanh\!\left(
@@ -106,9 +107,9 @@ W_s h_i^{(t)}+a_i^{(t)}+W_x x_i+W_c c+b
 \right).
 $$
 
-The submitted ensemble used five transition rules sharing this bonded message and reaction calculation.
+The submitted ensemble **(What is "submitted ensemble"? Have you mentioned an ensemble approach before?)** used five transition rules sharing this bonded message and reaction calculation.
 
-**Gated residual.** A learned channel-wise gate controlled the proportion of the proposed reaction accepted at each atom:
+**Gated residual.** **(Give a reference and a better description of what this is)** A learned channel-wise gate controlled the proportion of the proposed reaction accepted at each atom:
 
 $$
 \alpha_i^{(t)}=\sigma\!\left(W_\alpha
@@ -118,34 +119,34 @@ h_i^{(t+1)}=(1-s\alpha_i^{(t)})\odot h_i^{(t)}
 +s\alpha_i^{(t)}\odot r_i^{(t)},
 $$
 
-where $s\alpha$ was capped at one and $s$ was the update scale.
+where $s\alpha$ was capped at one and $s$ was the update scale. **(Do not leave any part of the maths undefined)**
 
-**Inertial reaction–diffusion.** A velocity state introduced momentum, while neighbour exchange and restoring forces supplied graph diffusion and damping:
+**Inertial reaction–diffusion.** **(Give a reference and a better description of what this is)** A velocity state introduced momentum, while neighbour exchange and restoring forces supplied graph diffusion and damping:
 
 $$
 f_i^{(t)}=r_i^{(t)}+D\odot(\bar h_i^{(t)}-h_i^{(t)})-R\odot h_i^{(t)},
 $$
-
+**(Do not leave any part of the maths undefined)**
 $$
 v_i^{(t+1)}=\eta\gamma\odot v_i^{(t)}+\delta\odot f_i^{(t)},
 \qquad
 h_i^{(t+1)}=\tanh\!\left(h_i^{(t)}+\delta\odot v_i^{(t+1)}\right).
 $$
 
-The channel-wise damping $\gamma$, step size $\delta$, diffusion $D$, restoring strength $R$, and inertial multiplier $\eta$ were constrained to stable ranges by sigmoid or softplus transformations.
+The channel-wise damping $\gamma$, step size $\delta$, diffusion $D$, restoring strength $R$, and inertial multiplier $\eta$ were constrained to stable ranges by sigmoid or softplus transformations. **(Do not leave any part of the maths undefined)**
 
-**FitzHugh–Nagumo.** The state was divided into excitation $u$ and recovery $v$ channels. Their update combined the cubic excitable-system dynamics with learned chemical drive and graph diffusion:
+**FitzHugh–Nagumo.** **(Give a reference and a better description of what this is)** The state was divided into excitation $u$ and recovery $v$ channels. Their update combined the cubic excitable-system dynamics with learned chemical drive and graph diffusion:
 
 $$
 \Delta u_i=u_i-\frac{u_i^3}{3}-v_i
 +\kappa_s\tanh(W_u r_i)+D_u(\bar u_i-u_i),
 $$
-
+**(Do not leave any part of the maths undefined)**
 $$
 \Delta v_i=\epsilon\left[u_i+q-v_i+0.1\tanh(W_v r_i)\right]
 +D_v(\bar v_i-v_i),
 $$
-
+**(Do not leave any part of the maths undefined)**
 The two channel groups were then advanced together:
 
 $$
@@ -153,37 +154,38 @@ h_i^{(t+1)}=\tanh\!\left(
 [u_i+s\Delta u_i,\;v_i+s\Delta v_i]
 \right).
 $$
+**(Do not leave any part of the maths undefined)**
 
-**Kuramoto–Sakaguchi.** Each channel was treated as a wrapped phase $\phi_i=\pi h_i$. Bond-gated phase coupling and a chemically conditioned natural frequency gave
+**Kuramoto–Sakaguchi.** **(Give a reference and a better description of what this is)** Each channel was treated as a wrapped phase $\phi_i=\pi h_i$. Bond-gated phase coupling and a chemically conditioned natural frequency gave
 
 $$
 q_i^{(t)}=\frac{1}{|N(i)|}\sum_{j\in N(i)}
 g_{ji}\odot\sin\!\left(\phi_j^{(t)}-\phi_i^{(t)}-\psi\right),
 $$
-
+**(Do not leave any part of the maths undefined)**
 $$
 \phi_i^{(t+1)}=\phi_i^{(t)}+s\left[
 \omega_i^{(t)}+Kq_i^{(t)}\right],
 \qquad
 \omega_i^{(t)}=A\tanh(W_\omega r_i^{(t)}).
 $$
+**(Do not leave any part of the maths undefined)**
+The updated phase was wrapped and divided by $\pi$ to return it to $[-1,1]$. The phase lag $\psi$, coupling $K$, and frequency scale $A$ were selected during training-only hyperparameter search.**(Do not leave any part of the maths undefined)**
 
-The updated phase was wrapped and divided by $\pi$ to return it to $[-1,1]$. The phase lag $\psi$, coupling $K$, and frequency scale $A$ were selected during training-only hyperparameter search.
-
-**Delayed memory.** A rule-specific delay $d$ selected a preceding state from the retained trajectory. The new drive combined the current reaction, a learned transformation of the current and delayed states, and explicit delayed-state feedback:
+**Delayed memory.** **(Give a reference and a better description of what this is)** A rule-specific delay $d$ selected a preceding state from the retained trajectory. The new drive combined the current reaction, a learned transformation of the current and delayed states, and explicit delayed-state feedback:
 
 $$
 \tilde r_i^{(t)}=\tanh\!\left(W_d[r_i^{(t)},h_i^{(t-d)}]\right),
 $$
-
+**(Do not leave any part of the maths undefined)**
 $$
 h_i^{(t+1)}=\tanh\!\left(
 (1-\zeta s)h_i^{(t)}+s\left[(1-\mu)r_i^{(t)}
 +\mu\tilde r_i^{(t)}+\kappa_d(h_i^{(t-d)}-h_i^{(t)})\right]
 \right).
 $$
-
-The delay, memory mixture $\mu$, delayed feedback $\kappa_d$, and damping $\zeta$ were determined from the rule-specific search space.
+**(Do not leave any part of the maths undefined)**
+The delay, memory mixture $\mu$, delayed feedback $\kappa_d$, and damping $\zeta$ were determined from the rule-specific search space.**(Do not leave any part of the maths undefined)**
 
 Each trajectory was pooled into a molecular fingerprint containing the final atom-state mean and variance, the time-averaged atom state, the temporal variance of the molecular mean state, and mean state-change energy. The multiscale variant appended molecular mean states at 12.5%, 25%, 50%, 75%, and 100% of the trajectory. CYP-specific readout features were formed by combining the endpoint one-hot vector with endpoint-gated copies of the dynamical fingerprint.
 
