@@ -72,107 +72,111 @@ Each of the four CYP endpoints was a distinct prediction task defined by the dir
 
 For atom $i$, the chemical input vector $x_i$ contained its fixed descriptors; for example, an aromatic sp2 carbon could be represented by a carbon element indicator, zero formal charge, an aromaticity indicator, an sp2-hybridization indicator, its degree, and its other listed atom properties. This input was mapped to an initial state with $H$ dynamical channels. These channels are $H$ learned real-valued coordinates that evolve at every generation and may combine information from several chemical descriptors rather than corresponding one-to-one with named chemical properties:
 
-$$
+```math
 h_i^{(0)}=\tanh\!\left(s_0 W_{\mathrm{init}}x_i\right),
-$$
+```
 
 Here, $W_{\mathrm{init}}$ maps the fixed descriptor vector $x_i$ into $H$ values, so $h_i^{(0)}\in\mathbb{R}^{H}$ is atom $i$'s complete $H$-channel dynamical state at generation zero. The superscript $(0)$ denotes the initial generation and is distinct from the channel count $H$. The scalar $s_0$ is the initialization scale: it multiplies the projected input before the hyperbolic tangent and therefore controls the initial state magnitude and degree of saturation. A shared local rule was then applied recurrently for $T$ generations. The parameters of this rule were tied across atoms and generations, making the construction a graph recurrent neural network with cellular-automata locality.
 
 At generation $t$, the message from neighbour $j$ to atom $i$ was
 
-$$
+```math
 g_{ji}=\sigma\!\left(\frac{W_g e_{ji}}{\theta_b}\right),
 \qquad
 m_{ji}^{(t)}=g_{ji}\odot W_n h_j^{(t)}+W_e e_{ji},
-$$
+```
 
 Here, $\sigma(z)=1/(1+\exp(-z))$ is the logistic sigmoid applied elementwise. The subscript $n$ in $W_n$ denotes *neighbour*: $W_n$ is a learned linear map applied to the neighbouring state $h_j^{(t)}\in\mathbb{R}^{H}$, which is atom $j$'s dynamical state at generation $t$. The learned maps $W_e$ and $W_g$ respectively transform the bond description and generate a channel-wise bond gate. The positive bond temperature $\theta_b$ controls gate sharpness: a smaller value makes sigmoid gates more decisive, whereas a larger value moves them towards one half. The symbol $\odot$ denotes elementwise multiplication. Incoming messages and neighbouring states were degree-normalized by averaging over the number of neighbours, preventing atoms with more bonds from acquiring larger aggregate values merely because of their degree:
 
-$$
+```math
 a_i^{(t)}=\frac{1}{|N(i)|}\sum_{j\in N(i)}m_{ji}^{(t)},
 \qquad
 \bar h_i^{(t)}=\frac{1}{|N(i)|}\sum_{j\in N(i)}h_j^{(t)}.
-$$
+```
 Here, $N(i)$ is the set of atoms directly bonded to atom $i$, and $|N(i)|$ is the number of those neighbours. The state $h_i^{(t)}$ belongs to atom $i$ itself, whereas $\bar h_i^{(t)}$ is the mean state of its directly bonded neighbours. Chemical identity and CYP context entered every generation through a common reaction drive:
 
-$$
+```math
 r_i^{(t)}=\tanh\!\left(
 W_s h_i^{(t)}+a_i^{(t)}+W_x x_i+W_c c+b
 \right).
-$$
+```
 
 The common reaction drive $r_i^{(t)}\in\mathbb{R}^{H}$ is the candidate state change calculated for every atom and rule from the atom's present state $h_i^{(t)}$, its aggregated bond-conditioned neighbour message $a_i^{(t)}$, its fixed chemical input $x_i$, and the CYP context $c$. The learned maps $W_s$, $W_x$, and $W_c$ project their respective inputs into $H$ channels, and $b\in\mathbb{R}^{H}$ is a learned bias. The submitted ensemble, introduced above as a collection of independently trained Graph-CA predictors, used five transition rules sharing this bonded message and reaction calculation.
 
 **Gated residual.** Inspired by gating in recurrent neural networks [13], this rule allows every atom and channel to retain its current value or accept a learned fraction of the newly proposed reaction. The gate is recalculated from the local molecular state at every generation:
 
-$$
+```math
 \alpha_i^{(t)}=\sigma\!\left(W_\alpha
 [h_i^{(t)},a_i^{(t)},x_i,c]\right),
 \qquad
 h_i^{(t+1)}=(1-s\alpha_i^{(t)})\odot h_i^{(t)}
 +s\alpha_i^{(t)}\odot r_i^{(t)},
-$$
+```
 
 Here, $\alpha_i^{(t)}\in(0,1)^H$ is atom $i$'s channel-wise acceptance gate; $W_\alpha$ is a learned map from the concatenated vector $[h_i^{(t)},a_i^{(t)},x_i,c]$ to $H$ gate values; square brackets denote concatenation; and $s>0$ is the update scale. The product $s\alpha_i^{(t)}$ was capped at one in each channel, $1$ denotes the $H$-component all-ones vector, and $\odot$ denotes elementwise multiplication. Thus, each new channel value is a weighted mixture of its previous value $h_i^{(t)}$ and proposed reaction $r_i^{(t)}$.
 
 **Inertial reaction–diffusion.** This rule combines local reaction–diffusion, whose classical formulation couples reaction kinetics to spatial exchange [14], with a momentum-like velocity state [15]. The reaction term drives local change, the graph-diffusion term exchanges state with bonded neighbours, and restoring and damping terms control growth:
 
-$$
+```math
 f_i^{(t)}=r_i^{(t)}+D\odot(\bar h_i^{(t)}-h_i^{(t)})-R\odot h_i^{(t)},
-$$
-$$
+```
+
+```math
 v_i^{(t+1)}=\eta\gamma\odot v_i^{(t)}+\delta\odot f_i^{(t)},
 \qquad
 h_i^{(t+1)}=\tanh\!\left(h_i^{(t)}+\delta\odot v_i^{(t+1)}\right).
-$$
+```
 
 Here, $f_i^{(t)}\in\mathbb{R}^{H}$ is the total force-like drive; $r_i^{(t)}$ is the common reaction drive; $\bar h_i^{(t)}-h_i^{(t)}$ is the graph-diffusion gradient between the neighbour mean and atom $i$; and $D,R\in\mathbb{R}_{\geq0}^{H}$ are channel-wise diffusion and restoring strengths. The auxiliary velocity $v_i^{(t)}\in\mathbb{R}^{H}$, initialized to zero, carries change between generations. The vectors $\gamma,\delta\in\mathbb{R}^{H}$ are channel-wise damping and step size, while the scalar $\eta$ is the inertial multiplier. These quantities were constrained to stable ranges by sigmoid or softplus transformations, and $\tanh$ bounded the updated state.
 
 **FitzHugh–Nagumo.** Adapted from the classical excitable-system model [16,17], this rule divides the state into a fast excitation subsystem and a slower recovery subsystem. Their interaction can create threshold responses, pulses, and oscillatory relaxation, while learned chemical drive and graph diffusion condition those behaviours on the molecule:
 
-$$
+```math
 \Delta u_i^{(t)}=u_i^{(t)}-\frac{(u_i^{(t)})^3}{3}-v_i^{(t)}
 +\kappa_s\tanh(W_u r_i^{(t)})+D_u(\bar u_i^{(t)}-u_i^{(t)}),
-$$
-$$
+```
+
+```math
 \Delta v_i^{(t)}=\epsilon\left[u_i^{(t)}+q-v_i^{(t)}+0.1\tanh(W_v r_i^{(t)})\right]
 +D_v(\bar v_i^{(t)}-v_i^{(t)}),
-$$
+```
 The two channel groups were then advanced together:
 
-$$
+```math
 h_i^{(t+1)}=\tanh\!\left(
 [u_i^{(t)}+s\Delta u_i^{(t)},\;v_i^{(t)}+s\Delta v_i^{(t)}]
 \right).
-$$
+```
 
 Here, $u_i^{(t)},v_i^{(t)}\in\mathbb{R}^{H/2}$ are the excitation and recovery halves of $h_i^{(t)}$; $\bar u_i^{(t)}$ and $\bar v_i^{(t)}$ are their respective means over $N(i)$; and $\Delta u_i^{(t)}$ and $\Delta v_i^{(t)}$ are their proposed increments. The learned maps $W_u$ and $W_v$ project the $H$-channel reaction drive into the corresponding half-state. The scalar $\kappa_s$ scales chemical stimulation, $D_u,D_v\geq0$ control graph diffusion, $\epsilon>0$ sets the recovery timescale, $q$ offsets recovery, $0.1$ is the fixed recovery-drive coefficient, and $s>0$ is the integration step. Square brackets concatenate the two updated half-states, and $\tanh$ bounds the resulting $H$-channel state.
 
 **Kuramoto–Sakaguchi.** Adapted from coupled phase-oscillator theory [18,19], this rule treats every dynamical channel as a wrapped phase $\phi_i^{(t)}=\pi h_i^{(t)}$. Bond-gated coupling encourages neighbouring phases to coordinate, while chemical and CYP information determine each atom's intrinsic phase velocity:
 
-$$
+```math
 q_i^{(t)}=\frac{1}{|N(i)|}\sum_{j\in N(i)}
 g_{ji}\odot\sin\!\left(\phi_j^{(t)}-\phi_i^{(t)}-\psi\right),
-$$
-$$
+```
+
+```math
 \phi_i^{(t+1)}=\phi_i^{(t)}+s\left[
 \omega_i^{(t)}+Kq_i^{(t)}\right],
 \qquad
 \omega_i^{(t)}=A\tanh(W_\omega r_i^{(t)}).
-$$
+```
 Here, $\phi_i^{(t)}\in[-\pi,\pi)^H$ is atom $i$'s phase vector; $q_i^{(t)}\in\mathbb{R}^{H}$ is its mean bond-gated phase-coupling signal; $N(i)$ and $|N(i)|$ denote its bonded-neighbour set and size; $g_{ji}\in(0,1)^H$ is the bond gate; and $\sin$ and $\odot$ act elementwise. The phase lag $\psi$ shifts the preferred phase relationship, $K$ is the coupling strength, and $s$ is the integration step. The chemically conditioned natural-frequency vector is $\omega_i^{(t)}\in\mathbb{R}^{H}$, where $W_\omega$ is learned, $r_i^{(t)}$ is the common reaction drive, and $A$ sets the frequency scale. The updated phase was wrapped modulo $2\pi$ into $[-\pi,\pi)$ and divided by $\pi$ to return $h_i^{(t+1)}$ to $[-1,1]$. The phase lag, coupling strength, and frequency scale were selected during training-only hyperparameter search.
 
 **Delayed memory.** Drawing upon delay-differential dynamical systems [20], this rule makes the next state depend upon both the present calculation and an earlier point in the retained trajectory. It can therefore represent lagged feedback and history-dependent responses that a present-state-only rule cannot express. A rule-specific delay $d$ selected the preceding state, and the new drive combined the current reaction, a learned transformation of the current and delayed states, and explicit delayed-state feedback:
 
-$$
+```math
 \tilde r_i^{(t)}=\tanh\!\left(W_d[r_i^{(t)},h_i^{(t-d)}]\right),
-$$
-$$
+```
+
+```math
 h_i^{(t+1)}=\tanh\!\left(
 (1-\zeta s)h_i^{(t)}+s\left[(1-\mu)r_i^{(t)}
 +\mu\tilde r_i^{(t)}+\kappa_d(h_i^{(t-d)}-h_i^{(t)})\right]
 \right).
-$$
+```
 Here, $h_i^{(t-d)}\in\mathbb{R}^{H}$ is atom $i$'s state $d$ generations earlier, with the earliest available retained state used when $t<d$; $\tilde r_i^{(t)}\in\mathbb{R}^{H}$ is the delay-conditioned reaction; $W_d$ is a learned map from the concatenation $[r_i^{(t)},h_i^{(t-d)}]$ to $H$ values; and $\tanh$ bounds both the delayed reaction and updated state. The scalar $\mu\in[0,1]$ mixes the present reaction $r_i^{(t)}$ with the delayed reaction, $\kappa_d$ controls feedback from the difference $h_i^{(t-d)}-h_i^{(t)}$, $\zeta$ controls damping of the present state, $s>0$ is the update scale, and $1$ in $(1-\mu)$ is the scalar multiplicative identity. The delay and these coefficients were determined from the rule-specific search space.
 
 Each trajectory was pooled into a molecular fingerprint containing the final atom-state mean and variance, the time-averaged atom state, the temporal variance of the molecular mean state, and mean state-change energy. The multiscale variant appended molecular mean states at 12.5%, 25%, 50%, 75%, and 100% of the trajectory. CYP-specific readout features were formed by combining the endpoint one-hot vector with endpoint-gated copies of the dynamical fingerprint.
@@ -185,17 +189,17 @@ The predictive campaign evaluated DS-GCAE, CFT-DS-GCAE, CV-CYP-GCA, EA-CV-CYP-GC
 
 Training batches were divided by molecule into support and query subsets. The Graph-CA generated fingerprint matrix $F_s$ for the support molecules, which was standardized column-wise to $Z_s$. With centered targets $y_s-\bar y_s$, the ridge coefficients were obtained by the closed-form differentiable solve
 
-$$
+```math
 \beta=\left(Z_s^{\mathsf T}Z_s+\lambda I\right)^{-1}
 Z_s^{\mathsf T}(y_s-\bar y_s).
-$$
+```
 
 For query fingerprint $f_q$, prediction was
 
-$$
+```math
 \widehat y_q=\bar y_s+
 \left(\frac{f_q-\bar F_s}{s_F}\right)^{\mathsf T}\beta,
-$$
+```
 
 where $\bar F_s$ and $s_F$ were the support feature mean and scale. The intercept was excluded from the ridge penalty. The linear solve remained connected to the Graph-CA computation graph, allowing query loss gradients to pass through $\beta$ and into every recurrent generation. A Hermitian pseudoinverse implemented the same ridge objective when highly correlated trajectory statistics made the normal equations numerically singular.
 
@@ -211,9 +215,9 @@ The first submitted method, DS-GCAE, combined these signals through a fixed glob
 
 A separate standardized ridge stack was fitted for each CYP endpoint using the ten expert signals. Ridge penalties $0.01, 0.1, 1, 10, 100,$ and $1000$ were compared inside nested scaffold-grouped folds using endpoint ST-RAE. Each outer-fold prediction was generated by a stack whose penalty and parameters had been selected without that fold. An optional affine calibration
 
-$$
+```math
 \widehat y_{\mathrm{cal}}=a\widehat y+b
-$$
+```
 
 was assessed with calibration penalties of 0, 1, 10, 100, 1000, and an identity option. Calibration training also used out-of-fold predictions. The selected final penalties were 1000 for CYP1A2 and CYP2D6 and 100 for CYP2C9 and CYP3A4. Identity calibration, $a=1$ and $b=0$, was selected for all four endpoints.
 
@@ -233,18 +237,18 @@ The final CYP1A2 system combined conservative graph flux, delayed memory, and Gr
 
 CIA-EA-CV-CYP-GCA retained the endpoint-specific recurrent systems, scaffold separation, differentiable ridge solve, and sparse out-of-fold rule selection of EA-CV-CYP-GCA. For every retained transition-rule specialist, recurrent training compared credible-interval loss weights of 0, 0.25, 0.50, and 0.75. The zero setting reproduced endpoint-aligned mean-squared-error training. Positive settings combined squared pIC50 error with a differentiable distance from the reported lower and upper credible bounds. For prediction $\widehat y$, lower bound $l$, upper bound $u$, and temperature $\tau=0.05$, the smooth interval distance was
 
-$$
+```math
 d_{\tau}(\widehat y,l,u)=
 \tau\log\left(1+\exp\left(\frac{l-\widehat y}{\tau}\right)\right)
 +\tau\log\left(1+\exp\left(\frac{\widehat y-u}{\tau}\right)\right).
-$$
+```
 
 With interval weight $\alpha$, the recurrent query loss was
 
-$$
+```math
 L=(1-\alpha)L_{\mathrm{MSE}}+\alpha\,\frac{1}{n}
 \sum_{k=1}^{n}d_{\tau}(\widehat y_k,l_k,u_k)^2.
-$$
+```
 
 Selection used endpoint ST-RAE across two scaffold folds. The selected loss configuration for each rule then advanced to five-fold confirmation with two seeds, followed by leakage-safe sparse ridge subset selection. The sealed holdout was opened once after all loss weights, rule subsets, and ridge penalties had been fixed. The final CYP1A2 system combined Gray–Scott, FitzHugh–Nagumo, and conservative graph flux. CYP2C9 combined Gray–Scott and damped symplectic. CYP2D6 combined delayed memory and FitzHugh–Nagumo. CYP3A4 combined damped symplectic and delayed memory. Complete blind inference used the frozen systems and did not load blind labels.
 
@@ -256,9 +260,9 @@ Dynamical analysis was performed after predictive training, using frozen model p
 
 An initial screen was calculated from the complete atom-by-channel validation trajectories. For trajectory $H_t$, the molecular mean state was calculated at each generation, and late-time motion was measured from the mean Euclidean step length over the second half of the observed sequence. Recurrence was assessed over lags from 2 to 64 generations by comparing the mean lagged state distance with the distance expected from the accumulated mean step length. The smallest normalized lagged distance defined the recurrence ratio. Spectral entropy was calculated from the non-zero-frequency Fourier power of each state channel and averaged across channels. A screening score combined these quantities:
 
-$$
+```math
 S = \frac{v_{\mathrm{late}}\left(1 + H_{\mathrm{spectral}}\right)}{R_{\mathrm{recurrence}}},
-$$
+```
 
 where $v_{\mathrm{late}}$ is late-time motion, $H_{\mathrm{spectral}}$ is normalized spectral entropy, and $R_{\mathrm{recurrence}}$ is the recurrence ratio. This score acted as a computational targeting device rather than a definition of chaos. Candidates were drawn from gated residual, delayed memory, inertial reaction–diffusion, Kuramoto–Sakaguchi, and FitzHugh–Nagumo transition-rule families so that the long-horizon analysis included contracting, oscillatory, recurrent, and expanding regimes.
 
@@ -272,12 +276,12 @@ Each detailed case was paired with eight independently oriented full-state pertu
 
 The Kuramoto–Sakaguchi state is phase-like and wrapped to the interval $[-1,1]$. Differences were consequently measured on the circular state space. For reference state $h$ and companion state $h'$, the elementwise circular difference was
 
-$$
+```math
 \Delta(h',h) = \frac{1}{\pi}\mathrm{atan2}\!\left[
 \sin\!\left(\pi(h'-h)\right),
 \cos\!\left(\pi(h'-h)\right)
 \right],
-$$
+```
 
 and full-state separation was $d=\lVert\Delta(h',h)\rVert_2$. This prevented an apparent jump across the phase boundary from being interpreted as physical divergence.
 
@@ -296,10 +300,10 @@ The numerical settings for the confirmatory and population experiments are summa
 
 Persistent local instability was tested with a Benettin-style repeated-renormalization calculation. A companion state was placed at distance $\varepsilon$ from the post-burn-in reference state, and both states were advanced for each interval $\tau$. The circular separation $d_k$ was measured, its logarithmic expansion was recorded, and the companion was returned to distance $\varepsilon$ along the observed separation direction. The largest Lyapunov exponent was estimated as
 
-$$
+```math
 \lambda_1 = \frac{1}{K\tau}
 \sum_{k=1}^{K}\log\!\left(\frac{d_k}{\varepsilon}\right).
-$$
+```
 
 The complete design produced 48 estimates. Repeated renormalization tested whether divergence was continually regenerated after local separations had been returned to the same small scale.
 
