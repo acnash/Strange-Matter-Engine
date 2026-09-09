@@ -8,21 +8,21 @@
 
 ## Abstract
 
-Cytochrome P450 (CYP) inhibition is a major consideration in drug discovery because it can alter drug metabolism and contribute to clinically significant drug–drug interactions. The 2026 OpenADMET CYP Inhibition Challenge provides a blinded setting in which to evaluate computational prediction of direct-inhibition pIC50 across four CYP isoforms. Here, we introduce a molecular graph cellular automaton that represents atoms as cells, chemical bonds as local neighbourhoods, and molecular computation **(what is molecular computation?)** as the repeated evolution of a shared, learned transition rule. Our approach retains the complete sequence of atom states and uses its transient and terminal properties **(what are transient and terminal endpoints?)** to predict CYP inhibition. We call this evolving representation **molecule space-time**: the joint description of molecular structure and its learned progression through computational time. The latest Credible-Interval-Aligned Endpoint-Aligned Cross-Validated CYP-Specialist Graph Cellular Automata system, CIA-EA-CV-CYP-GCA, combined isoform-specific recurrent training with a smooth experimental-interval loss and achieved sealed-holdout MA-ST-RAE 0.7485 and RMSE 0.8477 pIC50. The preceding EA-CV-CYP-GCA OpenADMET blind evaluation returned MA-ST-RAE 1.0071, macro MAE 1.0778, macro R-squared -0.0715, macro Spearman rho 0.5345, and macro Kendall tau 0.3750. As a secondary objective, we investigated the nonlinear dynamics contained within molecule space-time by extending selected trajectories over thousands of generations and examining convergence, recurrence, periodicity, perturbation sensitivity, strange-attractor candidates, and possible chaotic behaviour. This analysis confirmed two bounded Kuramoto–Sakaguchi trajectories with continually regenerated positive Lyapunov exponents and multidirectional expansion. The framework treats prediction and dynamical exploration as complementary views of the same learned molecular process, offering a route toward CYP inhibition models whose internal evolution can be measured, visualised, and studied as a nonlinear system.
+Cytochrome P450 (CYP) inhibition is a major consideration in drug discovery because it can alter drug metabolism and contribute to clinically significant drug–drug interactions. The 2026 OpenADMET CYP Inhibition Challenge provides a blinded setting in which to evaluate computational prediction of direct-inhibition pIC50 across four CYP isoforms. Here, we introduce a molecular graph cellular automaton that represents atoms as cells, chemical bonds as local neighbourhoods, and molecular computation, meaning the transformation and integration of chemically encoded information by the graph, as the repeated evolution of a shared, learned transition rule. Our approach retains the complete sequence of atom states and uses both transient properties measured during its evolution and terminal properties measured at its final generation to predict CYP inhibition. We call this evolving representation **molecule space-time**: the joint description of molecular structure and its learned progression through computational time. The latest Credible-Interval-Aligned Endpoint-Aligned Cross-Validated CYP-Specialist Graph Cellular Automata system, CIA-EA-CV-CYP-GCA, combined isoform-specific recurrent training with a smooth experimental-interval loss and achieved sealed-holdout MA-ST-RAE 0.7485 and RMSE 0.8477 pIC50. The preceding EA-CV-CYP-GCA OpenADMET blind evaluation returned MA-ST-RAE 1.0071, macro MAE 1.0778, macro R-squared -0.0715, macro Spearman rho 0.5345, and macro Kendall tau 0.3750. As a secondary objective, we investigated the nonlinear dynamics contained within molecule space-time by extending selected trajectories over thousands of generations and examining convergence, recurrence, periodicity, perturbation sensitivity, strange-attractor candidates, and possible chaotic behaviour. This analysis confirmed two bounded Kuramoto–Sakaguchi trajectories with continually regenerated positive Lyapunov exponents and multidirectional expansion. The framework treats prediction and dynamical exploration as complementary views of the same learned molecular process, offering a route toward CYP inhibition models whose internal evolution can be measured, visualised, and studied as a nonlinear system.
 
 ## Introduction
 
-The 2026 OpenADMET CYP Inhibition Blind Challenge asks participants to predict direct-inhibition pIC50 values for CYP1A2, CYP2C9, CYP2D6, and CYP3A4 from molecular structure, with performance assessed against an unseen test set. Cytochrome P450 enzymes govern the oxidative metabolism of many medicines, and their inhibition can slow drug clearance, increase systemic exposure, alter the metabolism of co-administered compounds, and contribute to clinically important drug–drug interactions **(REFERENCES)**. Reliable computational prediction can therefore help medicinal chemists identify liabilities earlier, prioritize experiments, and guide molecular design before more expensive laboratory studies are undertaken.
+The 2026 OpenADMET CYP Inhibition Blind Challenge asks participants to predict direct-inhibition pIC50 values for CYP1A2, CYP2C9, CYP2D6, and CYP3A4 from molecular structure, with performance assessed against an unseen test set. Cytochrome P450 enzymes govern the oxidative metabolism of many medicines, and their inhibition can slow drug clearance, increase systemic exposure, alter the metabolism of co-administered compounds, and contribute to clinically important drug–drug interactions [1]. Reliable computational prediction can therefore help medicinal chemists identify liabilities earlier, prioritize experiments, and guide molecular design before more expensive laboratory studies are undertaken.
 
-Our immediate objective in the competition is to produce four useful CYP-specific predictions for every blinded molecule while preserving strict separation between training, model selection, validation, and the hidden challenge set. We approach this as a supervised regression problem in which atom-level chemical descriptors are propagated through the bonded molecular graph, pooled into trajectory fingerprints, and mapped to pIC50 by a differentiable ridge readout. Several transition rules and temporal scales **(what are temporal scales?)** are combined in an ensemble **(an ensemble of what?)** so that complementary forms of local molecular computation can contribute to the final prediction.
+Our immediate objective in the competition is to produce four useful CYP-specific predictions for every blinded molecule while preserving strict separation between training, model selection, validation, and the hidden challenge set. We approach this as a supervised regression problem in which atom-level chemical descriptors are propagated through the bonded molecular graph, pooled into trajectory fingerprints, and mapped to pIC50 by a differentiable ridge readout. Several transition rules and temporal scales, meaning trajectories evolved for different numbers of cellular-automata generations, are combined in an ensemble of independently trained Graph-CA predictors so that complementary forms of local molecular computation can contribute to the final prediction.
 
-Established approaches to molecular-property prediction include descriptor-based quantitative structure–activity relationship models **(REFERENCE)**, random forests **(REFERENCE)** and gradient-boosted trees **(REFERENCE)**, message-passing graph neural networks **(REFERENCE)**, graph transformers **(REFERENCE)**, three-dimensional equivariant neural networks **(REFERENCE)**, and pretrained molecular foundation models **(REFERENCE)**. These architectures provide strong and extensively studied competitive baselines. The present work instead examines a comparatively novel question: whether the aesthetic and dynamical character of information itself can become a useful molecular representation when complex global patterns emerge from repeated local decisions.
+Established approaches to molecular-property prediction include descriptor-based quantitative structure–activity relationship models [2], random forests [3] and gradient-boosted trees [4], message-passing graph neural networks [5], graph transformers [6], three-dimensional equivariant neural networks [7], and pretrained molecular foundation models [8]. These architectures provide strong and extensively studied competitive baselines. The present work instead examines a comparatively novel question: whether the aesthetic and dynamical character of information itself can become a useful molecular representation when complex global patterns emerge from repeated local decisions.
 
-We encode each drug as a connected cellular automaton in which atoms are cells, covalent bonds define neighbourhoods, atom descriptors provide the initial information, and a shared transition rule determines how every atom responds to its neighbours at each generation. Bond identity controls the passage of information through single, double, triple, and aromatic connections. This construction retains the defining cellular-automata principle that global behaviour arises from repeated local interactions **(reference)**, while replacing the regular lattice of a classical cellular automaton with the irregular bonded graph of a molecule.
+We encode each drug as a connected cellular automaton in which atoms are cells, covalent bonds define neighbourhoods, atom descriptors provide the initial information, and a shared transition rule determines how every atom responds to its neighbours at each generation. Bond identity controls the passage of information through single, double, triple, and aromatic connections. This construction retains the defining cellular-automata principle that global behaviour arises from repeated local interactions [9,10], while replacing the regular lattice of a classical cellular automaton with the irregular bonded graph of a molecule.
 
-Wolfram's qualitative classification provides a useful vocabulary for the behaviours that cellular automata can produce. Class I systems settle into a homogeneous fixed state; Class II systems form stable or periodic structures; Class III systems generate aperiodic, chaos-like activity; and Class IV systems support persistent localized structures and complex interactions often associated with the boundary between order and disorder. A learned molecular graph cellular automaton does not map automatically onto these lattice-based classes, although the classification motivates measurable analogues including point attractors, oscillations, persistent complex motion, sensitivity to perturbation, and bounded strange attractors. **(I don't think this is paragraph is relevant. Make an assessment whether it remains. If it does, it will need references.)**
+Wolfram's qualitative classification provides a useful vocabulary for the behaviours that cellular automata can produce [9,10]. Class I systems settle into a homogeneous fixed state; Class II systems form stable or periodic structures; Class III systems generate aperiodic, chaos-like activity; and Class IV systems support persistent localized structures and complex interactions often associated with the boundary between order and disorder. A learned molecular graph cellular automaton does not map automatically onto these lattice-based classes, although the classification motivates measurable analogues including point attractors, oscillations, persistent complex motion, sensitivity to perturbation, and bounded strange attractors.
 
-We regard the method's near-term prospects against highly optimized molecular-learning systems as modest, and its scientific purpose extends beyond leaderboard position. The retained atom-by-channel trajectories allow us to ask how chemical information moves through a ligand, how molecular topology shapes that motion, and whether minute changes to the starting state are repeatedly amplified while the trajectory remains confined to an attracting region. As demonstrated here, particular molecular structures and CYP-conditioned encodings produce bounded trajectories with continually regenerated positive Lyapunov exponents and multidirectional expansion **(References for Lyapunov exponents and multidirectional expansion)**. These strange-attractor dynamics connect molecular structure, local information processing, and emergent behaviour within a single predictive cellular-automata framework.
+We regard the method's near-term prospects against highly optimized molecular-learning systems as modest, and its scientific purpose extends beyond leaderboard position. The retained atom-by-channel trajectories allow us to ask how chemical information moves through a ligand, how molecular topology shapes that motion, and whether minute changes to the starting state are repeatedly amplified while the trajectory remains confined to an attracting region. As demonstrated here, particular molecular structures and CYP-conditioned encodings produce bounded trajectories with continually regenerated positive Lyapunov exponents and multidirectional expansion, interpreted through the established theory and numerical estimation of Lyapunov spectra [11,12]. These strange-attractor dynamics connect molecular structure, local information processing, and emergent behaviour within a single predictive cellular-automata framework.
 
 ## Materials and Methods
 
@@ -30,7 +30,9 @@ We regard the method's near-term prospects against highly optimized molecular-le
 
 The study used the primary direct-inhibition dataset released for the 2026 OpenADMET CYP Inhibition Blind Challenge. It comprised 4,905 unique compounds represented by a molecule identifier and a SMILES string. Experimental direct-inhibition pIC50 values were provided for four major drug-metabolising cytochrome P450 isoforms: CYP1A2, CYP2C9, CYP2D6, and CYP3A4. Here, pIC50 denotes the negative base-10 logarithm of the half-maximal inhibitory concentration expressed in molar units. Each reported measurement was accompanied by lower and upper uncertainty bounds and an estimated standard deviation from the fitted concentration–response experiment.
 
-The response matrix was incomplete because compounds were not necessarily measured against every CYP isoform. The dataset contained 6,525 observed compound–CYP pairs, distributed as follows:
+The response matrix was incomplete because compounds were not necessarily measured against every CYP isoform. The dataset contained 6,525 observed compound–CYP pairs, distributed as summarised in Table 1.
+
+**Table 1. Number of observed direct-inhibition pIC50 measurements for each CYP isoform.**
 
 | CYP isoform | Compounds with an observed direct-inhibition pIC50 |
 |---|---:|
@@ -40,9 +42,7 @@ The response matrix was incomplete because compounds were not necessarily measur
 | CYP3A4 | 2,335 |
 | **Total** | **6,525** |
 
-**(This table needs a table caption and it needs referencing in the main body of the text.)**
-
-Each observed compound–CYP pair constituted one supervised regression example. DS-GCAE and CFT-DS-GCAE learned a shared CYP-conditioned mapping. CV-CYP-GCA used independent endpoint models with shared four-endpoint supervision inside recurrent training batches. EA-CV-CYP-GCA aligned each independent nonlinear Graph-CA system with one isoform throughout recurrent backpropagation, differentiable ridge fitting, validation, and checkpoint selection. CIA-EA-CV-CYP-GCA retained this endpoint alignment and additionally trained selected cellular-automata experts against the experimental credible intervals used by the challenge metric. Missing endpoint **(what is a missing endpoint?)** values were retained as missing and contributed neither targets nor loss terms. The single-concentration, time-dependent-inhibition, and Emax datasets distributed with the challenge were outside the scope of this direct-inhibition study.
+Each observed compound–CYP pair constituted one supervised regression example. DS-GCAE and CFT-DS-GCAE learned a shared CYP-conditioned mapping. CV-CYP-GCA used independent endpoint models with shared four-endpoint supervision inside recurrent training batches. EA-CV-CYP-GCA aligned each independent nonlinear Graph-CA system with one isoform throughout recurrent backpropagation, differentiable ridge fitting, validation, and checkpoint selection. CIA-EA-CV-CYP-GCA retained this endpoint alignment and additionally trained selected cellular-automata experts against the experimental credible intervals used by the challenge metric. A missing endpoint was a compound–CYP combination for which no experimental direct-inhibition pIC50 value was reported. These values were retained as missing and contributed neither targets nor loss terms. The single-concentration, time-dependent-inhibition, and Emax datasets distributed with the challenge were outside the scope of this direct-inhibition study.
 
 To assess generalisation beyond closely related chemistry, compounds were grouped by their standardised Bemis–Murcko scaffold before data partitioning. A fixed 20% subset of scaffold groups was reserved as a sealed holdout, leaving 5,216 observed compound–CYP pairs for model fitting and internal selection and 1,309 pairs for final validation. No scaffold group occurred in both partitions. Hyperparameter selection was conducted within the fitting pool, while the reserved scaffold holdout remained unused until final evaluation.
 
@@ -50,9 +50,11 @@ The challenge test set contained 750 additional compounds for which all direct-i
 
 ### Molecular Graph Representation
 
-SMILES strings were cleaned with RDKit **(What do you mean by cleaned?)**, reduced to the largest organic fragment, sanitized, and converted to canonical isomeric SMILES. Each standardized molecule was represented as a graph $G=(V,E)$, where every heavy atom $i\in V$ was a cellular-automata cell and every covalent bond defined two directed message-passing edges, $j\rightarrow i$ and $i\rightarrow j$. Molecular geometry was absent from the predictive input **(what is the predictive input?)**.
+SMILES strings underwent RDKit structure cleanup, including normalization of standard functional-group and charge representations, before being reduced to the largest organic fragment, sanitized, and converted to canonical isomeric SMILES. Each standardized molecule was represented as a graph $G=(V,E)$, where every heavy atom $i\in V$ was a cellular-automata cell and every covalent bond defined two directed message-passing edges, $j\rightarrow i$ and $i\rightarrow j$. The predictive input, meaning the information supplied to the model to generate a pIC50 prediction, comprised the standardized two-dimensional graph connectivity, atom and bond descriptors, and CYP context; it contained no molecular geometry.
 
-The baseline atom encoding contained one-hot element identity for H, C, N, O, F, P, S, Cl, Br, I, and other elements **(give an example of one-hot element identity encoding)**; formal charge; aromaticity; sp, sp2, sp3, and other hybridization states; degree; total attached hydrogens; ring membership; hydrogen-bond donor and acceptor status; and tetrahedral chirality. Training-only model selection **(What is a training-only model selection?)** could extend this encoding with five chemically organized feature groups:
+The baseline atom encoding contained one-hot element identity for H, C, N, O, F, P, S, Cl, Br, I, and other elements; for example, with this ordering carbon was encoded as $(0,1,0,0,0,0,0,0,0,0,0)$ and oxygen as $(0,0,0,1,0,0,0,0,0,0,0)$. Further descriptors comprised formal charge; aromaticity; sp, sp2, sp3, and other hybridization states; degree; total attached hydrogens; ring membership; hydrogen-bond donor and acceptor status; and tetrahedral chirality. Training-only model selection, meaning comparison of alternative feature profiles using only the fitting data and its internal validation partitions, could extend this encoding with five chemically organised feature groups summarised in Table 2. The sealed holdout and blinded challenge set played no part in that selection.
+
+**Table 2. Chemically organised atom-feature groups considered during training-only model selection.** A feature group is a named collection of related atom-level descriptors that was added to the baseline encoding as one candidate block.
 
 | Feature group | Atom-level quantities |
 |---|---|
@@ -62,23 +64,19 @@ The baseline atom encoding contained one-hot element identity for H, C, N, O, F,
 | Ring geometry | Number of rings containing the atom and indicators for ring sizes 3, 4, 5, 6, 7, and 8 or greater |
 | Local environment | Mean neighbouring electronegativity, electronegativity difference from the neighbourhood, mean neighbouring atomic number, and mean neighbouring formal charge |
 
-**(In the above table, what do you mean by "Feature group"? The table needs a caption and it needs referencing from the main body of the text.)**
-
 The selected feature profile was stored with every frozen checkpoint, preserving the exact feature names and order required for inference. Continuous quantities were scaled by fixed chemically meaningful constants during graph construction. Bond vector $e_{ji}$ contained one-hot single, double, triple, or aromatic identity, conjugation, ring membership, and three stereochemical indicators. The same bond vector was attached to both directed representations of an undirected bond.
 
-The four CYP endpoints **(What is a CYP endpoint?)** were represented by a one-hot context vector $c$. Consequently, a molecule retained one chemical graph while its cellular-automata trajectory and readout were conditioned on CYP1A2, CYP2C9, CYP2D6, or CYP3A4. Independent molecule–CYP graphs were combined as disconnected components during batched GPU evaluation, so message passing remained confined to atoms belonging to the same molecule **(This sentence is unclear. I don't know what it means)**.
+Each of the four CYP endpoints was a distinct prediction task defined by the direct-inhibition pIC50 for one isoform. The endpoints were represented by a one-hot context vector $c$. Consequently, a molecule retained one chemical graph while its cellular-automata trajectory and readout were conditioned on CYP1A2, CYP2C9, CYP2D6, or CYP3A4. For efficient GPU calculation, several molecule–CYP examples were placed in one batch without creating bonds between different molecules. Each atom could therefore exchange messages only with atoms in its own molecular graph.
 
 ### Nonlinear Graph Cellular Automaton
 
-For atom $i$, chemical input $x_i$ **(give an example of a chemical input)** was mapped to an initial state with $H$ dynamical channels **(What are dynamical channels?)**:
+For atom $i$, the chemical input vector $x_i$ contained its fixed descriptors; for example, an aromatic sp2 carbon could be represented by a carbon element indicator, zero formal charge, an aromaticity indicator, an sp2-hybridization indicator, its degree, and its other listed atom properties. This input was mapped to an initial state with $H$ dynamical channels. These channels are $H$ learned real-valued coordinates that evolve at every generation and may combine information from several chemical descriptors rather than corresponding one-to-one with named chemical properties:
 
 $$
 h_i^{(0)}=\tanh\!\left(s_0 W_{\mathrm{init}}x_i\right),
 $$
 
-**(I don't understand how the h_i^(0) related to H )**
-
-where $s_0$ controlled the initialization scale **(what is an initialized scale)**. A shared local rule was then applied recurrently for $T$ generations. The parameters of this rule were tied across atoms and generations, making the construction a graph recurrent neural network with cellular-automata locality.
+Here, $W_{\mathrm{init}}$ maps the fixed descriptor vector $x_i$ into $H$ values, so $h_i^{(0)}\in\mathbb{R}^{H}$ is atom $i$'s complete $H$-channel dynamical state at generation zero. The superscript $(0)$ denotes the initial generation and is distinct from the channel count $H$. The scalar $s_0$ is the initialization scale: it multiplies the projected input before the hyperbolic tangent and therefore controls the initial state magnitude and degree of saturation. A shared local rule was then applied recurrently for $T$ generations. The parameters of this rule were tied across atoms and generations, making the construction a graph recurrent neural network with cellular-automata locality.
 
 At generation $t$, the message from neighbour $j$ to atom $i$ was
 
@@ -88,18 +86,14 @@ g_{ji}=\sigma\!\left(\frac{W_g e_{ji}}{\theta_b}\right),
 m_{ji}^{(t)}=g_{ji}\odot W_n h_j^{(t)}+W_e e_{ji},
 $$
 
-**(what is sigma?)**
-
-where $W_n$ **(what is n in W_n?)** transformed the neighbouring state **(what is the neighbouring state defined as in the mathematics?)**, $W_e$ transformed the bond description, $W_g$ generated a channel-wise bond gate, $\theta_b$ was the bond temperature **(what is bond temperature?)**, and $\odot$ denoted elementwise multiplication. Incoming messages and neighbouring states were degree-normalized **(what is degree-normalized)**:
+Here, $\sigma(z)=1/(1+\exp(-z))$ is the logistic sigmoid applied elementwise. The subscript $n$ in $W_n$ denotes *neighbour*: $W_n$ is a learned linear map applied to the neighbouring state $h_j^{(t)}\in\mathbb{R}^{H}$, which is atom $j$'s dynamical state at generation $t$. The learned maps $W_e$ and $W_g$ respectively transform the bond description and generate a channel-wise bond gate. The positive bond temperature $\theta_b$ controls gate sharpness: a smaller value makes sigmoid gates more decisive, whereas a larger value moves them towards one half. The symbol $\odot$ denotes elementwise multiplication. Incoming messages and neighbouring states were degree-normalized by averaging over the number of neighbours, preventing atoms with more bonds from acquiring larger aggregate values merely because of their degree:
 
 $$
 a_i^{(t)}=\frac{1}{|N(i)|}\sum_{j\in N(i)}m_{ji}^{(t)},
 \qquad
 \bar h_i^{(t)}=\frac{1}{|N(i)|}\sum_{j\in N(i)}h_j^{(t)}.
 $$
-**(What is N_i?)**
-**(Wha is the difference between h_i^t with a line above it, and just h_i^t?)**
-Chemical identity and CYP context entered every generation through a common reaction drive **(what does "common reaction drive" mean?)**:
+Here, $N(i)$ is the set of atoms directly bonded to atom $i$, and $|N(i)|$ is the number of those neighbours. The state $h_i^{(t)}$ belongs to atom $i$ itself, whereas $\bar h_i^{(t)}$ is the mean state of its directly bonded neighbours. Chemical identity and CYP context entered every generation through a common reaction drive:
 
 $$
 r_i^{(t)}=\tanh\!\left(
@@ -107,9 +101,9 @@ W_s h_i^{(t)}+a_i^{(t)}+W_x x_i+W_c c+b
 \right).
 $$
 
-The submitted ensemble **(What is "submitted ensemble"? Have you mentioned an ensemble approach before?)** used five transition rules sharing this bonded message and reaction calculation.
+The common reaction drive $r_i^{(t)}\in\mathbb{R}^{H}$ is the candidate state change calculated for every atom and rule from the atom's present state $h_i^{(t)}$, its aggregated bond-conditioned neighbour message $a_i^{(t)}$, its fixed chemical input $x_i$, and the CYP context $c$. The learned maps $W_s$, $W_x$, and $W_c$ project their respective inputs into $H$ channels, and $b\in\mathbb{R}^{H}$ is a learned bias. The submitted ensemble, introduced above as a collection of independently trained Graph-CA predictors, used five transition rules sharing this bonded message and reaction calculation.
 
-**Gated residual.** **(Give a reference and a better description of what this is)** A learned channel-wise gate controlled the proportion of the proposed reaction accepted at each atom:
+**Gated residual.** Inspired by gating in recurrent neural networks [13], this rule allows every atom and channel to retain its current value or accept a learned fraction of the newly proposed reaction. The gate is recalculated from the local molecular state at every generation:
 
 $$
 \alpha_i^{(t)}=\sigma\!\left(W_\alpha
@@ -119,73 +113,67 @@ h_i^{(t+1)}=(1-s\alpha_i^{(t)})\odot h_i^{(t)}
 +s\alpha_i^{(t)}\odot r_i^{(t)},
 $$
 
-where $s\alpha$ was capped at one and $s$ was the update scale. **(Do not leave any part of the maths undefined)**
+Here, $\alpha_i^{(t)}\in(0,1)^H$ is atom $i$'s channel-wise acceptance gate; $W_\alpha$ is a learned map from the concatenated vector $[h_i^{(t)},a_i^{(t)},x_i,c]$ to $H$ gate values; square brackets denote concatenation; and $s>0$ is the update scale. The product $s\alpha_i^{(t)}$ was capped at one in each channel, $1$ denotes the $H$-component all-ones vector, and $\odot$ denotes elementwise multiplication. Thus, each new channel value is a weighted mixture of its previous value $h_i^{(t)}$ and proposed reaction $r_i^{(t)}$.
 
-**Inertial reaction–diffusion.** **(Give a reference and a better description of what this is)** A velocity state introduced momentum, while neighbour exchange and restoring forces supplied graph diffusion and damping:
+**Inertial reaction–diffusion.** This rule combines local reaction–diffusion, whose classical formulation couples reaction kinetics to spatial exchange [14], with a momentum-like velocity state [15]. The reaction term drives local change, the graph-diffusion term exchanges state with bonded neighbours, and restoring and damping terms control growth:
 
 $$
 f_i^{(t)}=r_i^{(t)}+D\odot(\bar h_i^{(t)}-h_i^{(t)})-R\odot h_i^{(t)},
 $$
-**(Do not leave any part of the maths undefined)**
 $$
 v_i^{(t+1)}=\eta\gamma\odot v_i^{(t)}+\delta\odot f_i^{(t)},
 \qquad
 h_i^{(t+1)}=\tanh\!\left(h_i^{(t)}+\delta\odot v_i^{(t+1)}\right).
 $$
 
-The channel-wise damping $\gamma$, step size $\delta$, diffusion $D$, restoring strength $R$, and inertial multiplier $\eta$ were constrained to stable ranges by sigmoid or softplus transformations. **(Do not leave any part of the maths undefined)**
+Here, $f_i^{(t)}\in\mathbb{R}^{H}$ is the total force-like drive; $r_i^{(t)}$ is the common reaction drive; $\bar h_i^{(t)}-h_i^{(t)}$ is the graph-diffusion gradient between the neighbour mean and atom $i$; and $D,R\in\mathbb{R}_{\geq0}^{H}$ are channel-wise diffusion and restoring strengths. The auxiliary velocity $v_i^{(t)}\in\mathbb{R}^{H}$, initialized to zero, carries change between generations. The vectors $\gamma,\delta\in\mathbb{R}^{H}$ are channel-wise damping and step size, while the scalar $\eta$ is the inertial multiplier. These quantities were constrained to stable ranges by sigmoid or softplus transformations, and $\tanh$ bounded the updated state.
 
-**FitzHugh–Nagumo.** **(Give a reference and a better description of what this is)** The state was divided into excitation $u$ and recovery $v$ channels. Their update combined the cubic excitable-system dynamics with learned chemical drive and graph diffusion:
+**FitzHugh–Nagumo.** Adapted from the classical excitable-system model [16,17], this rule divides the state into a fast excitation subsystem and a slower recovery subsystem. Their interaction can create threshold responses, pulses, and oscillatory relaxation, while learned chemical drive and graph diffusion condition those behaviours on the molecule:
 
 $$
-\Delta u_i=u_i-\frac{u_i^3}{3}-v_i
-+\kappa_s\tanh(W_u r_i)+D_u(\bar u_i-u_i),
+\Delta u_i^{(t)}=u_i^{(t)}-\frac{(u_i^{(t)})^3}{3}-v_i^{(t)}
++\kappa_s\tanh(W_u r_i^{(t)})+D_u(\bar u_i^{(t)}-u_i^{(t)}),
 $$
-**(Do not leave any part of the maths undefined)**
 $$
-\Delta v_i=\epsilon\left[u_i+q-v_i+0.1\tanh(W_v r_i)\right]
-+D_v(\bar v_i-v_i),
+\Delta v_i^{(t)}=\epsilon\left[u_i^{(t)}+q-v_i^{(t)}+0.1\tanh(W_v r_i^{(t)})\right]
++D_v(\bar v_i^{(t)}-v_i^{(t)}),
 $$
-**(Do not leave any part of the maths undefined)**
 The two channel groups were then advanced together:
 
 $$
 h_i^{(t+1)}=\tanh\!\left(
-[u_i+s\Delta u_i,\;v_i+s\Delta v_i]
+[u_i^{(t)}+s\Delta u_i^{(t)},\;v_i^{(t)}+s\Delta v_i^{(t)}]
 \right).
 $$
-**(Do not leave any part of the maths undefined)**
 
-**Kuramoto–Sakaguchi.** **(Give a reference and a better description of what this is)** Each channel was treated as a wrapped phase $\phi_i=\pi h_i$. Bond-gated phase coupling and a chemically conditioned natural frequency gave
+Here, $u_i^{(t)},v_i^{(t)}\in\mathbb{R}^{H/2}$ are the excitation and recovery halves of $h_i^{(t)}$; $\bar u_i^{(t)}$ and $\bar v_i^{(t)}$ are their respective means over $N(i)$; and $\Delta u_i^{(t)}$ and $\Delta v_i^{(t)}$ are their proposed increments. The learned maps $W_u$ and $W_v$ project the $H$-channel reaction drive into the corresponding half-state. The scalar $\kappa_s$ scales chemical stimulation, $D_u,D_v\geq0$ control graph diffusion, $\epsilon>0$ sets the recovery timescale, $q$ offsets recovery, $0.1$ is the fixed recovery-drive coefficient, and $s>0$ is the integration step. Square brackets concatenate the two updated half-states, and $\tanh$ bounds the resulting $H$-channel state.
+
+**Kuramoto–Sakaguchi.** Adapted from coupled phase-oscillator theory [18,19], this rule treats every dynamical channel as a wrapped phase $\phi_i^{(t)}=\pi h_i^{(t)}$. Bond-gated coupling encourages neighbouring phases to coordinate, while chemical and CYP information determine each atom's intrinsic phase velocity:
 
 $$
 q_i^{(t)}=\frac{1}{|N(i)|}\sum_{j\in N(i)}
 g_{ji}\odot\sin\!\left(\phi_j^{(t)}-\phi_i^{(t)}-\psi\right),
 $$
-**(Do not leave any part of the maths undefined)**
 $$
 \phi_i^{(t+1)}=\phi_i^{(t)}+s\left[
 \omega_i^{(t)}+Kq_i^{(t)}\right],
 \qquad
 \omega_i^{(t)}=A\tanh(W_\omega r_i^{(t)}).
 $$
-**(Do not leave any part of the maths undefined)**
-The updated phase was wrapped and divided by $\pi$ to return it to $[-1,1]$. The phase lag $\psi$, coupling $K$, and frequency scale $A$ were selected during training-only hyperparameter search.**(Do not leave any part of the maths undefined)**
+Here, $\phi_i^{(t)}\in[-\pi,\pi)^H$ is atom $i$'s phase vector; $q_i^{(t)}\in\mathbb{R}^{H}$ is its mean bond-gated phase-coupling signal; $N(i)$ and $|N(i)|$ denote its bonded-neighbour set and size; $g_{ji}\in(0,1)^H$ is the bond gate; and $\sin$ and $\odot$ act elementwise. The phase lag $\psi$ shifts the preferred phase relationship, $K$ is the coupling strength, and $s$ is the integration step. The chemically conditioned natural-frequency vector is $\omega_i^{(t)}\in\mathbb{R}^{H}$, where $W_\omega$ is learned, $r_i^{(t)}$ is the common reaction drive, and $A$ sets the frequency scale. The updated phase was wrapped modulo $2\pi$ into $[-\pi,\pi)$ and divided by $\pi$ to return $h_i^{(t+1)}$ to $[-1,1]$. The phase lag, coupling strength, and frequency scale were selected during training-only hyperparameter search.
 
-**Delayed memory.** **(Give a reference and a better description of what this is)** A rule-specific delay $d$ selected a preceding state from the retained trajectory. The new drive combined the current reaction, a learned transformation of the current and delayed states, and explicit delayed-state feedback:
+**Delayed memory.** Drawing upon delay-differential dynamical systems [20], this rule makes the next state depend upon both the present calculation and an earlier point in the retained trajectory. It can therefore represent lagged feedback and history-dependent responses that a present-state-only rule cannot express. A rule-specific delay $d$ selected the preceding state, and the new drive combined the current reaction, a learned transformation of the current and delayed states, and explicit delayed-state feedback:
 
 $$
 \tilde r_i^{(t)}=\tanh\!\left(W_d[r_i^{(t)},h_i^{(t-d)}]\right),
 $$
-**(Do not leave any part of the maths undefined)**
 $$
 h_i^{(t+1)}=\tanh\!\left(
 (1-\zeta s)h_i^{(t)}+s\left[(1-\mu)r_i^{(t)}
 +\mu\tilde r_i^{(t)}+\kappa_d(h_i^{(t-d)}-h_i^{(t)})\right]
 \right).
 $$
-**(Do not leave any part of the maths undefined)**
-The delay, memory mixture $\mu$, delayed feedback $\kappa_d$, and damping $\zeta$ were determined from the rule-specific search space.**(Do not leave any part of the maths undefined)**
+Here, $h_i^{(t-d)}\in\mathbb{R}^{H}$ is atom $i$'s state $d$ generations earlier, with the earliest available retained state used when $t<d$; $\tilde r_i^{(t)}\in\mathbb{R}^{H}$ is the delay-conditioned reaction; $W_d$ is a learned map from the concatenation $[r_i^{(t)},h_i^{(t-d)}]$ to $H$ values; and $\tanh$ bounds both the delayed reaction and updated state. The scalar $\mu\in[0,1]$ mixes the present reaction $r_i^{(t)}$ with the delayed reaction, $\kappa_d$ controls feedback from the difference $h_i^{(t-d)}-h_i^{(t)}$, $\zeta$ controls damping of the present state, $s>0$ is the update scale, and $1$ in $(1-\mu)$ is the scalar multiplicative identity. The delay and these coefficients were determined from the rule-specific search space.
 
 Each trajectory was pooled into a molecular fingerprint containing the final atom-state mean and variance, the time-averaged atom state, the temporal variance of the molecular mean state, and mean state-change energy. The multiscale variant appended molecular mean states at 12.5%, 25%, 50%, 75%, and 100% of the trajectory. CYP-specific readout features were formed by combining the endpoint one-hot vector with endpoint-gated copies of the dynamical fingerprint.
 
@@ -431,3 +419,26 @@ The dataset analysed in this study were provided through the 2026 OpenADMET CYP 
 ### Code availability
 
 Source code, trained model configurations and scripts required to reproduce the reported analyses are available at https://github.com/acnash/Strange-Matter-Engine.git
+
+## Bibliography
+
+1. Wienkers LC, Heath TG. Predicting in vivo drug interactions from in vitro drug discovery data. *Nature Reviews Drug Discovery*. 2005;4(10):825–833. doi: [10.1038/nrd1851](https://doi.org/10.1038/nrd1851).
+2. Cherkasov A, Muratov EN, Fourches D, et al. QSAR modeling: where have you been? Where are you going to? *Journal of Medicinal Chemistry*. 2014;57(12):4977–5010. doi: [10.1021/jm4004285](https://doi.org/10.1021/jm4004285).
+3. Breiman L. Random forests. *Machine Learning*. 2001;45:5–32. doi: [10.1023/A:1010933404324](https://doi.org/10.1023/A:1010933404324).
+4. Chen T, Guestrin C. XGBoost: a scalable tree boosting system. In: *Proceedings of the 22nd ACM SIGKDD International Conference on Knowledge Discovery and Data Mining*. 2016:785–794. doi: [10.1145/2939672.2939785](https://doi.org/10.1145/2939672.2939785).
+5. Gilmer J, Schoenholz SS, Riley PF, Vinyals O, Dahl GE. Neural message passing for quantum chemistry. *Proceedings of Machine Learning Research*. 2017;70:1263–1272. [https://proceedings.mlr.press/v70/gilmer17a.html](https://proceedings.mlr.press/v70/gilmer17a.html).
+6. Ying C, Cai T, Luo S, et al. Do transformers really perform badly for graph representation? *Advances in Neural Information Processing Systems*. 2021;34:28877–28888. [https://proceedings.neurips.cc/paper/2021/hash/f1c1592588411002af340cbaedd6fc33-Abstract.html](https://proceedings.neurips.cc/paper/2021/hash/f1c1592588411002af340cbaedd6fc33-Abstract.html).
+7. Satorras VG, Hoogeboom E, Welling M. E(n) equivariant graph neural networks. *Proceedings of Machine Learning Research*. 2021;139:9323–9332. [https://proceedings.mlr.press/v139/satorras21a.html](https://proceedings.mlr.press/v139/satorras21a.html).
+8. Zhou G, Gao Z, Ding Q, et al. Uni-Mol: a universal 3D molecular representation learning framework. *International Conference on Learning Representations*. 2023. [https://openreview.net/forum?id=6K2RM6wVqKu](https://openreview.net/forum?id=6K2RM6wVqKu).
+9. Wolfram S. Statistical mechanics of cellular automata. *Reviews of Modern Physics*. 1983;55(3):601–644. doi: [10.1103/RevModPhys.55.601](https://doi.org/10.1103/RevModPhys.55.601).
+10. Wolfram S. Universality and complexity in cellular automata. *Physica D: Nonlinear Phenomena*. 1984;10(1–2):1–35. doi: [10.1016/0167-2789(84)90245-8](https://doi.org/10.1016/0167-2789(84)90245-8).
+11. Benettin G, Galgani L, Giorgilli A, Strelcyn JM. Lyapunov characteristic exponents for smooth dynamical systems and for Hamiltonian systems; a method for computing all of them. Part 1: theory. *Meccanica*. 1980;15:9–20. doi: [10.1007/BF02128236](https://doi.org/10.1007/BF02128236).
+12. Oseledec VI. A multiplicative ergodic theorem: Lyapunov characteristic numbers for dynamical systems. *Transactions of the Moscow Mathematical Society*. 1968;19:197–231.
+13. Cho K, van Merriënboer B, Gulcehre C, et al. Learning phrase representations using RNN encoder–decoder for statistical machine translation. In: *Proceedings of the 2014 Conference on Empirical Methods in Natural Language Processing*. 2014:1724–1734. doi: [10.3115/v1/D14-1179](https://doi.org/10.3115/v1/D14-1179).
+14. Turing AM. The chemical basis of morphogenesis. *Philosophical Transactions of the Royal Society B*. 1952;237(641):37–72. doi: [10.1098/rstb.1952.0012](https://doi.org/10.1098/rstb.1952.0012).
+15. Polyak BT. Some methods of speeding up the convergence of iteration methods. *USSR Computational Mathematics and Mathematical Physics*. 1964;4(5):1–17. doi: [10.1016/0041-5553(64)90137-5](https://doi.org/10.1016/0041-5553(64)90137-5).
+16. FitzHugh R. Impulses and physiological states in theoretical models of nerve membrane. *Biophysical Journal*. 1961;1(6):445–466. doi: [10.1016/S0006-3495(61)86902-6](https://doi.org/10.1016/S0006-3495(61)86902-6).
+17. Nagumo J, Arimoto S, Yoshizawa S. An active pulse transmission line simulating nerve axon. *Proceedings of the IRE*. 1962;50(10):2061–2070. doi: [10.1109/JRPROC.1962.288235](https://doi.org/10.1109/JRPROC.1962.288235).
+18. Kuramoto Y. *Chemical Oscillations, Waves, and Turbulence*. Berlin: Springer; 1984. doi: [10.1007/978-3-642-69689-3](https://doi.org/10.1007/978-3-642-69689-3).
+19. Sakaguchi H, Kuramoto Y. A soluble active rotator model showing phase transitions via mutual entertainment. *Progress of Theoretical Physics*. 1986;76(3):576–581. doi: [10.1143/PTP.76.576](https://doi.org/10.1143/PTP.76.576).
+20. Hale JK, Verduyn Lunel SM. *Introduction to Functional Differential Equations*. New York: Springer; 1993. doi: [10.1007/978-1-4612-4342-7](https://doi.org/10.1007/978-1-4612-4342-7).
