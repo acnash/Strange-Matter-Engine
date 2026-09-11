@@ -2,7 +2,7 @@
 
 | Date | Method | Sealed point MA-ST-RAE | RMSE, pIC50 | Status |
 |---|---|---:|---:|---|
-| 2 September 2026 | CIA-EA-CV-CYP-GCA | **0.748490** | **0.847738** | Current internal leader |
+| 2 September 2026 | CIA-EA-CV-CYP-GCA | 0.748490 | 0.847738 | Superseded internal leader |
 | 2 September 2026 | PP-CIA-EA-CV-CYP-GCA | 0.760855 | 0.858781 | Experimental result |
 | 3 September 2026 | TA-CIA-EA-CV-CYP-GCA | 0.755021 | 0.850082 | Experimental result |
 | 3 September 2026 | FG-CIA-EA-CV-CYP-GCA | 0.751384 | 0.848686 | Experimental result |
@@ -16,6 +16,7 @@
 | 8 September 2026 | BTS-CIA-EA-CV-CYP-GCA | 0.755150 | 0.849111 | Experimental result; typed-bond temperature scaling did not improve leader |
 | 8 September 2026 | HWR-CIA-EA-CV-CYP-GCA | 0.751954 | 0.851544 | Experimental result; wider cellular state did not improve leader |
 | 8 September 2026 | GDR-CIA-EA-CV-CYP-GCA | 0.752414 | 0.848947 | Experimental result; longer recurrent evolution did not improve leader |
+| 9 September 2026 | USR-CIA-EA-CV-CYP-GCA | **0.748039** | **0.845606** | Current internal leader; recurrent update-scale refinement improved both primary and secondary sealed metrics |
 
 All entries use the same reserved scaffold holdout. Model and hyperparameter
 selection occur within the fitting pool; the reserved holdout is excluded from

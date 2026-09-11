@@ -183,7 +183,7 @@ Each trajectory was pooled into a molecular fingerprint containing the final ato
 
 ### Machine-Learning Training and Validation
 
-The predictive campaign evaluated DS-GCAE, CFT-DS-GCAE, CV-CYP-GCA, EA-CV-CYP-GCA, and the latest Credible-Interval-Aligned Endpoint-Aligned Cross-Validated CYP-Specialist Graph Cellular Automata system, abbreviated CIA-EA-CV-CYP-GCA. Each nonlinear Graph-CA expert was optimized by backpropagation through time. Adam updated the initialization, message, reaction, and transition-rule parameters with a cosine learning-rate schedule, gradient clipping, and an L2 penalty on cellular-automata weights. Generation count, dynamical-channel count, atom-feature profile, learning rate, ridge penalty, update scale, support fraction, batch size, bond temperature, initialization scale and noise, pooling design, rule-specific dynamical constants, and credible-interval loss weight were selected using labelled development data alone.
+The predictive campaign evaluated DS-GCAE, CFT-DS-GCAE, CV-CYP-GCA, EA-CV-CYP-GCA, the Credible-Interval-Aligned Endpoint-Aligned Cross-Validated CYP-Specialist Graph Cellular Automata system (CIA-EA-CV-CYP-GCA), and its update-scale-refined successor (USR-CIA-EA-CV-CYP-GCA). Each nonlinear Graph-CA expert was optimized by backpropagation through time. Adam updated the initialization, message, reaction, and transition-rule parameters with a cosine learning-rate schedule, gradient clipping, and an L2 penalty on cellular-automata weights. Generation count, dynamical-channel count, atom-feature profile, learning rate, ridge penalty, update scale, support fraction, batch size, bond temperature, initialization scale and noise, pooling design, rule-specific dynamical constants, and credible-interval loss weight were selected using labelled development data alone.
 
 #### Differentiable ridge readout
 
@@ -251,6 +251,12 @@ L=(1-\alpha)L_{\mathrm{MSE}}+\alpha\,\frac{1}{n}
 ```
 
 Selection used endpoint ST-RAE across two scaffold folds. The selected loss configuration for each rule then advanced to five-fold confirmation with two seeds, followed by leakage-safe sparse ridge subset selection. The sealed holdout was opened once after all loss weights, rule subsets, and ridge penalties had been fixed. The final CYP1A2 system combined Gray–Scott, FitzHugh–Nagumo, and conservative graph flux. CYP2C9 combined Gray–Scott and damped symplectic. CYP2D6 combined delayed memory and FitzHugh–Nagumo. CYP3A4 combined damped symplectic and delayed memory. Complete blind inference used the frozen systems and did not load blind labels.
+
+#### Recurrent update-scale refinement
+
+USR-CIA-EA-CV-CYP-GCA retained the complete CIA-EA-CV-CYP-GCA training and validation protocol while refining the magnitude of each recurrent cellular-state transition. For every selected rule and endpoint, the established update scale was multiplied by 0.75, 1.00, or 1.25. This bounded search altered the rate at which atom states evolved through computational time while preserving the rule family, chemically encoded atom cells, typed-bond interactions, explicit generation sequence, and retained trajectory representation. Candidate scales were selected by endpoint ST-RAE across two scaffold folds, followed by five-fold confirmation with two seeds and leakage-safe sparse ridge subset selection. The sealed holdout remained inaccessible until all scale choices, rule subsets, and ridge penalties had been fixed.
+
+The final CYP1A2 ensemble combined conservative graph flux at 1.25 times its established update scale with FitzHugh–Nagumo at 1.00 and Gray–Scott at 1.25. CYP2C9 combined Gray–Scott at 0.75 with damped symplectic at 1.00. CYP2D6 combined FitzHugh–Nagumo at 1.25 with delayed memory at 1.00. CYP3A4 retained damped symplectic alone at 0.75. Blind inference was then generated from the frozen systems without loading blind labels.
 
 ### Long-Horizon Dynamical Analysis
 
@@ -337,34 +343,34 @@ The intervention campaign comprised 187 modified and baseline systems evaluated 
 
 #### Sealed internal validation
 
-CIA-EA-CV-CYP-GCA was evaluated once on the sealed scaffold holdout containing 1,309 molecule–CYP observations. Its point MA-ST-RAE was 0.7485. Across 1,000 bootstrap resamples, mean MA-ST-RAE was 0.7491 with a 95% interval from 0.7108 to 0.7894. RMSE was 0.8477 pIC50. The complementary bootstrap macro metrics were MAE 0.6184 pIC50, R-squared 0.2934, Spearman rho 0.5397, and Kendall tau 0.3874.
+USR-CIA-EA-CV-CYP-GCA was evaluated once on the sealed scaffold holdout containing 1,309 molecule–CYP observations. Its point MA-ST-RAE was 0.7480. Across 1,000 bootstrap resamples, mean MA-ST-RAE was 0.7485 with a 95% interval from 0.7098 to 0.7897. RMSE was 0.8456 pIC50. The complementary bootstrap macro metrics were MAE 0.6180 pIC50, R-squared 0.2948, Spearman rho 0.5347, and Kendall tau 0.3840.
 
-| Metric | CIA-EA-CV-CYP-GCA | EA-CV-CYP-GCA | CV-CYP-GCA | CFT-DS-GCAE | DS-GCAE |
-|---|---:|---:|---:|---:|---:|
-| Point MA-ST-RAE | **0.7485** | 0.7545 | 0.7690 | 0.7739 | 0.7842 |
-| Bootstrap mean MA-ST-RAE | **0.7491** | 0.7551 | 0.7697 | 0.7749 | 0.7850 |
-| 95% bootstrap interval | 0.7108–0.7894 | 0.7177–0.7970 | 0.7320–0.8127 | 0.7356–0.8193 | 0.7464–0.8274 |
-| RMSE, pIC50 | **0.8477** | 0.8523 | 0.8625 | 0.8586 | 0.8678 |
-| Bootstrap macro MAE, pIC50 | **0.6184** | 0.6218 | 0.6296 | 0.6323 | 0.6387 |
-| Bootstrap macro R-squared | **0.2934** | 0.2864 | 0.2694 | 0.2754 | 0.2706 |
-| Bootstrap macro Spearman rho | **0.5397** | 0.5327 | 0.5218 | 0.5184 | 0.5098 |
-| Bootstrap macro Kendall tau | **0.3874** | 0.3816 | 0.3715 | 0.3699 | 0.3626 |
+| Metric | USR-CIA-EA-CV-CYP-GCA | CIA-EA-CV-CYP-GCA | EA-CV-CYP-GCA | CV-CYP-GCA | CFT-DS-GCAE | DS-GCAE |
+|---|---:|---:|---:|---:|---:|---:|
+| Point MA-ST-RAE | **0.7480** | 0.7485 | 0.7545 | 0.7690 | 0.7739 | 0.7842 |
+| Bootstrap mean MA-ST-RAE | **0.7485** | 0.7491 | 0.7551 | 0.7697 | 0.7749 | 0.7850 |
+| 95% bootstrap interval | 0.7098–0.7897 | 0.7108–0.7894 | 0.7177–0.7970 | 0.7320–0.8127 | 0.7356–0.8193 | 0.7464–0.8274 |
+| RMSE, pIC50 | **0.8456** | 0.8477 | 0.8523 | 0.8625 | 0.8586 | 0.8678 |
+| Bootstrap macro MAE, pIC50 | **0.6180** | 0.6184 | 0.6218 | 0.6296 | 0.6323 | 0.6387 |
+| Bootstrap macro R-squared | **0.2948** | 0.2934 | 0.2864 | 0.2694 | 0.2754 | 0.2706 |
+| Bootstrap macro Spearman rho | 0.5347 | **0.5397** | 0.5327 | 0.5218 | 0.5184 | 0.5098 |
+| Bootstrap macro Kendall tau | 0.3840 | **0.3874** | 0.3816 | 0.3715 | 0.3699 | 0.3626 |
 
-The four credible-interval-aligned systems produced point ST-RAE values of 0.8161 for CYP1A2, 0.7130 for CYP2C9, 0.9368 for CYP2D6, and 0.5280 for CYP3A4. CYP2D6 presented the largest residual difficulty on the sealed holdout, while CYP3A4 gave the strongest endpoint result. Credible-interval alignment improved point MA-ST-RAE by 0.0060 and RMSE by 0.0045 pIC50 relative to EA-CV-CYP-GCA.
+The four update-scale-refined systems produced point ST-RAE values of 0.8182 for CYP1A2, 0.7096 for CYP2C9, 0.9437 for CYP2D6, and 0.5206 for CYP3A4. CYP2D6 presented the largest residual difficulty on the sealed holdout, while CYP3A4 gave the strongest endpoint result. Update-scale refinement improved point MA-ST-RAE by 0.0005 and RMSE by 0.0021 pIC50 relative to CIA-EA-CV-CYP-GCA. Its bootstrap intervals substantially overlapped those of the preceding system, so the sealed improvement is appropriately interpreted as incremental.
 
 #### OpenADMET blind challenge evaluation
 
-The challenge organisers calculated the official metrics after submission against labels that remained unavailable during model development. The first submission used the dual-scale Graph-CA ensemble (DS-GCAE) and was recorded at rank 80 of 89. The second used CFT-DS-GCAE and was initially recorded at rank 82 of 90. The CV-CYP-GCA submission returned MA-ST-RAE 1.0171. The EA-CV-CYP-GCA submission stood at rank 99 of 111 on 1 September 2026 and improved every reported blind metric relative to CV-CYP-GCA. Changing leaderboard membership makes rank a time-specific snapshot, while metric values provide the direct comparison between submitted prediction files. CIA-EA-CV-CYP-GCA awaits organiser evaluation.
+The challenge organisers calculated the official metrics after submission against labels that remained unavailable during model development. The first submission used the dual-scale Graph-CA ensemble (DS-GCAE) and was recorded at rank 80 of 89. The second used CFT-DS-GCAE and was initially recorded at rank 82 of 90. The CV-CYP-GCA submission returned MA-ST-RAE 1.0171. The EA-CV-CYP-GCA submission stood at rank 99 of 111 on 1 September 2026 and improved every reported blind metric relative to CV-CYP-GCA. CIA-EA-CV-CYP-GCA subsequently returned MA-ST-RAE 1.0075, macro MAE 1.0781, macro R-squared -0.0716, macro Spearman rho 0.5379, and macro Kendall tau 0.3788, at rank 102 of 112 when recorded. Changing leaderboard membership makes rank a time-specific snapshot, while metric values provide the direct comparison between submitted prediction files. USR-CIA-EA-CV-CYP-GCA awaits organiser evaluation.
 
-| Official blind metric | DS-GCAE | CFT-DS-GCAE | CV-CYP-GCA | EA-CV-CYP-GCA |
-|---|---:|---:|---:|---:|
-| MA-ST-RAE | 1.0132 | 1.0120 | 1.0171 | **1.0071** |
-| Macro MAE | 1.0893 | 1.0861 | 1.0848 | **1.0778** |
-| Macro R-squared | -0.0827 | -0.0766 | -0.0840 | **-0.0715** |
-| Macro Spearman rho | 0.4751 | 0.4892 | 0.5180 | **0.5345** |
-| Macro Kendall tau | 0.3323 | 0.3424 | 0.3637 | **0.3750** |
+| Official blind metric | DS-GCAE | CFT-DS-GCAE | CV-CYP-GCA | EA-CV-CYP-GCA | CIA-EA-CV-CYP-GCA |
+|---|---:|---:|---:|---:|---:|
+| MA-ST-RAE | 1.0132 | 1.0120 | 1.0171 | **1.0071** | 1.0075 |
+| Macro MAE | 1.0893 | 1.0861 | 1.0848 | **1.0778** | 1.0781 |
+| Macro R-squared | -0.0827 | -0.0766 | -0.0840 | **-0.0715** | -0.0716 |
+| Macro Spearman rho | 0.4751 | 0.4892 | 0.5180 | 0.5345 | **0.5379** |
+| Macro Kendall tau | 0.3323 | 0.3424 | 0.3637 | 0.3750 | **0.3788** |
 
-EA-CV-CYP-GCA improved all five official blind metrics relative to CV-CYP-GCA. The gap between sealed internal and blind performance indicates that calibration and generalisation across the hidden chemical distribution remain important limitations. These leaderboard results represent externally calculated challenge outcomes rather than metrics reconstructed from locally available labels.
+EA-CV-CYP-GCA improved all five official blind metrics relative to CV-CYP-GCA. CIA-EA-CV-CYP-GCA produced slightly stronger rank-correlation metrics and nearly identical error metrics relative to EA-CV-CYP-GCA. The gap between sealed internal and blind performance indicates that calibration and generalisation across the hidden chemical distribution remain important limitations. These leaderboard results represent externally calculated challenge outcomes rather than metrics reconstructed from locally available labels.
 
 ### Nonlinear Dynamics in Molecular Space-Time
 
