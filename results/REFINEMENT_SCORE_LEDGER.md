@@ -17,6 +17,7 @@
 | 8 September 2026 | HWR-CIA-EA-CV-CYP-GCA | 0.751954 | 0.851544 | Experimental result; wider cellular state did not improve leader |
 | 8 September 2026 | GDR-CIA-EA-CV-CYP-GCA | 0.752414 | 0.848947 | Experimental result; longer recurrent evolution did not improve leader |
 | 9 September 2026 | USR-CIA-EA-CV-CYP-GCA | **0.748039** | **0.845606** | Current sealed-validation leader; blind evaluation did not confirm the incremental internal improvement |
+| 11 September 2026 | ISR-CIA-EA-CV-CYP-GCA | 0.752851 | 0.851661 | Experimental result; initial-state amplitude refinement did not improve the sealed leader |
 
 All entries use the same reserved scaffold holdout. Model and hyperparameter
 selection occur within the fitting pool; the reserved holdout is excluded from

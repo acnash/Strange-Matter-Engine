@@ -54,6 +54,7 @@ HIDDEN_WIDTH_REFINEMENT = os.environ.get("SME_HIDDEN_WIDTH_REFINEMENT", "0") == 
 GENERATION_DEPTH_REFINEMENT = os.environ.get("SME_GENERATION_DEPTH_REFINEMENT", "0") == "1"
 UPDATE_SCALE_REFINEMENT = os.environ.get("SME_UPDATE_SCALE_REFINEMENT", "0") == "1"
 INITIAL_SCALE_REFINEMENT = os.environ.get("SME_INITIAL_SCALE_REFINEMENT", "0") == "1"
+TRANSITION_ENERGY_REFINEMENT = os.environ.get("SME_TRANSITION_ENERGY_REFINEMENT", "0") == "1"
 INTERVAL_BETAS = (0.0, 0.25, 0.5, 0.75)
 POOL_WEIGHTS = (0.0, 0.05, 0.15, 0.30)
 PARENT_ENDPOINT_STUDY = (
@@ -74,6 +75,8 @@ TEST_CSV = ROOT / "data" / "openadmet-cyp-challenge-2026" / "cyp-challenge-TEST-
 
 
 def campaign_method() -> str:
+    if TRANSITION_ENERGY_REFINEMENT:
+        return "MTE-CIA-EA-CV-CYP-GCA"
     if INITIAL_SCALE_REFINEMENT:
         return "ISR-CIA-EA-CV-CYP-GCA"
     if UPDATE_SCALE_REFINEMENT:
@@ -110,6 +113,8 @@ def campaign_method() -> str:
 
 
 def campaign_architecture() -> str:
+    if TRANSITION_ENERGY_REFINEMENT:
+        return "multiscale_transition_energy_credible_interval_endpoint_graph_ca"
     if INITIAL_SCALE_REFINEMENT:
         return "initial_scale_refined_credible_interval_endpoint_graph_ca"
     if UPDATE_SCALE_REFINEMENT:
@@ -148,6 +153,8 @@ def campaign_architecture() -> str:
 
 
 def campaign_submission_name() -> str:
+    if TRANSITION_ENERGY_REFINEMENT:
+        return "multiscale_transition_energy_credible_interval_ea_cv_cyp_gca_submission.csv"
     if INITIAL_SCALE_REFINEMENT:
         return "initial_scale_refined_credible_interval_ea_cv_cyp_gca_submission.csv"
     if UPDATE_SCALE_REFINEMENT:
@@ -254,6 +261,8 @@ def fit(worker: Path, stage, endpoint, rule, variant, config, seed, fold,
 
 
 def screen(worker: Path) -> dict:
+    if TRANSITION_ENERGY_REFINEMENT:
+        return screen_transition_energy_refinement(worker)
     if INITIAL_SCALE_REFINEMENT:
         return screen_initial_scale_refinement(worker)
     if UPDATE_SCALE_REFINEMENT:
@@ -1073,6 +1082,80 @@ def screen_update_scale_refinement(worker: Path) -> dict:
     return selected
 
 
+def screen_transition_energy_refinement(worker: Path) -> dict:
+    """Test temporally localized nonlinear energy across retained CA checkpoints."""
+    parent = json.loads(
+        (PARENT_INTERVAL_STUDY / "screening_summary.json").read_text(
+            encoding="utf-8"
+        )
+    )
+    modes = (False, True)
+    jobs = [
+        (endpoint, candidate, enabled, fold)
+        for endpoint in ENDPOINTS for candidate in parent[endpoint]
+        for enabled in modes for fold in SCREEN_FOLDS
+    ]
+    scores = {
+        (endpoint, candidate["rule"], enabled): []
+        for endpoint in ENDPOINTS for candidate in parent[endpoint]
+        for enabled in modes
+    }
+    durations = []
+    for number, (endpoint, candidate, enabled, fold) in enumerate(jobs, 1):
+        config = deepcopy(candidate["config"])
+        config.update({
+            "multiscale_transition_energy": enabled,
+            "specialist_objective": "endpoint_only",
+        })
+        suffix = "transition_energy" if enabled else "core"
+        variant = f"{candidate['variant']}_multiscale_{suffix}"
+        progress(
+            "multiscale_transition_energy_screen", completed=number - 1,
+            total=len(jobs), endpoint=endpoint, rule=candidate["rule"],
+            multiscale_transition_energy=enabled, fold=fold,
+            estimated_remaining_seconds=(
+                np.mean(durations) * (len(jobs) - number + 1)
+                if durations else None
+            ),
+        )
+        started = time.time()
+        metrics = fit(
+            worker, "screen", endpoint, candidate["rule"], variant,
+            config, 6101, fold, 22, 6,
+        )
+        durations.append(time.time() - started)
+        scores[(endpoint, candidate["rule"], enabled)].append(float(
+            metrics.get("restored_validation_point_ma_st_rae", np.inf)
+        ))
+    selected = {}
+    for endpoint in ENDPOINTS:
+        selected[endpoint] = []
+        for candidate in parent[endpoint]:
+            choices = []
+            for enabled in modes:
+                values = scores[(endpoint, candidate["rule"], enabled)]
+                choices.append((float(np.mean(values)), enabled, values))
+            score, enabled, values = min(choices)
+            config = deepcopy(candidate["config"])
+            config.update({
+                "multiscale_transition_energy": enabled,
+                "specialist_objective": "endpoint_only",
+            })
+            suffix = "transition_energy" if enabled else "core"
+            selected[endpoint].append({
+                "rule": candidate["rule"],
+                "variant": f"{candidate['variant']}_multiscale_{suffix}",
+                "screen_ma_st_rae": score,
+                "fold_scores": values,
+                "interval_loss_beta": candidate.get("interval_loss_beta", 0.0),
+                "multiscale_transition_energy": enabled,
+                "config": config,
+            })
+        selected[endpoint].sort(key=lambda item: item["screen_ma_st_rae"])
+    write_json(STUDY / "screening_summary.json", selected)
+    return selected
+
+
 def screen_initial_scale_refinement(worker: Path) -> dict:
     """Tune the amplitude of the chemically encoded initial cellular state."""
     parent = json.loads(
@@ -1714,6 +1797,10 @@ def blind_member(worker: Path, endpoint: str, candidate: dict,
         ),
         "SME_DYNAMIC_OBSERVABLES": (
             "1" if candidate["config"].get("dynamic_observables", False)
+            else "0"
+        ),
+        "SME_MULTISCALE_TRANSITION_ENERGY": (
+            "1" if candidate["config"].get("multiscale_transition_energy", False)
             else "0"
         ),
     })

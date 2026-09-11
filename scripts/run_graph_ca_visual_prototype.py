@@ -73,6 +73,9 @@ PERTURBATION_CONSISTENCY_WEIGHT = float(os.environ.get("SME_PERTURBATION_CONSIST
 PERTURBATION_CONSISTENCY_EPSILON = float(os.environ.get("SME_PERTURBATION_CONSISTENCY_EPSILON", "0.001"))
 INITIAL_STATE_ANCHOR = os.environ.get("SME_INITIAL_STATE_ANCHOR", "0") == "1"
 DYNAMIC_OBSERVABLES = os.environ.get("SME_DYNAMIC_OBSERVABLES", "0") == "1"
+MULTISCALE_TRANSITION_ENERGY = os.environ.get(
+    "SME_MULTISCALE_TRANSITION_ENERGY", "0"
+) == "1"
 ACTIVITY_BALANCE_STRENGTH = float(os.environ.get("SME_ACTIVITY_BALANCE_STRENGTH", "0.0"))
 BOND_MESSAGE_DROPOUT = float(os.environ.get("SME_BOND_MESSAGE_DROPOUT", "0.0"))
 DEGREE_NORMALIZATION_POWER = float(os.environ.get("SME_DEGREE_NORMALIZATION_POWER", "1.0"))
@@ -423,6 +426,7 @@ def train(extended_dynamics: bool = False) -> None:
     global RULE, GENERATIONS, UPDATE_SCALE, INIT_SCALE, INITIAL_NOISE
     global SUPPORT_FRACTION, BOND_TEMPERATURE, DYN_A, DYN_B, DYN_C, DYN_D
     global TRAJECTORY_POOLING, RIDGE_MODE, CHEMICAL_FEATURE_GATING
+    global MULTISCALE_TRANSITION_ENERGY
     import torch
     from torch import nn
 
@@ -495,6 +499,9 @@ def train(extended_dynamics: bool = False) -> None:
         DYN_C = float(hyperparameters["dyn_c"])
         DYN_D = float(hyperparameters["dyn_d"])
         TRAJECTORY_POOLING = checkpoint.get("trajectory_pooling", "legacy")
+        MULTISCALE_TRANSITION_ENERGY = bool(
+            checkpoint.get("multiscale_transition_energy", False)
+        )
         RIDGE_MODE = checkpoint.get("ridge_mode", "shared")
         CHEMICAL_FEATURE_GATING = bool(checkpoint.get("chemical_feature_gating", False))
     feature_profile = (checkpoint.get("atom_feature_profile", "baseline")
@@ -820,6 +827,16 @@ def train(extended_dynamics: bool = False) -> None:
                 weighted_var = ((checkpoints - weighted_mean[:, None, :]).square()
                                 * weights[None, :, None]).sum(dim=1)
                 fingerprint = torch.cat((fingerprint, weighted_mean, weighted_var), dim=1)
+            if MULTISCALE_TRANSITION_ENERGY:
+                if len(checkpoint_summaries) != 5:
+                    raise RuntimeError("Transition-energy checkpoints are incomplete")
+                transition_energy = [
+                    (later - earlier).square()
+                    for earlier, later in zip(
+                        checkpoint_summaries[:-1], checkpoint_summaries[1:]
+                    )
+                ]
+                fingerprint = torch.cat((fingerprint, *transition_energy), dim=1)
             fingerprint = self._readout_features(
                 fingerprint, [cyp for _, cyp in examples]
             )
@@ -1510,6 +1527,7 @@ def train(extended_dynamics: bool = False) -> None:
                 "prediction_mode": "residual_ca" if residual_mode else "direct",
                 "residual_alpha": residual_alpha if residual_mode else None,
                 "trajectory_pooling": TRAJECTORY_POOLING,
+                "multiscale_transition_energy": MULTISCALE_TRANSITION_ENERGY,
                 "chemical_feature_gating": CHEMICAL_FEATURE_GATING,
                 "perturbation_consistency_weight": PERTURBATION_CONSISTENCY_WEIGHT,
                 "perturbation_consistency_epsilon": PERTURBATION_CONSISTENCY_EPSILON,
@@ -1619,6 +1637,7 @@ def train(extended_dynamics: bool = False) -> None:
         "prediction_mode": "residual_ca" if residual_mode else "direct",
         "residual_alpha": residual_alpha if residual_mode else None,
         "trajectory_pooling": TRAJECTORY_POOLING,
+        "multiscale_transition_energy": MULTISCALE_TRANSITION_ENERGY,
         "ridge_mode": RIDGE_MODE,
         "loss_mode": LOSS_MODE,
         "specialist_objective": SPECIALIST_OBJECTIVE,
