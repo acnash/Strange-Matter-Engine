@@ -27,3 +27,14 @@ CYP2C9, 0.943724 for CYP2D6, and 0.520633 for CYP3A4. Blind inference completed
 from the frozen selected systems without loading blind labels. The method is
 promoted as the internal leader under the abbreviation
 USR-CIA-EA-CV-CYP-GCA.
+
+## Official blind evaluation
+
+The challenge evaluation recorded rank **123 of 137**, MA-ST-RAE **1.0092**,
+macro MAE **1.0789**, macro R-squared **-0.0744**, macro Spearman rho **0.5345**,
+and macro Kendall tau **0.3762**. Relative to CIA-EA-CV-CYP-GCA, the primary
+MA-ST-RAE increased by 0.0017 and each complementary blind metric was slightly
+weaker. The update-scale refinement therefore remains the sealed-validation
+leader, while CIA-EA-CV-CYP-GCA remains the external reference model for this
+refinement lineage. The result demonstrates that the small sealed improvement
+did not transfer to the blinded challenge distribution.

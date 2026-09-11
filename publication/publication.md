@@ -360,17 +360,17 @@ The four update-scale-refined systems produced point ST-RAE values of 0.8182 for
 
 #### OpenADMET blind challenge evaluation
 
-The challenge organisers calculated the official metrics after submission against labels that remained unavailable during model development. The first submission used the dual-scale Graph-CA ensemble (DS-GCAE) and was recorded at rank 80 of 89. The second used CFT-DS-GCAE and was initially recorded at rank 82 of 90. The CV-CYP-GCA submission returned MA-ST-RAE 1.0171. The EA-CV-CYP-GCA submission stood at rank 99 of 111 on 1 September 2026 and improved every reported blind metric relative to CV-CYP-GCA. CIA-EA-CV-CYP-GCA subsequently returned MA-ST-RAE 1.0075, macro MAE 1.0781, macro R-squared -0.0716, macro Spearman rho 0.5379, and macro Kendall tau 0.3788, at rank 102 of 112 when recorded. Changing leaderboard membership makes rank a time-specific snapshot, while metric values provide the direct comparison between submitted prediction files. USR-CIA-EA-CV-CYP-GCA awaits organiser evaluation.
+The challenge organisers calculated the official metrics after submission against labels that remained unavailable during model development. The first submission used the dual-scale Graph-CA ensemble (DS-GCAE) and was recorded at rank 80 of 89. The second used CFT-DS-GCAE and was initially recorded at rank 82 of 90. The CV-CYP-GCA submission returned MA-ST-RAE 1.0171. The EA-CV-CYP-GCA submission stood at rank 99 of 111 on 1 September 2026 and improved every reported blind metric relative to CV-CYP-GCA. CIA-EA-CV-CYP-GCA subsequently returned MA-ST-RAE 1.0075 at rank 102 of 112 when recorded. USR-CIA-EA-CV-CYP-GCA returned MA-ST-RAE 1.0092 at rank 123 of 137 when recorded. Changing leaderboard membership makes rank a time-specific snapshot, while metric values provide the direct comparison between submitted prediction files.
 
-| Official blind metric | DS-GCAE | CFT-DS-GCAE | CV-CYP-GCA | EA-CV-CYP-GCA | CIA-EA-CV-CYP-GCA |
-|---|---:|---:|---:|---:|---:|
-| MA-ST-RAE | 1.0132 | 1.0120 | 1.0171 | **1.0071** | 1.0075 |
-| Macro MAE | 1.0893 | 1.0861 | 1.0848 | **1.0778** | 1.0781 |
-| Macro R-squared | -0.0827 | -0.0766 | -0.0840 | **-0.0715** | -0.0716 |
-| Macro Spearman rho | 0.4751 | 0.4892 | 0.5180 | 0.5345 | **0.5379** |
-| Macro Kendall tau | 0.3323 | 0.3424 | 0.3637 | 0.3750 | **0.3788** |
+| Official blind metric | DS-GCAE | CFT-DS-GCAE | CV-CYP-GCA | EA-CV-CYP-GCA | CIA-EA-CV-CYP-GCA | USR-CIA-EA-CV-CYP-GCA |
+|---|---:|---:|---:|---:|---:|---:|
+| MA-ST-RAE | 1.0132 | 1.0120 | 1.0171 | **1.0071** | 1.0075 | 1.0092 |
+| Macro MAE | 1.0893 | 1.0861 | 1.0848 | **1.0778** | 1.0781 | 1.0789 |
+| Macro R-squared | -0.0827 | -0.0766 | -0.0840 | **-0.0715** | -0.0716 | -0.0744 |
+| Macro Spearman rho | 0.4751 | 0.4892 | 0.5180 | 0.5345 | **0.5379** | 0.5345 |
+| Macro Kendall tau | 0.3323 | 0.3424 | 0.3637 | 0.3750 | **0.3788** | 0.3762 |
 
-EA-CV-CYP-GCA improved all five official blind metrics relative to CV-CYP-GCA. CIA-EA-CV-CYP-GCA produced slightly stronger rank-correlation metrics and nearly identical error metrics relative to EA-CV-CYP-GCA. The gap between sealed internal and blind performance indicates that calibration and generalisation across the hidden chemical distribution remain important limitations. These leaderboard results represent externally calculated challenge outcomes rather than metrics reconstructed from locally available labels.
+EA-CV-CYP-GCA improved all five official blind metrics relative to CV-CYP-GCA. CIA-EA-CV-CYP-GCA produced slightly stronger rank-correlation metrics and nearly identical error metrics relative to EA-CV-CYP-GCA. Update-scale refinement then improved sealed point MA-ST-RAE from 0.7485 to 0.7480 and sealed RMSE from 0.8477 to 0.8456 pIC50, while the official blind MA-ST-RAE increased from 1.0075 to 1.0092 and every complementary blind metric weakened slightly. The internal bootstrap intervals overlapped substantially, and the blind evaluation did not confirm that the small sealed gain represented improved generalisation. USR-CIA-EA-CV-CYP-GCA remains the result selected under the label-independent sealed protocol, CIA-EA-CV-CYP-GCA remains the external reference for the credible-interval refinement lineage, and EA-CV-CYP-GCA retains the lowest official primary metric among the recorded submissions. These leaderboard results represent externally calculated challenge outcomes rather than metrics reconstructed from locally available labels.
 
 ### Nonlinear Dynamics in Molecular Space-Time
 

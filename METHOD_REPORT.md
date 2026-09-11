@@ -4,7 +4,11 @@
 
 This is the permanent, version-independent method report for the Strange Matter Engine entry in the OpenADMET CYP Inhibition Blind Challenge. Its path remains stable. Whenever a new leading model replaces the submitted model, this document is updated on `main` to identify and describe that model, while versioned result directories preserve the historical artifacts.
 
-**Current production candidate:** Update-Scale-Refined Credible-Interval-Aligned Endpoint-Aligned Cross-Validated CYP-Specialist Graph Cellular Automata (USR-CIA-EA-CV-CYP-GCA v1)
+**Latest evaluated submission and sealed-validation leader:** Update-Scale-Refined Credible-Interval-Aligned Endpoint-Aligned Cross-Validated CYP-Specialist Graph Cellular Automata (USR-CIA-EA-CV-CYP-GCA v1)
+
+**External reference model for the current refinement lineage:** CIA-EA-CV-CYP-GCA v1
+
+**Lowest official primary metric among recorded submissions:** EA-CV-CYP-GCA v1, MA-ST-RAE 1.0071
 
 **Previously submitted models:** DS-GCAE v1, CFT-DS-GCAE v1, CV-CYP-GCA v1, EA-CV-CYP-GCA v1, and CIA-EA-CV-CYP-GCA v1
 
@@ -102,7 +106,7 @@ Endpoint point ST-RAE values were:
 
 On the same sealed validation set, DS-GCAE v1 achieved point MA-ST-RAE 0.784156 and RMSE 0.867775, CFT-DS-GCAE achieved 0.773895 and 0.858630, CV-CYP-GCA achieved 0.768985 and 0.862535, EA-CV-CYP-GCA achieved 0.754503 and 0.852280, and CIA-EA-CV-CYP-GCA achieved 0.748490 and 0.847738. USR-CIA-EA-CV-CYP-GCA improved the preceding internal leader by 0.000451 MA-ST-RAE and 0.002132 pIC50 RMSE. Its overlapping bootstrap interval indicates an incremental improvement.
 
-The EA-CV-CYP-GCA submission returned organiser-calculated MA-ST-RAE 1.0071, macro MAE 1.0778, macro R-squared -0.0715, macro Spearman rho 0.5345, and macro Kendall tau 0.3750. CIA-EA-CV-CYP-GCA subsequently returned MA-ST-RAE 1.0075, macro MAE 1.0781, macro R-squared -0.0716, macro Spearman rho 0.5379, and macro Kendall tau 0.3788, at rank 102 of 112 when recorded. These aggregate results supply external evaluation only; blinded labels remain unavailable and no leaderboard values enter training. USR-CIA-EA-CV-CYP-GCA has not yet received organiser-calculated metrics.
+The EA-CV-CYP-GCA submission returned organiser-calculated MA-ST-RAE 1.0071, macro MAE 1.0778, macro R-squared -0.0715, macro Spearman rho 0.5345, and macro Kendall tau 0.3750. CIA-EA-CV-CYP-GCA subsequently returned MA-ST-RAE 1.0075, macro MAE 1.0781, macro R-squared -0.0716, macro Spearman rho 0.5379, and macro Kendall tau 0.3788, at rank 102 of 112 when recorded. USR-CIA-EA-CV-CYP-GCA returned MA-ST-RAE 1.0092, macro MAE 1.0789, macro R-squared -0.0744, macro Spearman rho 0.5345, and macro Kendall tau 0.3762, at rank 123 of 137 when recorded. EA-CV-CYP-GCA retains the lowest official primary metric by 0.0004 relative to CIA-EA-CV-CYP-GCA, while CIA-EA-CV-CYP-GCA retains the strongest official rank correlations and serves as the external reference for the current refinement lineage. These aggregate results supply external evaluation only; blinded labels remain unavailable and no leaderboard values enter training.
 
 ## Blinded inference and submission
 
@@ -184,7 +188,7 @@ Production training and inference used an NVIDIA GeForce RTX 5070 Ti through CUD
 
 ## Limitations
 
-The validation estimates arise from one challenge dataset and its scaffold-aware partitions. CYP2D6 remains the weakest endpoint by ST-RAE. The preceding blind results demonstrate that local validation can substantially overestimate performance on the challenge distribution. USR-CIA-EA-CV-CYP-GCA produced sealed point MA-ST-RAE 0.748039 and RMSE 0.845606 pIC50, compared with 0.748490 and 0.847738 for CIA-EA-CV-CYP-GCA. The bootstrap intervals overlap substantially, and the measured improvement requires organiser evaluation on the hidden test labels.
+The validation estimates arise from one challenge dataset and its scaffold-aware partitions. CYP2D6 remains the weakest endpoint by ST-RAE. USR-CIA-EA-CV-CYP-GCA produced sealed point MA-ST-RAE 0.748039 and RMSE 0.845606 pIC50, compared with 0.748490 and 0.847738 for CIA-EA-CV-CYP-GCA, while its official blind MA-ST-RAE was 1.0092 compared with 1.0075 for CIA-EA-CV-CYP-GCA. The bootstrap intervals overlap substantially, and the blind result shows that the incremental sealed improvement did not transfer to the hidden challenge distribution. USR remains the historical outcome of the label-independent internal selection protocol, while CIA remains the external reference model for subsequent scientifically controlled refinements.
 
 ## Update history
 
@@ -196,3 +200,4 @@ The validation estimates arise from one challenge dataset and its scaffold-aware
 | 1 September 2026 | EA-CV-CYP-GCA v1 candidate | Aligned recurrent backpropagation and differentiable ridge batches with the active CYP, reran all ten rules, improved sealed validation, and generated a validated blind submission. |
 | 2 September 2026 | CIA-EA-CV-CYP-GCA v1 candidate | Aligned recurrent training with experimental credible intervals, improved sealed MA-ST-RAE to 0.748490 and RMSE to 0.847738 pIC50, and generated a label-blind submission. |
 | 9 September 2026 | USR-CIA-EA-CV-CYP-GCA v1 candidate | Refined recurrent update scales, improved sealed MA-ST-RAE to 0.748039 and RMSE to 0.845606 pIC50, and generated a schema-validated label-blind submission. |
+| 11 September 2026 | USR-CIA-EA-CV-CYP-GCA v1 blind result | Recorded rank 123 of 137 and official MA-ST-RAE 1.0092; retained USR as the sealed-validation leader and CIA as the external reference model because the incremental sealed gain did not transfer. |
