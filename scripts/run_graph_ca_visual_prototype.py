@@ -82,6 +82,9 @@ CHANNEL_ADAPTIVE_TIMESCALE = os.environ.get(
 MULTILAG_RECURRENCE_SIGNATURE = os.environ.get(
     "SME_MULTILAG_RECURRENCE_SIGNATURE", "0"
 ) == "1"
+TEMPORAL_EXTREMA_SIGNATURE = os.environ.get(
+    "SME_TEMPORAL_EXTREMA_SIGNATURE", "0"
+) == "1"
 ACTIVITY_BALANCE_STRENGTH = float(os.environ.get("SME_ACTIVITY_BALANCE_STRENGTH", "0.0"))
 BOND_MESSAGE_DROPOUT = float(os.environ.get("SME_BOND_MESSAGE_DROPOUT", "0.0"))
 DEGREE_NORMALIZATION_POWER = float(os.environ.get("SME_DEGREE_NORMALIZATION_POWER", "1.0"))
@@ -433,7 +436,7 @@ def train(extended_dynamics: bool = False) -> None:
     global SUPPORT_FRACTION, BOND_TEMPERATURE, DYN_A, DYN_B, DYN_C, DYN_D
     global TRAJECTORY_POOLING, RIDGE_MODE, CHEMICAL_FEATURE_GATING
     global MULTISCALE_TRANSITION_ENERGY, CHANNEL_ADAPTIVE_TIMESCALE
-    global MULTILAG_RECURRENCE_SIGNATURE
+    global MULTILAG_RECURRENCE_SIGNATURE, TEMPORAL_EXTREMA_SIGNATURE
     import torch
     from torch import nn
 
@@ -514,6 +517,9 @@ def train(extended_dynamics: bool = False) -> None:
         )
         MULTILAG_RECURRENCE_SIGNATURE = bool(
             checkpoint.get("multilag_recurrence_signature", False)
+        )
+        TEMPORAL_EXTREMA_SIGNATURE = bool(
+            checkpoint.get("temporal_extrema_signature", False)
         )
         RIDGE_MODE = checkpoint.get("ridge_mode", "shared")
         CHEMICAL_FEATURE_GATING = bool(checkpoint.get("chemical_feature_gating", False))
@@ -671,7 +677,10 @@ def train(extended_dynamics: bool = False) -> None:
             node_states = [h] if return_node_trajectory else None
             temporal_atom_sum = h.clone()
             graph_mean = self._graph_mean(h, graph_index, graph_count, atom_counts_tensor)
-            graph_mean_history = [graph_mean] if MULTILAG_RECURRENCE_SIGNATURE else None
+            retain_graph_means = (
+                MULTILAG_RECURRENCE_SIGNATURE or TEMPORAL_EXTREMA_SIGNATURE
+            )
+            graph_mean_history = [graph_mean] if retain_graph_means else None
             graph_mean_sum = graph_mean.clone()
             graph_mean_sq_sum = graph_mean.square()
             checkpoint_steps = tuple(max(1, round(GENERATIONS * fraction))
@@ -855,6 +864,20 @@ def train(extended_dynamics: bool = False) -> None:
                     correlation = covariance / variance_product.clamp_min(1e-12).sqrt()
                     correlations.append(correlation.clamp(-5.0, 5.0))
                 fingerprint = torch.cat((fingerprint, *correlations), dim=1)
+            if TEMPORAL_EXTREMA_SIGNATURE:
+                trajectory = torch.stack(graph_mean_history, dim=1)
+                temperature = 10.0
+                time_count = float(trajectory.shape[1])
+                correction = math.log(time_count) / temperature
+                soft_max = (
+                    torch.logsumexp(temperature * trajectory, dim=1)
+                    / temperature - correction
+                )
+                soft_min = (
+                    -torch.logsumexp(-temperature * trajectory, dim=1)
+                    / temperature + correction
+                )
+                fingerprint = torch.cat((fingerprint, soft_max, soft_min), dim=1)
             if INITIAL_STATE_ANCHOR:
                 fingerprint = torch.cat((fingerprint, initial_mean, initial_var), dim=1)
             if TRAJECTORY_POOLING == "multiscale":
@@ -1573,6 +1596,7 @@ def train(extended_dynamics: bool = False) -> None:
                 "multiscale_transition_energy": MULTISCALE_TRANSITION_ENERGY,
                 "channel_adaptive_timescale": CHANNEL_ADAPTIVE_TIMESCALE,
                 "multilag_recurrence_signature": MULTILAG_RECURRENCE_SIGNATURE,
+                "temporal_extrema_signature": TEMPORAL_EXTREMA_SIGNATURE,
                 "chemical_feature_gating": CHEMICAL_FEATURE_GATING,
                 "perturbation_consistency_weight": PERTURBATION_CONSISTENCY_WEIGHT,
                 "perturbation_consistency_epsilon": PERTURBATION_CONSISTENCY_EPSILON,
@@ -1685,6 +1709,7 @@ def train(extended_dynamics: bool = False) -> None:
         "multiscale_transition_energy": MULTISCALE_TRANSITION_ENERGY,
         "channel_adaptive_timescale": CHANNEL_ADAPTIVE_TIMESCALE,
         "multilag_recurrence_signature": MULTILAG_RECURRENCE_SIGNATURE,
+        "temporal_extrema_signature": TEMPORAL_EXTREMA_SIGNATURE,
         "ridge_mode": RIDGE_MODE,
         "loss_mode": LOSS_MODE,
         "specialist_objective": SPECIALIST_OBJECTIVE,

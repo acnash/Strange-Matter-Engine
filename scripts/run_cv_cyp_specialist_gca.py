@@ -57,6 +57,7 @@ INITIAL_SCALE_REFINEMENT = os.environ.get("SME_INITIAL_SCALE_REFINEMENT", "0") =
 TRANSITION_ENERGY_REFINEMENT = os.environ.get("SME_TRANSITION_ENERGY_REFINEMENT", "0") == "1"
 CHANNEL_TIMESCALE_REFINEMENT = os.environ.get("SME_CHANNEL_TIMESCALE_REFINEMENT", "0") == "1"
 MULTILAG_RECURRENCE_REFINEMENT = os.environ.get("SME_MULTILAG_RECURRENCE_REFINEMENT", "0") == "1"
+TEMPORAL_EXTREMA_REFINEMENT = os.environ.get("SME_TEMPORAL_EXTREMA_REFINEMENT", "0") == "1"
 INTERVAL_BETAS = (0.0, 0.25, 0.5, 0.75)
 POOL_WEIGHTS = (0.0, 0.05, 0.15, 0.30)
 PARENT_ENDPOINT_STUDY = (
@@ -77,6 +78,8 @@ TEST_CSV = ROOT / "data" / "openadmet-cyp-challenge-2026" / "cyp-challenge-TEST-
 
 
 def campaign_method() -> str:
+    if TEMPORAL_EXTREMA_REFINEMENT:
+        return "TES-CIA-EA-CV-CYP-GCA"
     if MULTILAG_RECURRENCE_REFINEMENT:
         return "MLR-CIA-EA-CV-CYP-GCA"
     if CHANNEL_TIMESCALE_REFINEMENT:
@@ -119,6 +122,8 @@ def campaign_method() -> str:
 
 
 def campaign_architecture() -> str:
+    if TEMPORAL_EXTREMA_REFINEMENT:
+        return "temporal_extrema_credible_interval_endpoint_graph_ca"
     if MULTILAG_RECURRENCE_REFINEMENT:
         return "multilag_recurrence_credible_interval_endpoint_graph_ca"
     if CHANNEL_TIMESCALE_REFINEMENT:
@@ -163,6 +168,8 @@ def campaign_architecture() -> str:
 
 
 def campaign_submission_name() -> str:
+    if TEMPORAL_EXTREMA_REFINEMENT:
+        return "temporal_extrema_credible_interval_ea_cv_cyp_gca_submission.csv"
     if MULTILAG_RECURRENCE_REFINEMENT:
         return "multilag_recurrence_credible_interval_ea_cv_cyp_gca_submission.csv"
     if CHANNEL_TIMESCALE_REFINEMENT:
@@ -275,6 +282,8 @@ def fit(worker: Path, stage, endpoint, rule, variant, config, seed, fold,
 
 
 def screen(worker: Path) -> dict:
+    if TEMPORAL_EXTREMA_REFINEMENT:
+        return screen_temporal_extrema_refinement(worker)
     if MULTILAG_RECURRENCE_REFINEMENT:
         return screen_multilag_recurrence_refinement(worker)
     if CHANNEL_TIMESCALE_REFINEMENT:
@@ -1093,6 +1102,80 @@ def screen_update_scale_refinement(worker: Path) -> dict:
                 "interval_loss_beta": candidate.get("interval_loss_beta", 0.0),
                 "update_scale_multiplier": scale,
                 "update_scale": update_scale,
+                "config": config,
+            })
+        selected[endpoint].sort(key=lambda item: item["screen_ma_st_rae"])
+    write_json(STUDY / "screening_summary.json", selected)
+    return selected
+
+
+def screen_temporal_extrema_refinement(worker: Path) -> dict:
+    """Test differentiable recurrent-state peaks and troughs."""
+    parent = json.loads(
+        (PARENT_INTERVAL_STUDY / "screening_summary.json").read_text(
+            encoding="utf-8"
+        )
+    )
+    modes = (False, True)
+    jobs = [
+        (endpoint, candidate, enabled, fold)
+        for endpoint in ENDPOINTS for candidate in parent[endpoint]
+        for enabled in modes for fold in SCREEN_FOLDS
+    ]
+    scores = {
+        (endpoint, candidate["rule"], enabled): []
+        for endpoint in ENDPOINTS for candidate in parent[endpoint]
+        for enabled in modes
+    }
+    durations = []
+    for number, (endpoint, candidate, enabled, fold) in enumerate(jobs, 1):
+        config = deepcopy(candidate["config"])
+        config.update({
+            "temporal_extrema_signature": enabled,
+            "specialist_objective": "endpoint_only",
+        })
+        suffix = "extrema" if enabled else "core"
+        variant = f"{candidate['variant']}_temporal_{suffix}"
+        progress(
+            "temporal_extrema_screen", completed=number - 1,
+            total=len(jobs), endpoint=endpoint, rule=candidate["rule"],
+            temporal_extrema_signature=enabled, fold=fold,
+            estimated_remaining_seconds=(
+                np.mean(durations) * (len(jobs) - number + 1)
+                if durations else None
+            ),
+        )
+        started = time.time()
+        metrics = fit(
+            worker, "screen", endpoint, candidate["rule"], variant,
+            config, 6101, fold, 22, 6,
+        )
+        durations.append(time.time() - started)
+        scores[(endpoint, candidate["rule"], enabled)].append(float(
+            metrics.get("restored_validation_point_ma_st_rae", np.inf)
+        ))
+    selected = {}
+    for endpoint in ENDPOINTS:
+        selected[endpoint] = []
+        for candidate in parent[endpoint]:
+            choices = []
+            for enabled in modes:
+                values = scores[(endpoint, candidate["rule"], enabled)]
+                choices.append((float(np.mean(values)), enabled, values))
+            score, enabled, values = min(choices)
+            config = deepcopy(candidate["config"])
+            config.update({
+                "temporal_extrema_signature": enabled,
+                "specialist_objective": "endpoint_only",
+            })
+            suffix = "extrema" if enabled else "core"
+            selected[endpoint].append({
+                "rule": candidate["rule"],
+                "variant": f"{candidate['variant']}_temporal_{suffix}",
+                "screen_ma_st_rae": score,
+                "fold_scores": values,
+                "interval_loss_beta": candidate.get("interval_loss_beta", 0.0),
+                "temporal_extrema_signature": enabled,
                 "config": config,
             })
         selected[endpoint].sort(key=lambda item: item["screen_ma_st_rae"])
@@ -1975,6 +2058,10 @@ def blind_member(worker: Path, endpoint: str, candidate: dict,
         ),
         "SME_MULTILAG_RECURRENCE_SIGNATURE": (
             "1" if candidate["config"].get("multilag_recurrence_signature", False)
+            else "0"
+        ),
+        "SME_TEMPORAL_EXTREMA_SIGNATURE": (
+            "1" if candidate["config"].get("temporal_extrema_signature", False)
             else "0"
         ),
     })
