@@ -79,6 +79,9 @@ MULTISCALE_TRANSITION_ENERGY = os.environ.get(
 CHANNEL_ADAPTIVE_TIMESCALE = os.environ.get(
     "SME_CHANNEL_ADAPTIVE_TIMESCALE", "0"
 ) == "1"
+MULTILAG_RECURRENCE_SIGNATURE = os.environ.get(
+    "SME_MULTILAG_RECURRENCE_SIGNATURE", "0"
+) == "1"
 ACTIVITY_BALANCE_STRENGTH = float(os.environ.get("SME_ACTIVITY_BALANCE_STRENGTH", "0.0"))
 BOND_MESSAGE_DROPOUT = float(os.environ.get("SME_BOND_MESSAGE_DROPOUT", "0.0"))
 DEGREE_NORMALIZATION_POWER = float(os.environ.get("SME_DEGREE_NORMALIZATION_POWER", "1.0"))
@@ -430,6 +433,7 @@ def train(extended_dynamics: bool = False) -> None:
     global SUPPORT_FRACTION, BOND_TEMPERATURE, DYN_A, DYN_B, DYN_C, DYN_D
     global TRAJECTORY_POOLING, RIDGE_MODE, CHEMICAL_FEATURE_GATING
     global MULTISCALE_TRANSITION_ENERGY, CHANNEL_ADAPTIVE_TIMESCALE
+    global MULTILAG_RECURRENCE_SIGNATURE
     import torch
     from torch import nn
 
@@ -507,6 +511,9 @@ def train(extended_dynamics: bool = False) -> None:
         )
         CHANNEL_ADAPTIVE_TIMESCALE = bool(
             checkpoint.get("channel_adaptive_timescale", False)
+        )
+        MULTILAG_RECURRENCE_SIGNATURE = bool(
+            checkpoint.get("multilag_recurrence_signature", False)
         )
         RIDGE_MODE = checkpoint.get("ridge_mode", "shared")
         CHEMICAL_FEATURE_GATING = bool(checkpoint.get("chemical_feature_gating", False))
@@ -664,6 +671,7 @@ def train(extended_dynamics: bool = False) -> None:
             node_states = [h] if return_node_trajectory else None
             temporal_atom_sum = h.clone()
             graph_mean = self._graph_mean(h, graph_index, graph_count, atom_counts_tensor)
+            graph_mean_history = [graph_mean] if MULTILAG_RECURRENCE_SIGNATURE else None
             graph_mean_sum = graph_mean.clone()
             graph_mean_sq_sum = graph_mean.square()
             checkpoint_steps = tuple(max(1, round(GENERATIONS * fraction))
@@ -802,6 +810,8 @@ def train(extended_dynamics: bool = False) -> None:
                     node_states.append(h)
                 temporal_atom_sum += h
                 graph_mean = self._graph_mean(h, graph_index, graph_count, atom_counts_tensor)
+                if graph_mean_history is not None:
+                    graph_mean_history.append(graph_mean)
                 lag_product_sum += graph_mean * previous_graph_mean
                 previous_graph_mean = graph_mean
                 graph_mean_sum += graph_mean
@@ -825,6 +835,26 @@ def train(extended_dynamics: bool = False) -> None:
                 lag_correlation = (lag_covariance / series_var.clamp_min(1e-6)).clamp(-5.0, 5.0)
                 displacement = final_mean - initial_mean
                 fingerprint = torch.cat((fingerprint, displacement, lag_correlation), dim=1)
+            if MULTILAG_RECURRENCE_SIGNATURE:
+                trajectory = torch.stack(graph_mean_history, dim=1)
+                lags = sorted(set(
+                    max(1, round(GENERATIONS * fraction))
+                    for fraction in (0.0625, 0.125, 0.25)
+                ))
+                correlations = []
+                for lag in lags:
+                    earlier = trajectory[:, :-lag, :]
+                    later = trajectory[:, lag:, :]
+                    earlier_centered = earlier - earlier.mean(dim=1, keepdim=True)
+                    later_centered = later - later.mean(dim=1, keepdim=True)
+                    covariance = (earlier_centered * later_centered).mean(dim=1)
+                    variance_product = (
+                        earlier_centered.square().mean(dim=1)
+                        * later_centered.square().mean(dim=1)
+                    )
+                    correlation = covariance / variance_product.clamp_min(1e-12).sqrt()
+                    correlations.append(correlation.clamp(-5.0, 5.0))
+                fingerprint = torch.cat((fingerprint, *correlations), dim=1)
             if INITIAL_STATE_ANCHOR:
                 fingerprint = torch.cat((fingerprint, initial_mean, initial_var), dim=1)
             if TRAJECTORY_POOLING == "multiscale":
@@ -1542,6 +1572,7 @@ def train(extended_dynamics: bool = False) -> None:
                 "trajectory_pooling": TRAJECTORY_POOLING,
                 "multiscale_transition_energy": MULTISCALE_TRANSITION_ENERGY,
                 "channel_adaptive_timescale": CHANNEL_ADAPTIVE_TIMESCALE,
+                "multilag_recurrence_signature": MULTILAG_RECURRENCE_SIGNATURE,
                 "chemical_feature_gating": CHEMICAL_FEATURE_GATING,
                 "perturbation_consistency_weight": PERTURBATION_CONSISTENCY_WEIGHT,
                 "perturbation_consistency_epsilon": PERTURBATION_CONSISTENCY_EPSILON,
@@ -1653,6 +1684,7 @@ def train(extended_dynamics: bool = False) -> None:
         "trajectory_pooling": TRAJECTORY_POOLING,
         "multiscale_transition_energy": MULTISCALE_TRANSITION_ENERGY,
         "channel_adaptive_timescale": CHANNEL_ADAPTIVE_TIMESCALE,
+        "multilag_recurrence_signature": MULTILAG_RECURRENCE_SIGNATURE,
         "ridge_mode": RIDGE_MODE,
         "loss_mode": LOSS_MODE,
         "specialist_objective": SPECIALIST_OBJECTIVE,
