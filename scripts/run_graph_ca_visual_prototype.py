@@ -76,6 +76,9 @@ DYNAMIC_OBSERVABLES = os.environ.get("SME_DYNAMIC_OBSERVABLES", "0") == "1"
 MULTISCALE_TRANSITION_ENERGY = os.environ.get(
     "SME_MULTISCALE_TRANSITION_ENERGY", "0"
 ) == "1"
+CHANNEL_ADAPTIVE_TIMESCALE = os.environ.get(
+    "SME_CHANNEL_ADAPTIVE_TIMESCALE", "0"
+) == "1"
 ACTIVITY_BALANCE_STRENGTH = float(os.environ.get("SME_ACTIVITY_BALANCE_STRENGTH", "0.0"))
 BOND_MESSAGE_DROPOUT = float(os.environ.get("SME_BOND_MESSAGE_DROPOUT", "0.0"))
 DEGREE_NORMALIZATION_POWER = float(os.environ.get("SME_DEGREE_NORMALIZATION_POWER", "1.0"))
@@ -426,7 +429,7 @@ def train(extended_dynamics: bool = False) -> None:
     global RULE, GENERATIONS, UPDATE_SCALE, INIT_SCALE, INITIAL_NOISE
     global SUPPORT_FRACTION, BOND_TEMPERATURE, DYN_A, DYN_B, DYN_C, DYN_D
     global TRAJECTORY_POOLING, RIDGE_MODE, CHEMICAL_FEATURE_GATING
-    global MULTISCALE_TRANSITION_ENERGY
+    global MULTISCALE_TRANSITION_ENERGY, CHANNEL_ADAPTIVE_TIMESCALE
     import torch
     from torch import nn
 
@@ -502,6 +505,9 @@ def train(extended_dynamics: bool = False) -> None:
         MULTISCALE_TRANSITION_ENERGY = bool(
             checkpoint.get("multiscale_transition_energy", False)
         )
+        CHANNEL_ADAPTIVE_TIMESCALE = bool(
+            checkpoint.get("channel_adaptive_timescale", False)
+        )
         RIDGE_MODE = checkpoint.get("ridge_mode", "shared")
         CHEMICAL_FEATURE_GATING = bool(checkpoint.get("chemical_feature_gating", False))
     feature_profile = (checkpoint.get("atom_feature_profile", "baseline")
@@ -546,6 +552,10 @@ def train(extended_dynamics: bool = False) -> None:
                 self.feature_gate_logits = nn.Parameter(torch.full((chem_dim,), 2.0))
             if TRAJECTORY_POOLING == "temporal_attention":
                 self.temporal_logits = nn.Parameter(torch.zeros(5))
+            if CHANNEL_ADAPTIVE_TIMESCALE:
+                self.channel_timescale_logits = nn.Parameter(
+                    torch.full((hidden,), 4.0)
+                )
             if RULE == "gated_residual":
                 self.gate = nn.Linear(hidden * 2 + chem_dim + 4, hidden)
             elif RULE == "inertial_reaction_diffusion":
@@ -782,6 +792,9 @@ def train(extended_dynamics: bool = False) -> None:
                              + DYN_C * (delayed_h - h))
                     new_h = torch.tanh((1.0 - damping * UPDATE_SCALE) * h
                                        + UPDATE_SCALE * drive)
+                if CHANNEL_ADAPTIVE_TIMESCALE:
+                    channel_rate = torch.sigmoid(self.channel_timescale_logits)
+                    new_h = h + channel_rate[None, :] * (new_h - h)
                 step_energy += (new_h - h).square() / float(GENERATIONS)
                 h = new_h
                 state_history.append(h)
@@ -1528,6 +1541,7 @@ def train(extended_dynamics: bool = False) -> None:
                 "residual_alpha": residual_alpha if residual_mode else None,
                 "trajectory_pooling": TRAJECTORY_POOLING,
                 "multiscale_transition_energy": MULTISCALE_TRANSITION_ENERGY,
+                "channel_adaptive_timescale": CHANNEL_ADAPTIVE_TIMESCALE,
                 "chemical_feature_gating": CHEMICAL_FEATURE_GATING,
                 "perturbation_consistency_weight": PERTURBATION_CONSISTENCY_WEIGHT,
                 "perturbation_consistency_epsilon": PERTURBATION_CONSISTENCY_EPSILON,
@@ -1638,6 +1652,7 @@ def train(extended_dynamics: bool = False) -> None:
         "residual_alpha": residual_alpha if residual_mode else None,
         "trajectory_pooling": TRAJECTORY_POOLING,
         "multiscale_transition_energy": MULTISCALE_TRANSITION_ENERGY,
+        "channel_adaptive_timescale": CHANNEL_ADAPTIVE_TIMESCALE,
         "ridge_mode": RIDGE_MODE,
         "loss_mode": LOSS_MODE,
         "specialist_objective": SPECIALIST_OBJECTIVE,
