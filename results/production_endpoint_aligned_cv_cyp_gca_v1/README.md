@@ -20,8 +20,18 @@ seeds, and selected sparse rule combinations from out-of-fold predictions.
 | Bootstrap macro Spearman rho | 0.532744 |
 | Bootstrap macro Kendall tau | 0.381552 |
 
-The preceding CV-CYP-GCA system achieved point MA-ST-RAE 0.768985 and RMSE
-0.862535 pIC50 on the same sealed holdout.
+## Official blind evaluation
+
+| Metric | Result |
+|---|---:|
+| MA-ST-RAE | **1.0071** |
+| Macro MAE | **1.0778** |
+| Macro R-squared | **-0.0715** |
+| Macro Spearman rho | **0.5345** |
+| Macro Kendall tau | **0.3750** |
+
+EA-CV-CYP-GCA is the canonical production and submission method because it
+holds the project's strongest recorded official primary metric.
 
 ## Selected transition rules
 

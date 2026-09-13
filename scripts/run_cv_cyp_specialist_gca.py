@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Resumable production campaign for CYP-specialist Graph cellular automata.
+"""Canonical EA-CV-CYP-GCA production and inference campaign.
 
 Each nonlinear Graph-CA is trained by backpropagation against observations from
 one CYP endpoint only.  A genuine differentiable ridge solve remains the
@@ -34,31 +34,34 @@ import run_production_transition_study as production
 from challenge_metrics import bootstrap_regression_report, soft_threshold_rae
 
 STUDY_NAME = os.environ.get(
-    "SME_CYP_CAMPAIGN_NAME", "production_cv_cyp_specialist_gca_v1"
+    "SME_CYP_CAMPAIGN_NAME", "production_endpoint_aligned_cv_cyp_gca_v1"
 )
 STUDY = ROOT / "results" / STUDY_NAME
-ENDPOINT_ALIGNED = os.environ.get("SME_ENDPOINT_ALIGNED", "0") == "1"
-INTERVAL_REFINEMENT = os.environ.get("SME_INTERVAL_REFINEMENT", "0") == "1"
-PARTIAL_POOL_REFINEMENT = os.environ.get("SME_PARTIAL_POOL_REFINEMENT", "0") == "1"
-TEMPORAL_REFINEMENT = os.environ.get("SME_TEMPORAL_REFINEMENT", "0") == "1"
-FEATURE_GATE_REFINEMENT = os.environ.get("SME_FEATURE_GATE_REFINEMENT", "0") == "1"
-PERTURBATION_REFINEMENT = os.environ.get("SME_PERTURBATION_REFINEMENT", "0") == "1"
-INITIAL_ANCHOR_REFINEMENT = os.environ.get("SME_INITIAL_ANCHOR_REFINEMENT", "0") == "1"
-DYNAMIC_OBSERVABLE_REFINEMENT = os.environ.get("SME_DYNAMIC_OBSERVABLE_REFINEMENT", "0") == "1"
-ACTIVITY_BALANCE_REFINEMENT = os.environ.get("SME_ACTIVITY_BALANCE_REFINEMENT", "0") == "1"
-BOND_DROPOUT_REFINEMENT = os.environ.get("SME_BOND_DROPOUT_REFINEMENT", "0") == "1"
-DEGREE_NORM_REFINEMENT = os.environ.get("SME_DEGREE_NORM_REFINEMENT", "0") == "1"
-SUPPORT_BALANCE_REFINEMENT = os.environ.get("SME_SUPPORT_BALANCE_REFINEMENT", "0") == "1"
-BOND_TEMPERATURE_REFINEMENT = os.environ.get("SME_BOND_TEMPERATURE_REFINEMENT", "0") == "1"
-HIDDEN_WIDTH_REFINEMENT = os.environ.get("SME_HIDDEN_WIDTH_REFINEMENT", "0") == "1"
-GENERATION_DEPTH_REFINEMENT = os.environ.get("SME_GENERATION_DEPTH_REFINEMENT", "0") == "1"
-UPDATE_SCALE_REFINEMENT = os.environ.get("SME_UPDATE_SCALE_REFINEMENT", "0") == "1"
-INITIAL_SCALE_REFINEMENT = os.environ.get("SME_INITIAL_SCALE_REFINEMENT", "0") == "1"
-TRANSITION_ENERGY_REFINEMENT = os.environ.get("SME_TRANSITION_ENERGY_REFINEMENT", "0") == "1"
-CHANNEL_TIMESCALE_REFINEMENT = os.environ.get("SME_CHANNEL_TIMESCALE_REFINEMENT", "0") == "1"
-MULTILAG_RECURRENCE_REFINEMENT = os.environ.get("SME_MULTILAG_RECURRENCE_REFINEMENT", "0") == "1"
-TEMPORAL_EXTREMA_REFINEMENT = os.environ.get("SME_TEMPORAL_EXTREMA_REFINEMENT", "0") == "1"
-DIRECTIONAL_FLUX_REFINEMENT = os.environ.get("SME_DIRECTIONAL_FLUX_REFINEMENT", "0") == "1"
+# Production is intentionally pinned to the externally strongest submitted
+# method. Historical refinement implementations remain below for provenance,
+# while these fixed switches prevent environment variables from selecting them.
+ENDPOINT_ALIGNED = True
+INTERVAL_REFINEMENT = False
+PARTIAL_POOL_REFINEMENT = False
+TEMPORAL_REFINEMENT = False
+FEATURE_GATE_REFINEMENT = False
+PERTURBATION_REFINEMENT = False
+INITIAL_ANCHOR_REFINEMENT = False
+DYNAMIC_OBSERVABLE_REFINEMENT = False
+ACTIVITY_BALANCE_REFINEMENT = False
+BOND_DROPOUT_REFINEMENT = False
+DEGREE_NORM_REFINEMENT = False
+SUPPORT_BALANCE_REFINEMENT = False
+BOND_TEMPERATURE_REFINEMENT = False
+HIDDEN_WIDTH_REFINEMENT = False
+GENERATION_DEPTH_REFINEMENT = False
+UPDATE_SCALE_REFINEMENT = False
+INITIAL_SCALE_REFINEMENT = False
+TRANSITION_ENERGY_REFINEMENT = False
+CHANNEL_TIMESCALE_REFINEMENT = False
+MULTILAG_RECURRENCE_REFINEMENT = False
+TEMPORAL_EXTREMA_REFINEMENT = False
+DIRECTIONAL_FLUX_REFINEMENT = False
 INTERVAL_BETAS = (0.0, 0.25, 0.5, 0.75)
 POOL_WEIGHTS = (0.0, 0.05, 0.15, 0.30)
 PARENT_ENDPOINT_STUDY = (
