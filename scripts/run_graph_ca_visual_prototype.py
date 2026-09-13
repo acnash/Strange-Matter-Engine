@@ -85,6 +85,9 @@ MULTILAG_RECURRENCE_SIGNATURE = os.environ.get(
 TEMPORAL_EXTREMA_SIGNATURE = os.environ.get(
     "SME_TEMPORAL_EXTREMA_SIGNATURE", "0"
 ) == "1"
+DIRECTIONAL_FLUX_SIGNATURE = os.environ.get(
+    "SME_DIRECTIONAL_FLUX_SIGNATURE", "0"
+) == "1"
 ACTIVITY_BALANCE_STRENGTH = float(os.environ.get("SME_ACTIVITY_BALANCE_STRENGTH", "0.0"))
 BOND_MESSAGE_DROPOUT = float(os.environ.get("SME_BOND_MESSAGE_DROPOUT", "0.0"))
 DEGREE_NORMALIZATION_POWER = float(os.environ.get("SME_DEGREE_NORMALIZATION_POWER", "1.0"))
@@ -437,6 +440,7 @@ def train(extended_dynamics: bool = False) -> None:
     global TRAJECTORY_POOLING, RIDGE_MODE, CHEMICAL_FEATURE_GATING
     global MULTISCALE_TRANSITION_ENERGY, CHANNEL_ADAPTIVE_TIMESCALE
     global MULTILAG_RECURRENCE_SIGNATURE, TEMPORAL_EXTREMA_SIGNATURE
+    global DIRECTIONAL_FLUX_SIGNATURE
     import torch
     from torch import nn
 
@@ -520,6 +524,9 @@ def train(extended_dynamics: bool = False) -> None:
         )
         TEMPORAL_EXTREMA_SIGNATURE = bool(
             checkpoint.get("temporal_extrema_signature", False)
+        )
+        DIRECTIONAL_FLUX_SIGNATURE = bool(
+            checkpoint.get("directional_flux_signature", False)
         )
         RIDGE_MODE = checkpoint.get("ridge_mode", "shared")
         CHEMICAL_FEATURE_GATING = bool(checkpoint.get("chemical_feature_gating", False))
@@ -687,6 +694,8 @@ def train(extended_dynamics: bool = False) -> None:
                                      for fraction in (0.125, 0.25, 0.5, 0.75, 1.0))
             checkpoint_summaries = []
             step_energy = torch.zeros_like(h)
+            positive_flux = torch.zeros_like(h)
+            negative_flux = torch.zeros_like(h)
             for step_index in range(1, GENERATIONS + 1):
                 agg = torch.zeros_like(h)
                 neighbour_mean = torch.zeros_like(h)
@@ -812,7 +821,11 @@ def train(extended_dynamics: bool = False) -> None:
                 if CHANNEL_ADAPTIVE_TIMESCALE:
                     channel_rate = torch.sigmoid(self.channel_timescale_logits)
                     new_h = h + channel_rate[None, :] * (new_h - h)
-                step_energy += (new_h - h).square() / float(GENERATIONS)
+                state_delta = new_h - h
+                step_energy += state_delta.square() / float(GENERATIONS)
+                if DIRECTIONAL_FLUX_SIGNATURE:
+                    positive_flux += torch.relu(state_delta) / float(GENERATIONS)
+                    negative_flux += torch.relu(-state_delta) / float(GENERATIONS)
                 h = new_h
                 state_history.append(h)
                 if return_node_trajectory:
@@ -839,6 +852,16 @@ def train(extended_dynamics: bool = False) -> None:
             series_var = (graph_mean_sq_sum / float(GENERATIONS + 1) - series_mean.square()).clamp_min(0.0)
             energy_mean = self._graph_mean(step_energy, graph_index, graph_count, atom_counts_tensor)
             fingerprint = torch.cat((final_mean, final_var, temporal_mean, series_var, energy_mean), dim=1)
+            if DIRECTIONAL_FLUX_SIGNATURE:
+                positive_flux_mean = self._graph_mean(
+                    positive_flux, graph_index, graph_count, atom_counts_tensor
+                )
+                negative_flux_mean = self._graph_mean(
+                    negative_flux, graph_index, graph_count, atom_counts_tensor
+                )
+                fingerprint = torch.cat(
+                    (fingerprint, positive_flux_mean, negative_flux_mean), dim=1
+                )
             if DYNAMIC_OBSERVABLES:
                 lag_covariance = lag_product_sum / float(GENERATIONS) - series_mean.square()
                 lag_correlation = (lag_covariance / series_var.clamp_min(1e-6)).clamp(-5.0, 5.0)
@@ -931,6 +954,8 @@ def train(extended_dynamics: bool = False) -> None:
                                      for fraction in (0.125, 0.25, 0.5, 0.75, 1.0))
             checkpoint_summaries = []
             step_energy = torch.zeros(hidden, device=device)
+            positive_flux = torch.zeros(hidden, device=device)
+            negative_flux = torch.zeros(hidden, device=device)
             for step_index in range(1, GENERATIONS + 1):
                 agg = torch.zeros_like(h)
                 neighbour_mean = torch.zeros_like(h)
@@ -1047,7 +1072,11 @@ def train(extended_dynamics: bool = False) -> None:
                              + DYN_C * (delayed_h - h))
                     new_h = torch.tanh((1.0 - damping * UPDATE_SCALE) * h
                                        + UPDATE_SCALE * drive)
-                step_energy += ((new_h - h) ** 2).mean(0) / float(GENERATIONS)
+                state_delta = new_h - h
+                step_energy += state_delta.square().mean(0) / float(GENERATIONS)
+                if DIRECTIONAL_FLUX_SIGNATURE:
+                    positive_flux += torch.relu(state_delta).mean(0) / float(GENERATIONS)
+                    negative_flux += torch.relu(-state_delta).mean(0) / float(GENERATIONS)
                 h = new_h
                 state_history.append(h)
                 states.append(h); means.append(h.mean(0))
@@ -1059,6 +1088,10 @@ def train(extended_dynamics: bool = False) -> None:
                 torch.stack(states).mean((0, 1)),
                 mean_series.var(0, unbiased=False), step_energy,
             ))
+            if DIRECTIONAL_FLUX_SIGNATURE:
+                fingerprint = torch.cat(
+                    (fingerprint, positive_flux, negative_flux)
+                )
             if DYNAMIC_OBSERVABLES:
                 lagged = (mean_series[1:] * mean_series[:-1]).mean(0)
                 series_mean = mean_series.mean(0)
@@ -1597,6 +1630,7 @@ def train(extended_dynamics: bool = False) -> None:
                 "channel_adaptive_timescale": CHANNEL_ADAPTIVE_TIMESCALE,
                 "multilag_recurrence_signature": MULTILAG_RECURRENCE_SIGNATURE,
                 "temporal_extrema_signature": TEMPORAL_EXTREMA_SIGNATURE,
+                "directional_flux_signature": DIRECTIONAL_FLUX_SIGNATURE,
                 "chemical_feature_gating": CHEMICAL_FEATURE_GATING,
                 "perturbation_consistency_weight": PERTURBATION_CONSISTENCY_WEIGHT,
                 "perturbation_consistency_epsilon": PERTURBATION_CONSISTENCY_EPSILON,
@@ -1710,6 +1744,7 @@ def train(extended_dynamics: bool = False) -> None:
         "channel_adaptive_timescale": CHANNEL_ADAPTIVE_TIMESCALE,
         "multilag_recurrence_signature": MULTILAG_RECURRENCE_SIGNATURE,
         "temporal_extrema_signature": TEMPORAL_EXTREMA_SIGNATURE,
+        "directional_flux_signature": DIRECTIONAL_FLUX_SIGNATURE,
         "ridge_mode": RIDGE_MODE,
         "loss_mode": LOSS_MODE,
         "specialist_objective": SPECIALIST_OBJECTIVE,
