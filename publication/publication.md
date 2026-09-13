@@ -205,6 +205,10 @@ where $\bar F_s$ and $s_F$ were the support feature mean and scale. The intercep
 
 This support–query construction trained the nonlinear cellular automaton to produce fingerprints that generalized beyond the observations used to solve the current ridge layer. At the end of training, a final ridge state was fitted from all permitted fitting observations and stored with the selected Graph-CA checkpoint. Early stopping and checkpoint promotion used MA-ST-RAE on the relevant scaffold-held-out development fold. RMSE was recorded as a secondary optimization diagnostic.
 
+#### Evolutionary training comparator
+
+We also specified a derivative-free comparator, ES-EA-CV-CYP-GCA, that preserved the molecular graph, chemical encodings, recurrent transition rules, retained trajectories, scaffold partitions, and analytic ridge readout used by EA-CV-CYP-GCA. Mirrored parameter perturbations were evaluated on the GPU in antithetic pairs. For every candidate, the Graph-CA generated support and query fingerprints, ridge coefficients were solved analytically from support observations, and query error supplied the evolutionary fitness. Paired fitness differences estimated an update direction for the nonlinear Graph-CA parameters, with Adam-style moment accumulation applied outside automatic differentiation. This design isolated the effect of nonlinear-parameter training because the representation, readout, and data-separation protocol remained fixed. The sealed holdout and blind labels were excluded from evolutionary fitness and checkpoint selection. EA-CV-CYP-GCA trained by backpropagation through time remained the primary submitted method while the evolutionary comparator was assessed.
+
 #### Final validation and blinded inference
 
 Model development used five scaffold-grouped folds within the fitting pool. The sealed holdout defined above was opened once after expert and endpoint-specific sparse ridge selection. Evaluation used the primary and complementary metrics specified in the Dataset and Prediction Task subsection, with final uncertainty estimated from 1,000 bootstrap resamples.

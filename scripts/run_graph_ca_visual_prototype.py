@@ -48,6 +48,15 @@ GENERATIONS = int(os.environ.get("SME_GENERATIONS", "16"))
 RUN_NAME = os.environ.get("SME_RUN_NAME", "graph_ca_visual_prototype")
 OUT = ROOT / "results" / RUN_NAME
 CA_LR = float(os.environ.get("SME_CA_LR", "1e-3"))
+TRAINING_ALGORITHM = os.environ.get("SME_TRAINING_ALGORITHM", "backprop").strip().lower()
+if TRAINING_ALGORITHM not in {"backprop", "evolution_strategy"}:
+    raise ValueError(
+        "SME_TRAINING_ALGORITHM must be 'backprop' or 'evolution_strategy'"
+    )
+ES_POPULATION = int(os.environ.get("SME_ES_POPULATION", "16"))
+ES_SIGMA = float(os.environ.get("SME_ES_SIGMA", "0.02"))
+ES_LR = float(os.environ.get("SME_ES_LR", "0.01"))
+ES_BATCH_MOLECULES = int(os.environ.get("SME_ES_BATCH_MOLECULES", "128"))
 RIDGE_STRENGTH = float(os.environ.get("SME_RIDGE", "1e-3"))
 CA_L2 = float(os.environ.get("SME_CA_L2", "1e-5"))
 GRAD_CLIP = float(os.environ.get("SME_GRAD_CLIP", "1.0"))
@@ -1277,8 +1286,10 @@ def train(extended_dynamics: bool = False) -> None:
         model.load_state_dict(checkpoint["state_dict"])
         model.eval()
     ca_params = list(model.parameters())
-    optimizer = torch.optim.Adam(ca_params, lr=CA_LR,
-                                 betas=(0.9, 0.999), eps=1e-8)
+    optimizer = None
+    if TRAINING_ALGORITHM == "backprop":
+        optimizer = torch.optim.Adam(ca_params, lr=CA_LR,
+                                     betas=(0.9, 0.999), eps=1e-8)
 
     def observed_pairs(indices):
         pairs = []
@@ -1442,11 +1453,162 @@ def train(extended_dynamics: bool = False) -> None:
     history, best, best_rmse, best_state, patience = [], math.inf, math.inf, None, 0
     rng = random.Random(SEED)
     max_epochs = int(os.environ.get("SME_MAX_EPOCHS", "200"))
-    scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(
+    scheduler = (torch.optim.lr_scheduler.CosineAnnealingLR(
         optimizer, T_max=max_epochs, eta_min=CA_LR * 0.1
-    )
+    ) if optimizer is not None else None)
     training_started = __import__("time").perf_counter()
-    for epoch in range(1, max_epochs + 1):
+
+    if TRAINING_ALGORITHM == "evolution_strategy":
+        if ES_POPULATION < 2 or ES_POPULATION % 2:
+            raise ValueError("SME_ES_POPULATION must be an even integer of at least 2")
+        if ES_SIGMA <= 0 or ES_LR <= 0:
+            raise ValueError("SME_ES_SIGMA and SME_ES_LR must be positive")
+        if device.type != "cuda":
+            raise RuntimeError("Evolution-strategy training requires a CUDA device")
+
+        parameter_shapes = [parameter.shape for parameter in ca_params]
+        parameter_sizes = [parameter.numel() for parameter in ca_params]
+
+        def parameter_vector():
+            return torch.cat([parameter.detach().reshape(-1) for parameter in ca_params])
+
+        def load_parameter_vector(vector):
+            offset = 0
+            with torch.no_grad():
+                for parameter, shape, size in zip(
+                        ca_params, parameter_shapes, parameter_sizes):
+                    parameter.copy_(vector[offset:offset + size].view(shape))
+                    offset += size
+
+        def es_batches(molecule_indices):
+            support_count = max(2, min(
+                len(molecule_indices) - 1,
+                round(SUPPORT_FRACTION * len(molecule_indices)),
+            ))
+            support_molecules = molecule_indices[:support_count]
+            query_molecules = molecule_indices[support_count:]
+            support_batch, query_batch = [], []
+            for index in support_molecules:
+                for endpoint, target in enumerate(data["train"][index]["labels"]):
+                    if (np.isfinite(target) and
+                            (SPECIALIST_OBJECTIVE != "endpoint_only" or
+                             endpoint == ACTIVE_CYP_INDEX)):
+                        support_batch.append((index, endpoint, float(target)))
+            for index in query_molecules:
+                for endpoint, target in enumerate(data["train"][index]["labels"]):
+                    if (np.isfinite(target) and
+                            (SPECIALIST_OBJECTIVE != "endpoint_only" or
+                             endpoint == ACTIVE_CYP_INDEX)):
+                        query_batch.append((index, endpoint, float(target)))
+            return support_batch, query_batch
+
+        def es_candidate_loss(vector, support_batch, query_batch):
+            load_parameter_vector(vector)
+            model.eval()
+            combined = support_batch + query_batch
+            with torch.no_grad():
+                fingerprints = model.forward_batch([
+                    (data["train"][index], endpoint)
+                    for index, endpoint, _ in combined
+                ])
+                support_targets = torch.tensor(
+                    [target for _, _, target in support_batch],
+                    dtype=torch.float32, device=device,
+                )
+                query_targets = torch.tensor(
+                    [target for _, _, target in query_batch],
+                    dtype=torch.float32, device=device,
+                )
+                ridge_state = differentiable_ridge_fit(
+                    fingerprints[:len(support_batch)], support_targets, RIDGE_STRENGTH
+                )
+                predictions = differentiable_ridge_predict(
+                    fingerprints[len(support_batch):], ridge_state
+                )
+                mse = ((predictions - query_targets) ** 2).mean()
+                regularisation = CA_L2 * vector.square().mean()
+            return float(mse + regularisation), float(mse), len(query_batch)
+
+        mean_vector = parameter_vector()
+        adam_mean = torch.zeros_like(mean_vector)
+        adam_variance = torch.zeros_like(mean_vector)
+        direction_count = ES_POPULATION // 2
+        print(json.dumps({
+            "training_algorithm": TRAINING_ALGORITHM,
+            "es_population": ES_POPULATION,
+            "es_antithetic_directions": direction_count,
+            "es_sigma": ES_SIGMA,
+            "es_lr": ES_LR,
+            "es_batch_molecules": ES_BATCH_MOLECULES,
+            "parameter_count": int(mean_vector.numel()),
+        }), flush=True)
+
+        for epoch in range(1, max_epochs + 1):
+            molecule_order = list(fit_indices)
+            rng.shuffle(molecule_order)
+            selected_molecules = molecule_order[:min(
+                len(molecule_order), max(4, ES_BATCH_MOLECULES)
+            )]
+            support_batch, query_batch = es_batches(selected_molecules)
+            if len(support_batch) < 2 or not query_batch:
+                raise RuntimeError("Evolution-strategy batch lacks support or query observations")
+            gradient_estimate = torch.zeros_like(mean_vector)
+            candidate_losses = []
+            candidate_mse = []
+            for _ in range(direction_count):
+                direction = torch.randn_like(mean_vector)
+                positive_loss, positive_mse, _ = es_candidate_loss(
+                    mean_vector + ES_SIGMA * direction, support_batch, query_batch
+                )
+                negative_loss, negative_mse, _ = es_candidate_loss(
+                    mean_vector - ES_SIGMA * direction, support_batch, query_batch
+                )
+                gradient_estimate.add_(
+                    ((positive_loss - negative_loss) / (2.0 * ES_SIGMA)) * direction
+                )
+                candidate_losses.extend((positive_loss, negative_loss))
+                candidate_mse.extend((positive_mse, negative_mse))
+            gradient_estimate.div_(direction_count)
+            adam_mean.mul_(0.9).add_(gradient_estimate, alpha=0.1)
+            adam_variance.mul_(0.999).addcmul_(
+                gradient_estimate, gradient_estimate, value=0.001
+            )
+            mean_hat = adam_mean / (1.0 - 0.9 ** epoch)
+            variance_hat = adam_variance / (1.0 - 0.999 ** epoch)
+            mean_vector = mean_vector - ES_LR * mean_hat / (variance_hat.sqrt() + 1e-8)
+            load_parameter_vector(mean_vector)
+            epoch_ridge_state = fitted_ridge_state()
+            val_rmse, val_ma_st_rae, per_cyp_st_rae, _, _ = evaluate(
+                val_pairs, epoch_ridge_state
+            )
+            row = {
+                "epoch": epoch,
+                "train_rmse": float(math.sqrt(float(np.mean(candidate_mse)))),
+                "validation_rmse": val_rmse,
+                "validation_ma_st_rae": val_ma_st_rae,
+                **{f"validation_{cyp}_st_rae": per_cyp_st_rae[cyp] for cyp in CYPS},
+                "mean_raw_gradient_norm": float(torch.linalg.vector_norm(
+                    gradient_estimate
+                )),
+                "fraction_gradients_clipped": 0.0,
+                "es_mean_candidate_loss": float(np.mean(candidate_losses)),
+                "es_best_candidate_loss": float(np.min(candidate_losses)),
+            }
+            history.append(row)
+            print(json.dumps(row), flush=True)
+            if val_ma_st_rae < best - MIN_DELTA:
+                best, best_rmse, patience = val_ma_st_rae, val_rmse, 0
+                best_state = {
+                    key: value.detach().cpu().clone()
+                    for key, value in model.state_dict().items()
+                }
+            else:
+                patience += 1
+            if patience >= PATIENCE_LIMIT:
+                break
+
+    else:
+      for epoch in range(1, max_epochs + 1):
         model.train()
         molecule_order = list(fit_indices); rng.shuffle(molecule_order)
         total_sq, total_n, raw_norms, clipped_norms = 0.0, 0, [], []
@@ -1641,7 +1803,11 @@ def train(extended_dynamics: bool = False) -> None:
                 "interval_loss_beta": INTERVAL_LOSS_BETA,
                 "interval_temperature": INTERVAL_TEMPERATURE,
                 "ridge_state": {k: v.detach().cpu() for k, v in final_ridge_state.items()},
+                "training_algorithm": TRAINING_ALGORITHM,
                 "hyperparameters": {"ca_lr": CA_LR,
+                    "es_population": ES_POPULATION,
+                    "es_sigma": ES_SIGMA, "es_lr": ES_LR,
+                    "es_batch_molecules": ES_BATCH_MOLECULES,
                     "ridge": RIDGE_STRENGTH, "ca_l2": CA_L2,
                     "gradient_clip": GRAD_CLIP, "update_scale": UPDATE_SCALE,
                     "init_scale": INIT_SCALE, "initial_noise": INITIAL_NOISE,
@@ -1706,6 +1872,7 @@ def train(extended_dynamics: bool = False) -> None:
         writer = csv.DictWriter(handle, fieldnames=pair_rows[0].keys()); writer.writeheader(); writer.writerows(pair_rows)
 
     common_metrics = {"seed": SEED, "selection_metric": "validation_ma_st_rae",
+        "training_algorithm": TRAINING_ALGORITHM,
         "best_validation_ma_st_rae": best,
         "best_validation_rmse": best_rmse,
         "restored_fit_rmse": train_rmse, "restored_validation_rmse": val_rmse,
@@ -1751,6 +1918,8 @@ def train(extended_dynamics: bool = False) -> None:
         "interval_loss_beta": INTERVAL_LOSS_BETA,
         "interval_temperature": INTERVAL_TEMPERATURE,
         "hyperparameters": {"ca_lr": CA_LR,
+        "es_population": ES_POPULATION, "es_sigma": ES_SIGMA,
+        "es_lr": ES_LR, "es_batch_molecules": ES_BATCH_MOLECULES,
         "ridge": RIDGE_STRENGTH, "ca_l2": CA_L2,
         "gradient_clip": GRAD_CLIP, "update_scale": UPDATE_SCALE,
         "init_scale": INIT_SCALE, "initial_noise": INITIAL_NOISE,

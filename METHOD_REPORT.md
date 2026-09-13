@@ -113,6 +113,26 @@ initialization, message, reaction, and transition-rule parameters using a
 cosine learning-rate schedule, gradient clipping, and cellular-automata L2
 regularization.
 
+## Evolutionary training comparison
+
+An experimental ES-EA-CV-CYP-GCA comparison retains the same atom cells,
+typed-bond neighbourhoods, recurrent transition rules, complete trajectory
+fingerprints, scaffold partitions, and analytic ridge readout. It replaces the
+nonlinear-parameter update with a mirrored evolution strategy. At each
+evolutionary generation, antithetic parameter perturbations are evaluated on
+the GPU. Each candidate produces support and query fingerprints, an analytic
+ridge model is fitted from the support observations, and its query error
+determines evolutionary fitness. The paired fitness difference estimates a
+search direction, which is accumulated with Adam-style first and second
+moments without automatic differentiation or backpropagation through time.
+
+This comparison changes only the optimizer for the nonlinear Graph-CA
+parameters. Ridge fitting remains exact for every candidate, and the same
+scaffold-safe development folds are used. The sealed holdout and blind labels
+remain excluded from evolutionary fitness and checkpoint selection. The
+backpropagation-trained EA-CV-CYP-GCA remains the canonical model while this
+alternative is evaluated.
+
 ## Model selection and validation
 
 Compounds were grouped by standardized Bemis-Murcko scaffold. A fixed 20% set
