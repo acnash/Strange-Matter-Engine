@@ -57,6 +57,13 @@ ES_POPULATION = int(os.environ.get("SME_ES_POPULATION", "16"))
 ES_SIGMA = float(os.environ.get("SME_ES_SIGMA", "0.02"))
 ES_LR = float(os.environ.get("SME_ES_LR", "0.01"))
 ES_BATCH_MOLECULES = int(os.environ.get("SME_ES_BATCH_MOLECULES", "128"))
+ES_BATCH_COMPOSITION = os.environ.get(
+    "SME_ES_BATCH_COMPOSITION", "random"
+).strip().lower()
+if ES_BATCH_COMPOSITION not in {"random", "activity_stratified"}:
+    raise ValueError(
+        "SME_ES_BATCH_COMPOSITION must be 'random' or 'activity_stratified'"
+    )
 RIDGE_STRENGTH = float(os.environ.get("SME_RIDGE", "1e-3"))
 CA_L2 = float(os.environ.get("SME_CA_L2", "1e-5"))
 GRAD_CLIP = float(os.environ.get("SME_GRAD_CLIP", "1.0"))
@@ -1481,12 +1488,48 @@ def train(extended_dynamics: bool = False) -> None:
                     offset += size
 
         def es_batches(molecule_indices):
+            eligible = []
+            for index in molecule_indices:
+                relevant_targets = [
+                    float(target)
+                    for endpoint, target in enumerate(data["train"][index]["labels"])
+                    if (np.isfinite(target) and
+                        (SPECIALIST_OBJECTIVE != "endpoint_only" or
+                         endpoint == ACTIVE_CYP_INDEX))
+                ]
+                if relevant_targets:
+                    eligible.append((index, float(np.mean(relevant_targets))))
+            if len(eligible) < 3:
+                return [], []
             support_count = max(2, min(
-                len(molecule_indices) - 1,
-                round(SUPPORT_FRACTION * len(molecule_indices)),
+                len(eligible) - 1,
+                round(SUPPORT_FRACTION * len(eligible)),
             ))
-            support_molecules = molecule_indices[:support_count]
-            query_molecules = molecule_indices[support_count:]
+            if ES_BATCH_COMPOSITION == "activity_stratified":
+                ordered = [index for index, _ in sorted(eligible, key=lambda item: item[1])]
+                query_count = len(ordered) - support_count
+                query_positions = {
+                    int(round(position))
+                    for position in np.linspace(0, len(ordered) - 1, query_count)
+                }
+                if len(query_positions) < query_count:
+                    query_positions.update(
+                        position for position in range(len(ordered))
+                        if position not in query_positions
+                    )
+                    query_positions = set(sorted(query_positions)[:query_count])
+                support_molecules = [
+                    index for position, index in enumerate(ordered)
+                    if position not in query_positions
+                ]
+                query_molecules = [
+                    index for position, index in enumerate(ordered)
+                    if position in query_positions
+                ]
+            else:
+                ordered = [index for index, _ in eligible]
+                support_molecules = ordered[:support_count]
+                query_molecules = ordered[support_count:]
             support_batch, query_batch = [], []
             for index in support_molecules:
                 for endpoint, target in enumerate(data["train"][index]["labels"]):
@@ -1540,6 +1583,7 @@ def train(extended_dynamics: bool = False) -> None:
             "es_sigma": ES_SIGMA,
             "es_lr": ES_LR,
             "es_batch_molecules": ES_BATCH_MOLECULES,
+            "es_batch_composition": ES_BATCH_COMPOSITION,
             "parameter_count": int(mean_vector.numel()),
         }), flush=True)
 
@@ -1808,6 +1852,7 @@ def train(extended_dynamics: bool = False) -> None:
                     "es_population": ES_POPULATION,
                     "es_sigma": ES_SIGMA, "es_lr": ES_LR,
                     "es_batch_molecules": ES_BATCH_MOLECULES,
+                    "es_batch_composition": ES_BATCH_COMPOSITION,
                     "ridge": RIDGE_STRENGTH, "ca_l2": CA_L2,
                     "gradient_clip": GRAD_CLIP, "update_scale": UPDATE_SCALE,
                     "init_scale": INIT_SCALE, "initial_noise": INITIAL_NOISE,
@@ -1920,6 +1965,7 @@ def train(extended_dynamics: bool = False) -> None:
         "hyperparameters": {"ca_lr": CA_LR,
         "es_population": ES_POPULATION, "es_sigma": ES_SIGMA,
         "es_lr": ES_LR, "es_batch_molecules": ES_BATCH_MOLECULES,
+        "es_batch_composition": ES_BATCH_COMPOSITION,
         "ridge": RIDGE_STRENGTH, "ca_l2": CA_L2,
         "gradient_clip": GRAD_CLIP, "update_scale": UPDATE_SCALE,
         "init_scale": INIT_SCALE, "initial_noise": INITIAL_NOISE,
