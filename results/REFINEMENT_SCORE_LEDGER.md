@@ -21,6 +21,7 @@
 | 12 September 2026 | MTE-CIA-EA-CV-CYP-GCA | 0.756595 | 0.846761 | Experimental result; multiscale transition-energy features did not improve the sealed leader |
 | 12 September 2026 | CAT-CIA-EA-CV-CYP-GCA | 0.749949 | 0.847707 | Experimental result; channel-adaptive recurrent timescales approached but did not improve the sealed leader |
 | 12 September 2026 | MLR-CIA-EA-CV-CYP-GCA | 0.755634 | 0.846953 | Experimental result; multi-lag recurrence signatures did not improve the sealed leader |
+| 13 September 2026 | TES-CIA-EA-CV-CYP-GCA | 0.749176 | 0.846845 | Experimental result; differentiable temporal extrema approached but did not improve the sealed leader |
 
 All entries use the same reserved scaffold holdout. Model and hyperparameter
 selection occur within the fitting pool; the reserved holdout is excluded from
