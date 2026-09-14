@@ -209,6 +209,8 @@ This support–query construction trained the nonlinear cellular automaton to pr
 
 We also specified a derivative-free comparator, ES-EA-CV-CYP-GCA, that preserved the molecular graph, chemical encodings, recurrent transition rules, retained trajectories, scaffold partitions, and analytic ridge readout used by EA-CV-CYP-GCA. Mirrored parameter perturbations were evaluated on the GPU in antithetic pairs. For every candidate, the Graph-CA generated support and query fingerprints, ridge coefficients were solved analytically from support observations, and query error supplied the evolutionary fitness. Paired fitness differences estimated an update direction for the nonlinear Graph-CA parameters, with Adam-style moment accumulation applied outside automatic differentiation. This design isolated the effect of nonlinear-parameter training because the representation, readout, and data-separation protocol remained fixed. The sealed holdout and blind labels were excluded from evolutionary fitness and checkpoint selection. EA-CV-CYP-GCA trained by backpropagation through time remained the primary submitted method while the evolutionary comparator was assessed.
 
+The optimizer campaign fixed the Graph-CA to the canonical CYP3A4 damped-symplectic expert with 16 hidden channels, 32 recurrent generations, periodic-electronic atom features, typed-bond messages, multiscale trajectory pooling, update scale 0.25, support fraction 0.6, and ridge penalty 0.1. Thirty-two evolutionary configurations varied population size from 32 to 128, Gaussian perturbation scale from 0.005 to 0.08, evolutionary learning rate from 0.0005 to 0.01, batch size from 256 to 1,600 molecules, random or activity-stratified batch composition, and four stopping policies. Each configuration was screened on two scaffold folds. The five leading settings advanced to five-fold confirmation with two independent seeds, giving 64 screening runs and 50 confirmation runs. Five CUDA workers executed the 114 runs. The fixed backpropagation-trained expert's original two-fold screening result supplied the matched development reference; evolutionary confirmation quantified performance across the broader fold and seed set. No evolutionary configuration was evaluated on the sealed holdout or blind challenge set.
+
 #### Final validation and blinded inference
 
 Model development used five scaffold-grouped folds within the fitting pool. The sealed holdout defined above was opened once after expert and endpoint-specific sparse ridge selection. Evaluation used the primary and complementary metrics specified in the Dataset and Prediction Task subsection, with final uncertainty estimated from 1,000 bootstrap resamples.
@@ -320,6 +322,20 @@ EA-CV-CYP-GCA was evaluated once on the sealed scaffold holdout containing 1,309
 | Bootstrap macro Kendall tau | **0.3816** |
 
 The endpoint point ST-RAE values were 0.8208 for CYP1A2, 0.7246 for CYP2C9, 0.9382 for CYP2D6, and 0.5344 for CYP3A4. CYP2D6 presented the largest residual difficulty on the sealed holdout, while CYP3A4 gave the strongest endpoint result.
+
+#### Evolutionary optimizer comparison
+
+The evolutionary campaign completed all 114 planned development runs. On the same two screening folds used for the historical backpropagation reference, the strongest evolutionary screen configuration achieved mean MA-ST-RAE 0.6388 and RMSE 0.8037 pIC50, compared with MA-ST-RAE 0.6269 for the backpropagation-trained fixed Graph-CA. The evolutionary error was therefore 0.0119 higher, corresponding to 1.9% relative degradation in the primary metric.
+
+Broader confirmation selected configuration 24, which used a population of 128, perturbation scale 0.02, evolutionary learning rate 0.01, batches of 256 molecules with activity-stratified composition, and the patient stopping policy. Across five scaffold folds and two seeds, its mean MA-ST-RAE was 0.6595 with standard deviation 0.0430 and range 0.5983 to 0.7229. Mean RMSE was 0.8180 pIC50 with standard deviation 0.0429. The difference between the screening winner, configuration 04, and the confirmation winner illustrates the value of repeated scaffold and seed evaluation when tuning a stochastic optimizer.
+
+| Development comparison | Training | MA-ST-RAE | RMSE, pIC50 | Evaluation |
+|---|---|---:|---:|---|
+| Fixed CYP3A4 damped-symplectic Graph-CA | Backpropagation through time | **0.6269** | Not recorded in the screening summary | Two scaffold screening folds |
+| Evolutionary configuration 04 | Mirrored evolution strategy | 0.6388 | 0.8037 | Two scaffold screening folds |
+| Evolutionary configuration 24 | Mirrored evolution strategy | 0.6595 ± 0.0430 | 0.8180 ± 0.0429 | Five folds and two seeds |
+
+The tuned evolutionary optimizer trained a functional encoded Graph-CA while preserving recurrent generations and the analytic ridge readout. Its matched screening score did not improve on backpropagation, and its confirmed result did not justify sealed or blind evaluation. EA-CV-CYP-GCA therefore remained the selected predictive method, while ES-EA-CV-CYP-GCA was retained as evidence that the cellular-automata parameters can also be learned through a derivative-free evolutionary procedure.
 
 #### OpenADMET blind challenge evaluation
 

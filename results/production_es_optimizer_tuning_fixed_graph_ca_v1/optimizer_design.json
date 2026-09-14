@@ -1,0 +1,330 @@
+{
+  "campaign": "production_es_optimizer_tuning_fixed_graph_ca_v1",
+  "fixed_graph_ca": {
+    "SME_CA_RULE": "damped_symplectic",
+    "SME_ACTIVE_CYP": "CYP3A4",
+    "SME_SPECIALIST_OBJECTIVE": "endpoint_only",
+    "SME_GENERATIONS": "32",
+    "SME_HIDDEN_CHANNELS": "16",
+    "SME_RIDGE": "0.1",
+    "SME_CA_L2": "0.000001",
+    "SME_UPDATE_SCALE": "0.25",
+    "SME_INIT_SCALE": "1.5",
+    "SME_INITIAL_NOISE": "0.0",
+    "SME_SUPPORT_FRACTION": "0.6",
+    "SME_BOND_TEMPERATURE": "1.0",
+    "SME_DYN_A": "0.5",
+    "SME_DYN_B": "0.2",
+    "SME_DYN_C": "0.2",
+    "SME_DYN_D": "0.15",
+    "SME_ATOM_FEATURE_PROFILE": "periodic_electronic",
+    "SME_TRAJECTORY_POOLING": "multiscale",
+    "SME_RIDGE_MODE": "shared"
+  },
+  "screen_folds": [
+    0,
+    1
+  ],
+  "confirmation_folds": [
+    0,
+    1,
+    2,
+    3,
+    4
+  ],
+  "confirmation_seeds": [
+    1701,
+    4211
+  ],
+  "parallel_cuda_workers": 5,
+  "configs": [
+    {
+      "population": 64,
+      "sigma": 0.02,
+      "learning_rate": 0.003,
+      "batch_molecules": 1024,
+      "batch_composition": "random",
+      "stopping_profile": "patient",
+      "config_id": "config_00"
+    },
+    {
+      "population": 96,
+      "sigma": 0.08,
+      "learning_rate": 0.003,
+      "batch_molecules": 1600,
+      "batch_composition": "activity_stratified",
+      "stopping_profile": "fine",
+      "config_id": "config_01"
+    },
+    {
+      "population": 128,
+      "sigma": 0.04,
+      "learning_rate": 0.0005,
+      "batch_molecules": 1600,
+      "batch_composition": "random",
+      "stopping_profile": "patient",
+      "config_id": "config_02"
+    },
+    {
+      "population": 128,
+      "sigma": 0.01,
+      "learning_rate": 0.0005,
+      "batch_molecules": 1024,
+      "batch_composition": "activity_stratified",
+      "stopping_profile": "balanced",
+      "config_id": "config_03"
+    },
+    {
+      "population": 96,
+      "sigma": 0.01,
+      "learning_rate": 0.01,
+      "batch_molecules": 1024,
+      "batch_composition": "activity_stratified",
+      "stopping_profile": "responsive",
+      "config_id": "config_04"
+    },
+    {
+      "population": 64,
+      "sigma": 0.005,
+      "learning_rate": 0.0005,
+      "batch_molecules": 1600,
+      "batch_composition": "activity_stratified",
+      "stopping_profile": "fine",
+      "config_id": "config_05"
+    },
+    {
+      "population": 96,
+      "sigma": 0.08,
+      "learning_rate": 0.003,
+      "batch_molecules": 256,
+      "batch_composition": "random",
+      "stopping_profile": "balanced",
+      "config_id": "config_06"
+    },
+    {
+      "population": 64,
+      "sigma": 0.04,
+      "learning_rate": 0.01,
+      "batch_molecules": 1024,
+      "batch_composition": "activity_stratified",
+      "stopping_profile": "patient",
+      "config_id": "config_07"
+    },
+    {
+      "population": 64,
+      "sigma": 0.02,
+      "learning_rate": 0.0005,
+      "batch_molecules": 512,
+      "batch_composition": "random",
+      "stopping_profile": "patient",
+      "config_id": "config_08"
+    },
+    {
+      "population": 64,
+      "sigma": 0.01,
+      "learning_rate": 0.001,
+      "batch_molecules": 1600,
+      "batch_composition": "activity_stratified",
+      "stopping_profile": "patient",
+      "config_id": "config_09"
+    },
+    {
+      "population": 32,
+      "sigma": 0.005,
+      "learning_rate": 0.006,
+      "batch_molecules": 512,
+      "batch_composition": "activity_stratified",
+      "stopping_profile": "responsive",
+      "config_id": "config_10"
+    },
+    {
+      "population": 128,
+      "sigma": 0.04,
+      "learning_rate": 0.001,
+      "batch_molecules": 512,
+      "batch_composition": "activity_stratified",
+      "stopping_profile": "responsive",
+      "config_id": "config_11"
+    },
+    {
+      "population": 128,
+      "sigma": 0.01,
+      "learning_rate": 0.0005,
+      "batch_molecules": 256,
+      "batch_composition": "activity_stratified",
+      "stopping_profile": "balanced",
+      "config_id": "config_12"
+    },
+    {
+      "population": 128,
+      "sigma": 0.005,
+      "learning_rate": 0.001,
+      "batch_molecules": 256,
+      "batch_composition": "random",
+      "stopping_profile": "patient",
+      "config_id": "config_13"
+    },
+    {
+      "population": 64,
+      "sigma": 0.02,
+      "learning_rate": 0.01,
+      "batch_molecules": 512,
+      "batch_composition": "activity_stratified",
+      "stopping_profile": "fine",
+      "config_id": "config_14"
+    },
+    {
+      "population": 32,
+      "sigma": 0.02,
+      "learning_rate": 0.006,
+      "batch_molecules": 1024,
+      "batch_composition": "random",
+      "stopping_profile": "patient",
+      "config_id": "config_15"
+    },
+    {
+      "population": 64,
+      "sigma": 0.08,
+      "learning_rate": 0.003,
+      "batch_molecules": 512,
+      "batch_composition": "random",
+      "stopping_profile": "balanced",
+      "config_id": "config_16"
+    },
+    {
+      "population": 32,
+      "sigma": 0.005,
+      "learning_rate": 0.003,
+      "batch_molecules": 1024,
+      "batch_composition": "random",
+      "stopping_profile": "responsive",
+      "config_id": "config_17"
+    },
+    {
+      "population": 96,
+      "sigma": 0.02,
+      "learning_rate": 0.001,
+      "batch_molecules": 1600,
+      "batch_composition": "random",
+      "stopping_profile": "responsive",
+      "config_id": "config_18"
+    },
+    {
+      "population": 128,
+      "sigma": 0.01,
+      "learning_rate": 0.0005,
+      "batch_molecules": 1600,
+      "batch_composition": "random",
+      "stopping_profile": "fine",
+      "config_id": "config_19"
+    },
+    {
+      "population": 96,
+      "sigma": 0.01,
+      "learning_rate": 0.001,
+      "batch_molecules": 512,
+      "batch_composition": "activity_stratified",
+      "stopping_profile": "balanced",
+      "config_id": "config_20"
+    },
+    {
+      "population": 32,
+      "sigma": 0.005,
+      "learning_rate": 0.006,
+      "batch_molecules": 256,
+      "batch_composition": "random",
+      "stopping_profile": "balanced",
+      "config_id": "config_21"
+    },
+    {
+      "population": 96,
+      "sigma": 0.08,
+      "learning_rate": 0.01,
+      "batch_molecules": 512,
+      "batch_composition": "random",
+      "stopping_profile": "fine",
+      "config_id": "config_22"
+    },
+    {
+      "population": 128,
+      "sigma": 0.04,
+      "learning_rate": 0.0005,
+      "batch_molecules": 1024,
+      "batch_composition": "random",
+      "stopping_profile": "fine",
+      "config_id": "config_23"
+    },
+    {
+      "population": 128,
+      "sigma": 0.02,
+      "learning_rate": 0.01,
+      "batch_molecules": 256,
+      "batch_composition": "activity_stratified",
+      "stopping_profile": "patient",
+      "config_id": "config_24"
+    },
+    {
+      "population": 32,
+      "sigma": 0.08,
+      "learning_rate": 0.003,
+      "batch_molecules": 1024,
+      "batch_composition": "random",
+      "stopping_profile": "balanced",
+      "config_id": "config_25"
+    },
+    {
+      "population": 32,
+      "sigma": 0.02,
+      "learning_rate": 0.001,
+      "batch_molecules": 256,
+      "batch_composition": "random",
+      "stopping_profile": "patient",
+      "config_id": "config_26"
+    },
+    {
+      "population": 64,
+      "sigma": 0.04,
+      "learning_rate": 0.003,
+      "batch_molecules": 1600,
+      "batch_composition": "activity_stratified",
+      "stopping_profile": "responsive",
+      "config_id": "config_27"
+    },
+    {
+      "population": 64,
+      "sigma": 0.01,
+      "learning_rate": 0.006,
+      "batch_molecules": 1024,
+      "batch_composition": "activity_stratified",
+      "stopping_profile": "fine",
+      "config_id": "config_28"
+    },
+    {
+      "population": 32,
+      "sigma": 0.08,
+      "learning_rate": 0.001,
+      "batch_molecules": 256,
+      "batch_composition": "random",
+      "stopping_profile": "responsive",
+      "config_id": "config_29"
+    },
+    {
+      "population": 96,
+      "sigma": 0.005,
+      "learning_rate": 0.01,
+      "batch_molecules": 256,
+      "batch_composition": "activity_stratified",
+      "stopping_profile": "fine",
+      "config_id": "config_30"
+    },
+    {
+      "population": 96,
+      "sigma": 0.005,
+      "learning_rate": 0.006,
+      "batch_molecules": 512,
+      "batch_composition": "random",
+      "stopping_profile": "responsive",
+      "config_id": "config_31"
+    }
+  ]
+}
