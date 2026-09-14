@@ -854,7 +854,8 @@ def train(extended_dynamics: bool = False) -> None:
                 previous_graph_mean = graph_mean
                 graph_mean_sum += graph_mean
                 graph_mean_sq_sum += graph_mean.square()
-                if TRAJECTORY_POOLING in {"multiscale", "temporal_attention"} and step_index in checkpoint_steps:
+                if (TRAJECTORY_POOLING in {"multiscale", "temporal_attention"}
+                        or MULTISCALE_TRANSITION_ENERGY) and step_index in checkpoint_steps:
                     checkpoint_summaries.append(graph_mean)
 
             final_mean = self._graph_mean(h, graph_index, graph_count, atom_counts_tensor)
@@ -1096,7 +1097,8 @@ def train(extended_dynamics: bool = False) -> None:
                 h = new_h
                 state_history.append(h)
                 states.append(h); means.append(h.mean(0))
-                if TRAJECTORY_POOLING in {"multiscale", "temporal_attention"} and step_index in checkpoint_steps:
+                if (TRAJECTORY_POOLING in {"multiscale", "temporal_attention"}
+                        or MULTISCALE_TRANSITION_ENERGY) and step_index in checkpoint_steps:
                     checkpoint_summaries.append(h.mean(0))
             mean_series = torch.stack(means)
             fingerprint = torch.cat((
