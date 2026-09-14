@@ -1,0 +1,169 @@
+{
+  "campaign": "production_hybrid_genetic_structure_search_cyp3a4_v1",
+  "scope": "CYP3A4",
+  "search": "hybrid_genetic_structure_search",
+  "population_size": 24,
+  "genetic_generations": 4,
+  "mutation_probability_per_gene": 0.25,
+  "selection": "tournament_3",
+  "crossover": "uniform",
+  "screen_folds": [
+    0,
+    1
+  ],
+  "confirmation_folds": [
+    0,
+    1,
+    2,
+    3,
+    4
+  ],
+  "confirmation_seeds": [
+    1701,
+    4211
+  ],
+  "confirmation_candidates": 5,
+  "parallel_cuda_workers": 5,
+  "screen_epochs": 35,
+  "confirmation_epochs": 80,
+  "gene_space": {
+    "rule": [
+      "damped_symplectic",
+      "fitzhugh_nagumo",
+      "delayed_memory"
+    ],
+    "generations": [
+      16,
+      32,
+      64,
+      128
+    ],
+    "hidden_channels": [
+      8,
+      16,
+      24
+    ],
+    "atom_feature_profile": [
+      "periodic_electronic",
+      "electronic_local",
+      "periodic_valence",
+      "comprehensive"
+    ],
+    "trajectory_pooling": [
+      "legacy",
+      "multiscale",
+      "temporal_attention"
+    ],
+    "degree_normalization_power": [
+      0.5,
+      1.0
+    ],
+    "chemical_feature_gating": [
+      false,
+      true
+    ],
+    "initial_state_anchor": [
+      false,
+      true
+    ],
+    "dynamic_observables": [
+      false,
+      true
+    ],
+    "multiscale_transition_energy": [
+      false,
+      true
+    ],
+    "channel_adaptive_timescale": [
+      false,
+      true
+    ],
+    "multilag_recurrence_signature": [
+      false,
+      true
+    ],
+    "temporal_extrema_signature": [
+      false,
+      true
+    ],
+    "directional_flux_signature": [
+      false,
+      true
+    ]
+  },
+  "canonical_genome": {
+    "rule": "damped_symplectic",
+    "generations": 32,
+    "hidden_channels": 16,
+    "atom_feature_profile": "periodic_electronic",
+    "trajectory_pooling": "multiscale",
+    "degree_normalization_power": 1.0,
+    "chemical_feature_gating": false,
+    "initial_state_anchor": false,
+    "dynamic_observables": false,
+    "multiscale_transition_energy": false,
+    "channel_adaptive_timescale": false,
+    "multilag_recurrence_signature": false,
+    "temporal_extrema_signature": false,
+    "directional_flux_signature": false
+  },
+  "fixed_training": {
+    "SME_ACTIVE_CYP": "CYP3A4",
+    "SME_SPECIALIST_OBJECTIVE": "endpoint_only",
+    "SME_TRAINING_ALGORITHM": "backprop",
+    "SME_CA_LR": "0.003",
+    "SME_BATCH_MOLECULES": "64",
+    "SME_RIDGE_MODE": "shared",
+    "SME_CV_FOLDS": "5",
+    "SME_CV_SPLIT_SEED": "260822",
+    "SME_TUNING_ONLY": "1",
+    "SME_EVALUATE_RESERVED_HOLDOUT": "0"
+  },
+  "rule_profiles": {
+    "damped_symplectic": {
+      "SME_RIDGE": "0.1",
+      "SME_CA_L2": "0.000001",
+      "SME_GRAD_CLIP": "1.0",
+      "SME_UPDATE_SCALE": "0.25",
+      "SME_INIT_SCALE": "1.5",
+      "SME_INITIAL_NOISE": "0.0",
+      "SME_SUPPORT_FRACTION": "0.6",
+      "SME_BOND_TEMPERATURE": "1.0",
+      "SME_DYN_A": "0.5",
+      "SME_DYN_B": "0.2",
+      "SME_DYN_C": "0.2",
+      "SME_DYN_D": "0.15"
+    },
+    "fitzhugh_nagumo": {
+      "SME_RIDGE": "0.01",
+      "SME_CA_L2": "0.0001",
+      "SME_GRAD_CLIP": "0.5",
+      "SME_UPDATE_SCALE": "0.08",
+      "SME_INIT_SCALE": "0.5",
+      "SME_INITIAL_NOISE": "0.005",
+      "SME_SUPPORT_FRACTION": "0.75",
+      "SME_BOND_TEMPERATURE": "1.0",
+      "SME_DYN_A": "0.5",
+      "SME_DYN_B": "0.2",
+      "SME_DYN_C": "0.8",
+      "SME_DYN_D": "0.15"
+    },
+    "delayed_memory": {
+      "SME_RIDGE": "0.1",
+      "SME_CA_L2": "0.000001",
+      "SME_GRAD_CLIP": "2.0",
+      "SME_UPDATE_SCALE": "0.08",
+      "SME_INIT_SCALE": "0.5",
+      "SME_INITIAL_NOISE": "0.0",
+      "SME_SUPPORT_FRACTION": "0.6",
+      "SME_BOND_TEMPERATURE": "2.0",
+      "SME_DYN_A": "0.2",
+      "SME_DYN_B": "0.2",
+      "SME_DYN_C": "0.8",
+      "SME_DYN_D": "0.15"
+    }
+  },
+  "sealed_holdout_used_for_selection": false,
+  "blind_labels_loaded": false,
+  "total_planned_runs": 242
+}

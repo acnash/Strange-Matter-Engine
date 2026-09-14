@@ -211,11 +211,19 @@ We also specified a derivative-free comparator, ES-EA-CV-CYP-GCA, that preserved
 
 The optimizer campaign fixed the Graph-CA to the canonical CYP3A4 damped-symplectic expert with 16 hidden channels, 32 recurrent generations, periodic-electronic atom features, typed-bond messages, multiscale trajectory pooling, update scale 0.25, support fraction 0.6, and ridge penalty 0.1. Thirty-two evolutionary configurations varied population size from 32 to 128, Gaussian perturbation scale from 0.005 to 0.08, evolutionary learning rate from 0.0005 to 0.01, batch size from 256 to 1,600 molecules, random or activity-stratified batch composition, and four stopping policies. Each configuration was screened on two scaffold folds. The five leading settings advanced to five-fold confirmation with two independent seeds, giving 64 screening runs and 50 confirmation runs. Five CUDA workers executed the 114 runs. The fixed backpropagation-trained expert's original two-fold screening result supplied the matched development reference; evolutionary confirmation quantified performance across the broader fold and seed set. No evolutionary configuration was evaluated on the sealed holdout or blind challenge set.
 
+#### Hybrid genetic Graph-CA structure search
+
+We next applied a genetic algorithm to the discrete architecture of the CYP3A4 specialist while retaining backpropagation through time for continuous parameter estimation. Each genome encoded the transition-rule family, recurrent depth, hidden-state width, atom-feature profile, trajectory-pooling design, degree normalization, chemical-feature gating, initial-state anchoring, channel-adaptive timescales, and optional trajectory observables. The rule families available to the search were damped symplectic, FitzHugh-Nagumo, and delayed memory. Recurrent depth took values of 16, 32, 64, or 128 generations, hidden width took values of 8, 16, or 24 channels, and atom encodings ranged from periodic-electronic features to the comprehensive chemical profile. Numerical optimizer settings remained fixed at their established rule-specific values.
+
+Four genetic generations each contained 24 unique structures. Uniform crossover, tournament selection with groups of three, and independent per-gene mutation probability 0.25 generated successive populations. Every structure was trained by backpropagation on two scaffold development folds under a 35-epoch maximum budget, giving 192 screening runs. The four leading evolved structures and the canonical reference advanced to five-fold, two-seed confirmation under an 80-epoch maximum budget, giving 50 additional runs and 242 runs overall. Development MA-ST-RAE was the genetic fitness and RMSE was the secondary diagnostic. Five CUDA workers evaluated independent candidates concurrently.
+
+The selected genome used a FitzHugh-Nagumo transition rule, 128 recurrent generations, 24 hidden channels, comprehensive atom features, multiscale trajectory pooling, unit degree normalization, dynamic observables, and multiscale transition-energy summaries. Chemical-feature gating, initial-state anchoring, channel-adaptive timescales, multi-lag recurrence, temporal extrema, and directional-flux summaries were inactive. Its continuous Graph-CA weights were trained through backpropagation, and its analytic ridge readout remained differentiable. The sealed holdout and blind labels were excluded from genetic fitness, parent selection, crossover, mutation, early stopping, and confirmation.
+
 #### Final validation and blinded inference
 
-Model development used five scaffold-grouped folds within the fitting pool. The sealed holdout defined above was opened once after expert and endpoint-specific sparse ridge selection. Evaluation used the primary and complementary metrics specified in the Dataset and Prediction Task subsection, with final uncertainty estimated from 1,000 bootstrap resamples.
+Model development used five scaffold-grouped folds within the fitting pool. The sealed holdout defined above was opened once after expert and endpoint-specific sparse ridge selection. The hybrid genetic CYP3A4 structure was likewise frozen after its five-fold, two-seed development confirmation before its single sealed evaluation. Evaluation used the primary and complementary metrics specified in the Dataset and Prediction Task subsection, with final uncertainty estimated from 1,000 bootstrap resamples.
 
-After model freezing, each selected rule generated predictions from five scaffold folds and two seeds for every blinded molecule–CYP pair. Predictions were averaged within each rule before the saved endpoint-specific ridge combination generated the final pIC50 values.
+After model freezing, each selected rule generated predictions from five scaffold folds and two seeds for every blinded molecule–CYP pair. Predictions were averaged within each rule before the saved endpoint-specific ridge combination generated the final pIC50 values. The HGS-CIA-EA-CV-CYP-GCA submission retained the frozen CIA-EA-CV-CYP-GCA predictions for CYP1A2, CYP2C9, and CYP2D6 and replaced the CYP3A4 component with the mean prediction from the ten frozen checkpoints of the genetically selected specialist.
 
 #### Endpoint-aligned cross-validated CYP-specialist training
 
@@ -337,6 +345,25 @@ Broader confirmation selected configuration 24, which used a population of 128, 
 
 The tuned evolutionary optimizer trained a functional encoded Graph-CA while preserving recurrent generations and the analytic ridge readout. Its matched screening score did not improve on backpropagation, and its confirmed result did not justify sealed or blind evaluation. EA-CV-CYP-GCA therefore remained the selected predictive method, while ES-EA-CV-CYP-GCA was retained as evidence that the cellular-automata parameters can also be learned through a derivative-free evolutionary procedure.
 
+#### Hybrid genetic structure-search result
+
+The hybrid genetic campaign completed all 242 planned development runs. Across five scaffold folds and two seeds, the selected FitzHugh-Nagumo genome achieved mean MA-ST-RAE 0.5970 with standard deviation 0.0430 and range 0.5191 to 0.6519. Mean RMSE was 0.7811 pIC50 with standard deviation 0.0359 and range 0.7309 to 0.8242. Under the same confirmation design, the canonical CYP3A4 genome achieved mean MA-ST-RAE 0.6389, so the selected genetic structure reduced the primary development error by 0.0420, or 6.6%.
+
+After the genome and all ten checkpoints were frozen, the protected holdout was evaluated once. HGS-CIA-EA-CV-CYP-GCA retained the CIA-EA-CV-CYP-GCA specialists for CYP1A2, CYP2C9, and CYP2D6 and used the genetic specialist for CYP3A4. Its sealed point MA-ST-RAE was 0.7437 and RMSE was 0.8416 pIC50, compared with 0.7485 and 0.8477 pIC50 for CIA-EA-CV-CYP-GCA. CYP3A4 point ST-RAE improved from 0.5280 to 0.5090. Across 1,000 bootstrap resamples, mean MA-ST-RAE was 0.7444 with a 95% interval from 0.7058 to 0.7851. Bootstrap macro MAE was 0.6124 pIC50, macro R-squared was 0.2995, macro Spearman rho was 0.5428, and macro Kendall tau was 0.3904.
+
+| Sealed metric | CIA-EA-CV-CYP-GCA | HGS-CIA-EA-CV-CYP-GCA |
+|---|---:|---:|
+| Point MA-ST-RAE | 0.7485 | **0.7437** |
+| RMSE, pIC50 | 0.8477 | **0.8416** |
+| CYP3A4 point ST-RAE | 0.5280 | **0.5090** |
+| Bootstrap mean MA-ST-RAE | 0.7491 | **0.7444** |
+| Bootstrap macro MAE, pIC50 | 0.6184 | **0.6124** |
+| Bootstrap macro R-squared | 0.2934 | **0.2995** |
+| Bootstrap macro Spearman rho | 0.5397 | **0.5428** |
+| Bootstrap macro Kendall tau | 0.3874 | **0.3904** |
+
+The frozen blinded submission contains 750 molecules and 3,000 finite endpoint predictions. Blind labels remained unavailable, and the external leaderboard result for HGS-CIA-EA-CV-CYP-GCA was pending at manuscript preparation.
+
 #### OpenADMET blind challenge evaluation
 
 The challenge organisers calculated the official metrics after submission against labels that remained unavailable during model development. EA-CV-CYP-GCA was recorded at rank 99 of 111 on 1 September 2026. Changing leaderboard membership makes rank a time-specific snapshot, while the metric values provide the stable official evaluation record.
@@ -387,11 +414,11 @@ The two confirmed strange attractors are a subset of the Kuramoto–Sakaguchi pe
 
 ## Conclusions
 
-We represented drug molecules as connected graph cellular automata in which atoms acted as cells, covalent bonds defined local neighbourhoods, and atom states evolved through learned transition rules. Complete trajectories were pooled into molecular fingerprints and linked to CYP1A2, CYP2C9, CYP2D6, and CYP3A4 pIC50 values through differentiable ridge regression. EA-CV-CYP-GCA aligned recurrent backpropagation, ridge fitting, validation, and checkpoint selection with each active CYP isoform. It achieved sealed MA-ST-RAE 0.7545 and RMSE 0.8523 pIC50, while its official OpenADMET blind evaluation returned MA-ST-RAE 1.0071.
+We represented drug molecules as connected graph cellular automata in which atoms acted as cells, covalent bonds defined local neighbourhoods, and atom states evolved through learned transition rules. Complete trajectories were pooled into molecular fingerprints and linked to CYP1A2, CYP2C9, CYP2D6, and CYP3A4 pIC50 values through differentiable ridge regression. A hybrid genetic search optimized the discrete CYP3A4 Graph-CA structure while backpropagation through time trained every candidate's continuous parameters. The resulting HGS-CIA-EA-CV-CYP-GCA system achieved sealed MA-ST-RAE 0.7437 and RMSE 0.8416 pIC50, improving the CIA-EA-CV-CYP-GCA reference values of 0.7485 and 0.8477 pIC50. Its blinded submission was prepared with the three established CIA endpoint systems and the ten-checkpoint genetic CYP3A4 ensemble; external evaluation was pending. The previously submitted EA-CV-CYP-GCA system returned official OpenADMET blind MA-ST-RAE 1.0071.
 
 The retained cellular-automata histories also exposed several forms of emergent molecular information dynamics. Across 13,090 screened trajectories we observed contraction towards a point attractor, period-two oscillator candidates, persistent complex motion, and two Kuramoto–Sakaguchi trajectories that satisfied our operational tests for hyperchaotic strange attractors. Their perturbation sensitivity was continually regenerated after renormalization, their leading Lyapunov spectra contained several positive exponents, and perturbed initial conditions remained bounded while approaching the same attracting distribution. Structural association and intervention experiments further indicated that molecular connectivity and bond identity influence the strength of this instability.
 
-The present predictive results leave considerable scope for improved calibration and generalisation, while the dynamical findings establish a practical framework for studying how local chemical interactions generate global computational behaviour. Future development will refine the predictive ensemble, expand confirmatory testing across more molecules and transition rules, and examine whether particular scaffolds, bond arrangements, or chemical encodings reproducibly select point, periodic, complex, or strange-attractor regimes. This combination of molecular prediction and measurable nonlinear dynamics offers a distinctive way to investigate the flow of chemical information through molecular graphs.
+The genetic structure search produced a reproducible development gain that transferred to the sealed scaffold holdout, supporting external evaluation of the frozen HGS-CIA-EA-CV-CYP-GCA submission. The dynamical findings establish a practical framework for studying how local chemical interactions generate global computational behaviour. Future development will assess the blind generalisation of the genetic specialist, expand confirmatory testing across more molecules and transition rules, and examine whether particular scaffolds, bond arrangements, or chemical encodings reproducibly select point, periodic, complex, or strange-attractor regimes. This combination of molecular prediction and measurable nonlinear dynamics offers a distinctive way to investigate the flow of chemical information through molecular graphs.
 
 ### Author contributions
 
