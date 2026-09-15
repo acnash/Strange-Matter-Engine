@@ -1,0 +1,97 @@
+{
+  "campaign": "production_genetic_programming_graph_ca_cyp3a4_v1",
+  "scope": "CYP3A4",
+  "search": "genetic_programming_of_cellular_update_equations",
+  "population_size": 24,
+  "genetic_generations": 4,
+  "mutation_probability": 0.35,
+  "selection": "tournament_3",
+  "crossover": "subtree",
+  "maximum_tree_depth": 4,
+  "parsimony_penalty_per_node": 0.0005,
+  "terminals": [
+    "reaction",
+    "state",
+    "neighbour_delta",
+    "memory_delta"
+  ],
+  "unary_primitives": [
+    "neg",
+    "tanh",
+    "sin",
+    "scale"
+  ],
+  "binary_primitives": [
+    "add",
+    "sub",
+    "mul",
+    "mean"
+  ],
+  "scales": [
+    -1.0,
+    -0.5,
+    0.25,
+    0.5,
+    1.0
+  ],
+  "screen_folds": [
+    0,
+    1
+  ],
+  "confirmation_folds": [
+    0,
+    1,
+    2,
+    3,
+    4
+  ],
+  "confirmation_seeds": [
+    1701,
+    4211
+  ],
+  "confirmation_candidates": 5,
+  "parallel_cuda_workers": 5,
+  "screen_epochs": 35,
+  "confirmation_epochs": 80,
+  "fixed_training": {
+    "SME_ACTIVE_CYP": "CYP3A4",
+    "SME_SPECIALIST_OBJECTIVE": "endpoint_only",
+    "SME_TRAINING_ALGORITHM": "backprop",
+    "SME_CA_RULE": "genetic_program",
+    "SME_GENERATIONS": "128",
+    "SME_HIDDEN_CHANNELS": "24",
+    "SME_ATOM_FEATURE_PROFILE": "comprehensive",
+    "SME_TRAJECTORY_POOLING": "multiscale",
+    "SME_DEGREE_NORMALIZATION_POWER": "1.0",
+    "SME_DYNAMIC_OBSERVABLES": "1",
+    "SME_MULTISCALE_TRANSITION_ENERGY": "1",
+    "SME_CHEMICAL_FEATURE_GATING": "0",
+    "SME_INITIAL_STATE_ANCHOR": "0",
+    "SME_CHANNEL_ADAPTIVE_TIMESCALE": "0",
+    "SME_MULTILAG_RECURRENCE_SIGNATURE": "0",
+    "SME_TEMPORAL_EXTREMA_SIGNATURE": "0",
+    "SME_DIRECTIONAL_FLUX_SIGNATURE": "0",
+    "SME_CA_LR": "0.003",
+    "SME_RIDGE": "0.01",
+    "SME_CA_L2": "0.0001",
+    "SME_GRAD_CLIP": "0.5",
+    "SME_UPDATE_SCALE": "0.08",
+    "SME_INIT_SCALE": "0.5",
+    "SME_INITIAL_NOISE": "0.005",
+    "SME_SUPPORT_FRACTION": "0.75",
+    "SME_BATCH_MOLECULES": "64",
+    "SME_BOND_TEMPERATURE": "1.0",
+    "SME_DYN_A": "0.5",
+    "SME_DYN_B": "0.2",
+    "SME_DYN_C": "0.8",
+    "SME_DYN_D": "0.15",
+    "SME_RIDGE_MODE": "shared",
+    "SME_CV_FOLDS": "5",
+    "SME_CV_SPLIT_SEED": "260822",
+    "SME_TUNING_ONLY": "1",
+    "SME_EVALUATE_RESERVED_HOLDOUT": "0"
+  },
+  "total_planned_runs": 242,
+  "sealed_holdout_used_for_selection": false,
+  "blind_labels_loaded": false
+}

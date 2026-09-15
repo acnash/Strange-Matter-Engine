@@ -44,6 +44,9 @@ CACHE = Path(os.environ.get(
     str(ROOT / "tmp" / "strange_matter_graph_ca_graphs.pkl"),
 ))
 RULE = os.environ.get("SME_CA_RULE", "gated_residual")
+GP_PROGRAM = json.loads(os.environ.get(
+    "SME_GP_PROGRAM_JSON", '{"op":"reaction"}'
+))
 GENERATIONS = int(os.environ.get("SME_GENERATIONS", "16"))
 RUN_NAME = os.environ.get("SME_RUN_NAME", "graph_ca_visual_prototype")
 OUT = ROOT / "results" / RUN_NAME
@@ -451,7 +454,7 @@ def prepare() -> None:
 
 
 def train(extended_dynamics: bool = False) -> None:
-    global RULE, GENERATIONS, UPDATE_SCALE, INIT_SCALE, INITIAL_NOISE
+    global RULE, GP_PROGRAM, GENERATIONS, UPDATE_SCALE, INIT_SCALE, INITIAL_NOISE
     global SUPPORT_FRACTION, BOND_TEMPERATURE, DYN_A, DYN_B, DYN_C, DYN_D
     global TRAJECTORY_POOLING, RIDGE_MODE, CHEMICAL_FEATURE_GATING
     global MULTISCALE_TRANSITION_ENERGY, CHANNEL_ADAPTIVE_TIMESCALE
@@ -517,6 +520,7 @@ def train(extended_dynamics: bool = False) -> None:
         checkpoint = load_checkpoint(torch, checkpoint_path, device)
         hyperparameters = checkpoint["hyperparameters"]
         RULE = checkpoint["rule"]
+        GP_PROGRAM = checkpoint.get("gp_program", GP_PROGRAM)
         GENERATIONS = (int(os.environ.get("SME_EXTENDED_GENERATIONS", "5000"))
                        if extended_dynamics else int(checkpoint["generations"]))
         UPDATE_SCALE = float(hyperparameters["update_scale"])
@@ -626,6 +630,8 @@ def train(extended_dynamics: bool = False) -> None:
                 self.flux_drive = nn.Linear(hidden, hidden, bias=False)
             elif RULE == "delayed_memory":
                 self.delayed_drive = nn.Linear(hidden * 2, hidden)
+            elif RULE == "genetic_program":
+                pass
             else:
                 raise ValueError(f"Unknown CA rule: {RULE}")
 
@@ -654,6 +660,50 @@ def train(extended_dynamics: bool = False) -> None:
             if not CHEMICAL_FEATURE_GATING:
                 return x
             return x * torch.sigmoid(self.feature_gate_logits)[None, :]
+
+        @staticmethod
+        def _program_drive(node, state, reaction, neighbour_mean, delayed_state):
+            """Evaluate one bounded differentiable genetic-program tree."""
+            op = node["op"]
+            if op == "reaction":
+                return reaction
+            if op == "state":
+                return state
+            if op == "neighbour_delta":
+                return neighbour_mean - state
+            if op == "memory_delta":
+                return delayed_state - state
+            if op == "neg":
+                return -GraphCA._program_drive(
+                    node["arg"], state, reaction, neighbour_mean, delayed_state
+                )
+            if op == "tanh":
+                return torch.tanh(GraphCA._program_drive(
+                    node["arg"], state, reaction, neighbour_mean, delayed_state
+                ))
+            if op == "sin":
+                return torch.sin(GraphCA._program_drive(
+                    node["arg"], state, reaction, neighbour_mean, delayed_state
+                ))
+            if op == "scale":
+                return float(node["value"]) * GraphCA._program_drive(
+                    node["arg"], state, reaction, neighbour_mean, delayed_state
+                )
+            left = GraphCA._program_drive(
+                node["left"], state, reaction, neighbour_mean, delayed_state
+            )
+            right = GraphCA._program_drive(
+                node["right"], state, reaction, neighbour_mean, delayed_state
+            )
+            if op == "add":
+                return left + right
+            if op == "sub":
+                return left - right
+            if op == "mul":
+                return left * right
+            if op == "mean":
+                return 0.5 * (left + right)
+            raise ValueError(f"Unknown genetic-program primitive: {op}")
 
         def forward_batch(self, examples, initial_perturbations=None,
                           return_node_trajectory=False):
@@ -824,6 +874,13 @@ def train(extended_dynamics: bool = False) -> None:
                         net_flux.index_add_(0, dst, directed_flux)
                     normalizer = degree.max().clamp_min(1.0)
                     new_h = h + UPDATE_SCALE * DYN_A * net_flux / normalizer
+                elif RULE == "genetic_program":
+                    delay = max(1, min(len(state_history), round(1 + 15 * DYN_A)))
+                    delayed_h = state_history[-delay]
+                    drive = self._program_drive(
+                        GP_PROGRAM, h, reaction, neighbour_mean, delayed_h
+                    )
+                    new_h = torch.tanh(h + UPDATE_SCALE * drive)
                 else:  # delayed_memory
                     delay = max(1, min(len(state_history), round(1 + 15 * DYN_A)))
                     delayed_h = state_history[-delay]
@@ -1079,6 +1136,13 @@ def train(extended_dynamics: bool = False) -> None:
                         directed_flux = edge_gate * torch.tanh(self.flux_drive(h[src] - h[dst]))
                         net_flux.index_add_(0, dst, directed_flux)
                     new_h = h + UPDATE_SCALE * DYN_A * net_flux / degree.max().clamp_min(1.0)
+                elif RULE == "genetic_program":
+                    delay = max(1, min(len(state_history), round(1 + 15 * DYN_A)))
+                    delayed_h = state_history[-delay]
+                    drive = self._program_drive(
+                        GP_PROGRAM, h, reaction, neighbour_mean, delayed_h
+                    )
+                    new_h = torch.tanh(h + UPDATE_SCALE * drive)
                 else:  # delayed_memory
                     delay = max(1, min(len(state_history), round(1 + 15 * DYN_A)))
                     delayed_h = state_history[-delay]
@@ -1827,6 +1891,7 @@ def train(extended_dynamics: bool = False) -> None:
     OUT.mkdir(parents=True, exist_ok=True)
     torch.save({"state_dict": best_state, "chem_dim": chem_dim, "seed": SEED,
                 "rule": RULE, "generations": GENERATIONS, "device": str(device),
+                "gp_program": GP_PROGRAM if RULE == "genetic_program" else None,
                 "atom_feature_profile": feature_profile,
                 "atom_feature_names": list(requested_feature_names),
                 "gpu": torch.cuda.get_device_name(device) if device.type == "cuda" else None,
