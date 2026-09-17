@@ -208,9 +208,7 @@ molecular graph.
 
 #### Fixed-rule and genetic-programmed molecular space-time
 
-<video controls width="100%" preload="metadata" src="https://raw.githubusercontent.com/acnash/Strange-Matter-Engine/main/output/videos/molecular_spacetime_trajectory_cascade_gp_vs_backprop_linkedin.mp4">
-  Molecular space-time trajectories comparing fixed-rule BPTT with genetic programming plus BPTT.
-</video>
+https://github.com/user-attachments/assets/c0ad14b7-4cd1-471e-92d6-8e78310d4b5e
 
 [Open the molecular space-time trajectory video](../../output/videos/molecular_spacetime_trajectory_cascade_gp_vs_backprop_linkedin.mp4).
 
@@ -234,9 +232,7 @@ latent information state carried by each atom.
 
 #### Four candidate dynamical regimes
 
-<video controls width="100%" preload="metadata" src="https://raw.githubusercontent.com/acnash/Strange-Matter-Engine/main/results/long_horizon_attractor_campaign_v1/videos/four_graph_ca_dynamical_regimes_2x2.mp4">
-  Four candidate Graph-CA dynamical regimes.
-</video>
+https://github.com/user-attachments/assets/e30b0641-6eca-4ded-a3a2-dd6f9d149b2c
 
 [Open the four-regime dynamics video](../long_horizon_attractor_campaign_v1/videos/four_graph_ca_dynamical_regimes_2x2.mp4).
 
