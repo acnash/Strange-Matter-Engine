@@ -439,6 +439,8 @@ The evolutionary-strategy comparator adds a useful boundary condition. Derivativ
 
 ### 4.4. Limitations and Future Tests
 
+The blind evaluation demonstrated moderate rank association with experimental inhibition, indicating predictive signal in the molecular trajectory representation. Absolute predictive accuracy remained limited, with MA-ST-RAE close to the mean-prediction baseline and a negative macro R-squared. Genetic programming produced a modest improvement whose statistical significance remains to be established.
+
 The challenge contains 4,905 labelled compounds and four related endpoints, and the blind metrics indicate substantial residual error. Genetic evolution was applied to the CYP3A4 specialist while the other three endpoint ensembles were inherited from the fixed-rule system. A larger study should evolve local rules independently for every endpoint and test whether a shared evolved rule can transfer across tasks.
 
 The emergence claim is operational: a global predictive representation is assembled by repeated local interactions. Stronger causal tests should measure how endpoint information accumulates with generation number, compare intact trajectories with temporally shuffled and bond-disconnected controls, ablate local message pathways, and quantify directed information transfer across bonds. These experiments would distinguish gains from recurrent depth from gains that depend specifically on organized local interaction.
