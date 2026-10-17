@@ -6,6 +6,8 @@ The previous complete-manuscript PDFs are `output/pdf/molecule_space_time_public
 
 ## Portable high-quality renderer
 
+The renderer sets Sections 1-5 with a 1.5-em first-line paragraph indent and no added space between paragraphs. Headings, figure and table captions, front matter, Appendix A and references retain their existing spacing. Markdown paragraph separators remain in the source to preserve paragraph structure; the PDF renderer controls their visual spacing.
+
 Install Python packages `markdown` and `latex2mathml`, and the Node package `playwright` in your local environment. Install Playwright Chromium with `npx playwright install chromium`, or set `PDF_BROWSER_PATH` to your Chrome or Edge executable.
 
 From the repository root, run:
@@ -16,6 +18,8 @@ node scripts/print_current_manuscript.cjs
 ```
 
 The renderer verifies that all figures loaded and creates `output/pdf/molecular_space_time_latest_high_quality.pdf`. Display equations are converted to MathML, and text remains selectable. Review the PDF visually after any changes.
+
+For the low-resolution preview, run `node scripts/print_current_manuscript.cjs --preview` after preparing the HTML. It keeps text selectable and reduces figure widths to at most 800 pixels, creating `output/pdf/molecular_space_time_low_resolution_preview.pdf`. This is the current complete-manuscript preview with the revised paragraph groupings. Use a full checkout on the other machine so the manuscript's linked `results/` figures and data are available.
 
 ## Ten-rule Figure 2
 

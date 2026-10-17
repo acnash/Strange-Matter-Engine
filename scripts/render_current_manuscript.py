@@ -36,9 +36,19 @@ figure.figure-two {break-before:page; break-after:page; margin:0;}
 figure.figure-two p {margin:0;}
 figure.figure-two img {width:174mm; height:200mm; max-height:none;}
 figure.figure-two figcaption {margin-top:2mm; font-size:9pt; line-height:1.25;}
+.main-text > p {margin:0; text-indent:1.5em;}
+.main-text > p.caption {text-indent:0; margin:3mm 0 2mm; break-after:avoid;}
+.main-text figure p, .main-text figcaption {text-indent:0;}
 '''
 body=re.sub(r'(<p><img.*?</p>)\s*<p>(<strong>Figure \d+\..*?)</p>',r'<figure>\1<figcaption>\2</figcaption></figure>',body,flags=re.S)
 body=re.sub(r'<figure>(?=<p><img[^>]+02_ten_rule_1d_cellular_evolution)', '<figure class="figure-two">', body)
+# Apply paragraph typography only to Sections 1-5. Front matter, appendix,
+# references, figures and table captions keep their existing presentation.
+start=body.index('<h2>1. Introduction</h2>')
+end=body.index('<h2>Author Contributions</h2>', start)
+main=body[start:end]
+main=re.sub(r'<p>(?=<strong>Table \d+\.)', '<p class="caption">', main)
+body=body[:start]+'<div class="main-text">'+main+'</div>'+body[end:]
 dest=ROOT/'tmp/pdfs/current_manuscript_print.html'
 dest.parent.mkdir(parents=True, exist_ok=True)
 dest.write_text('<!doctype html><html><head><meta charset="utf-8"><title>Molecular Space-Time</title><style>'+css+'</style></head><body>'+body+'</body></html>',encoding='utf-8')
