@@ -123,21 +123,21 @@ All training and model selection used the fitting data and its internal scaffold
 
 #### 2.4.1. Fixed-rule Graph-CA with backpropagation
 
-The fixed-rule reference, BP-Graph-CA, combined several individual Graph-CA models for each CYP isoform. Each was trained separately with a particular transition rule and configuration, such as its channel count and number of generations. Training used backpropagation through time (Figure 3A), credible-interval alignment, endpoint-aligned observations and cross-validation, as detailed below.
+The fixed-rule reference, BP-Graph-CA, used a stacked ensemble for each CYP isoform. Each component Graph-CA was trained separately with a particular transition rule and model configuration, such as its channel count and number of generations. A second regression model then learned how to combine their predictions. Training used backpropagation through time (Figure 3A), credible-interval alignment, endpoint-aligned observations and cross-validation, as detailed below.
 
 The Adam optimiser used these gradients to adjust the numerical weights that set the initial atom states, pass information along bonds, combine each atom's state with neighbour information, chemical descriptors and CYP context, and calculate the next state using the selected cellular automaton transition rule. We gradually reduced the learning rate, which controls the size of the adjustments to the model's weights, along a smooth curve defined by the cosine function. This allowed progressively finer adjustments as training continued. Gradient clipping limited exceptionally large updates, and an L2 penalty discouraged large cellular automaton weights. Using only the training data and its internal validation folds, we selected the number of generations and dynamical channels, atom-feature profile, learning rate, ridge penalty, update scale, proportion assigned to the support subset, batch size, bond temperature, initialisation scale and noise, pooling design, and constants specific to each transition rule.
 
 BP-Graph-CA trained four independent nonlinear prediction systems, one for each CYP isoform. A CYP-specific system used only measurements for its target isoform when fitting the ridge readout, calculating prediction error, deciding when to stop training and choosing which saved checkpoint to retain. Mean squared error measured the average squared prediction error. We supplemented it with a smooth credible-interval penalty, which added a cost when a prediction fell outside the experimental uncertainty interval reported for that measurement.
 
-For each CYP prediction target, we first screened all ten transition-rule families described in Section 2.3 using two scaffold-separated folds. The three strongest combinations of rule and model configuration then advanced to confirmation using five scaffold folds and two independent training seeds. Each out-of-fold prediction came from a model that had not used the corresponding validation fold for fitting. We used these predictions to choose a subset of individual Graph-CA models and fit the ridge combination that joined their predictions. Only after completing this selection did we evaluate the sealed holdout. The final CYP1A2 system combined individual Graph-CA models using FitzHugh–Nagumo, Gray–Scott and conservative graph flux. CYP2C9 combined Gray–Scott and damped symplectic; CYP2D6 used delayed memory and FitzHugh–Nagumo; and CYP3A4 used damped symplectic, FitzHugh–Nagumo and delayed memory. Internal validation selected these five families from the ten-rule search illustrated in Figure 2.
+For each CYP prediction target, we first screened all ten transition-rule families described in Section 2.3 using two scaffold-separated folds. The three strongest combinations of rule and model configuration then advanced to confirmation using five scaffold folds and two independent training seeds. Each out-of-fold prediction came from a model that had not used the corresponding validation fold for fitting. We used the validation predictions to select the Graph-CA models included in the final stacked ensemble and trained a ridge-regression stacking model to determine how their predictions should be weighted. Once the models and weights had been fixed, we evaluated the ensemble on the previously untouched holdout set. The final CYP1A2 system combined individual Graph-CA models using FitzHugh–Nagumo, Gray–Scott and conservative graph flux. CYP2C9 combined Gray–Scott and damped symplectic; CYP2D6 used delayed memory and FitzHugh–Nagumo; and CYP3A4 used damped symplectic, FitzHugh–Nagumo and delayed memory. Internal validation selected these five families from the ten-rule search illustrated in Figure 2.
 
 
 
 #### 2.4.2. Shared ridge readout and its role in training
 
-For every training batch, we divided molecules into a *support subset* and a *query subset*. Support fingerprints and measured pIC50 values supplied the observations for fitting the ridge coefficients. We then predicted the query molecules, whose exclusion from that fit tested whether the fingerprints transferred beyond the support examples. BP-Graph-CA, GA-Graph-CA and GP-Graph-CA differentiated through this fit when training numerical weights. ES-Graph-CA used query error as evolutionary fitness and estimated updates by comparing perturbed candidates. The outer genetic searches assessed trained candidates on internal validation folds.
+For every training batch, we divided the molecules into a readout-fitting subset, hereafter called the *support subset*, and a *query subset* used to assess the fitted readout. The Graph-CA trajectory of each molecule was summarised as a fixed-length numerical fingerprint. We used the fingerprints and measured pIC50 values of the molecules in the support subset to fit the ridge-regression readout. We then used that fitted readout to predict the query molecules, which had not contributed to the ridge fit. This tested whether the relationship learned between the trajectory fingerprints and pIC50 could predict molecules that had not been used to fit the ridge-regression readout. BP-Graph-CA, GA-Graph-CA and GP-Graph-CA differentiated through this fit when training numerical weights. By contrast, ES-Graph-CA used error on the query subset as its evolutionary fitness measure and estimated updates to its numerical weights by comparing perturbed candidates. Separately, GA-Graph-CA and GP-Graph-CA generated alternative model designs, trained the numerical weights of each design, and compared the completed models using internal validation folds.
 
-The support fingerprints formed the matrix Fₛ: each row represented a support molecule and each column represented one fingerprint feature. We standardised every column by subtracting its support-set mean and dividing by its support-set scale, producing Zₛ. We also centred the measured support targets by subtracting their mean, giving yₛ−ȳₛ. The following closed-form calculation then produced the ridge coefficients β [26]:
+The following matrix construction, feature standardisation, target centring and ridge calculation allowed fingerprint features with different numerical scales to contribute fairly, separated the average pIC50 from feature-dependent variation, and provided a stable, differentiable relationship between the trajectory fingerprints and pIC50. The fingerprints of the molecules in the support subset formed the matrix Fₛ: each row represented one molecule in the support subset and each column represented one fingerprint feature. We standardised every column by subtracting its support-set mean and dividing by its support-set scale, producing Zₛ. We also centred the measured support targets by subtracting their mean, giving yₛ−ȳₛ. The following closed-form calculation then produced the ridge coefficients β [26]:
 
 ```math
 \beta=\left(Z_s^{\mathsf T}Z_s+\lambda I\right)^{-1}
@@ -151,39 +151,33 @@ In this expression, ZₛᵀZₛ describes relationships among the standardised f
 \left(\frac{f_q-\bar F_s}{s_F}\right)^{\mathsf T}\beta,
 ```
 
-Here, F̄ₛ and s[F] are the support-set mean and scale for each fingerprint feature. Subtracting F̄ₛ and dividing by s[F] applies the same standardisation to the query fingerprint that was applied to the support fingerprints. The dot product with β produces the centred prediction, and adding ȳₛ restores the mean pIC50. The ridge penalty did not apply to this intercept.
+Here, F̄ₛ and s[F] are the support-set mean and scale for each fingerprint feature. Subtracting F̄ₛ and dividing by s[F] applies the same standardisation to the query fingerprint that was applied to the support fingerprints. The dot product with β produces the centred prediction, and adding ȳₛ restores the mean pIC50. The ridge penalty was applied only to the fingerprint coefficients. It was not applied to the intercept, which represented the mean pIC50 of the support subset rather than the influence of a fingerprint feature.
 
-Automatic differentiation retained the dependence of β on the support fingerprints. Query prediction errors could therefore update the Graph-CA through two connected routes: through the ridge fit and through the successive atom-state generations that produced the fingerprints. When highly correlated trajectory statistics made the matrix equations numerically singular, a Hermitian pseudoinverse supplied a numerically stable solution to the same ridge objective.
+The training software tracked each mathematical operation used to produce the predictions. It then worked backwards from the prediction error to calculate how each Graph-CA weight should change. Because the ridge coefficients depended on the molecular fingerprints, this calculation passed through both the ridge-regression fit and the successive Graph-CA generations that produced the fingerprints. When several trajectory features contained nearly the same information, the ordinary matrix calculation could become numerically unstable. In these cases, we used a pseudoinverse, which is a stable alternative to direct matrix inversion, to obtain coefficients for the same ridge-regression objective.
 
 After Graph-CA training, we refitted the ridge readout using all observations permitted for fitting and stored it with the selected checkpoint. MA-ST-RAE on the internal scaffold-separated validation fold determined early stopping and checkpoint selection; RMSE provided a secondary diagnostic.
 
-#### 2.4.3. Evolutionary-strategy comparator
+#### 2.4.3. Evolutionary-strategy optimisation of numerical weights
 
-We constructed ES-Graph-CA as a derivative-free comparison method (Figure 3B). *Derivative-free* means that it updated parameters without calculating gradients. To isolate this difference in training, it retained the same molecular graphs, chemical encodings, recurrent transition rules, stored trajectories, scaffold partitions and ridge-regression prediction step as the backpropagation system.
+We constructed ES-Graph-CA as a derivative-free comparison method that updated parameters without calculating gradients (Figure 3B). To isolate this difference in training, it retained the same molecular graphs, chemical encodings, recurrent transition rules, stored trajectories, scaffold partitions and ridge-regression prediction step as the backpropagation system.
 
-The evolutionary strategy created paired candidates by adding and subtracting the same random change from the current weights. These opposite, or *antithetic*, perturbations allowed a direct comparison of directions. Each candidate underwent the support/query ridge procedure in Section 2.4.2. Lower query error identified the more useful direction, and the optimiser combined evidence across pairs using Adam-style running averages to update the weights. The backpropagation-trained system remained the primary submitted method during this comparison.
+The evolutionary strategy created paired candidates by adding and subtracting the same random change from the current weights. These opposite, or *antithetic*, perturbations allowed a direct comparison of directions. Each candidate underwent the support/query ridge procedure in Section 2.4.2. Lower query error identified the more useful direction, and the optimiser combined evidence across pairs using Adam-style running averages to update the weights.
 
-The evolutionary-strategy campaign used the canonical damped-symplectic CYP3A4 individual Graph-CA model throughout. It had 16 hidden channels, 32 recurrent generations, periodic-electronic atom features, typed-bond messages, multiscale trajectory pooling, an update scale of 0.25, a support fraction of 0.6 and a ridge penalty of 0.1. We tested 32 evolutionary configurations. Population size ranged from 32 to 128 candidates; the standard deviation of the Gaussian parameter perturbation ranged from 0.005 to 0.08; the evolutionary learning rate ranged from 0.0005 to 0.01; and batch size ranged from 256 to 1,600 molecules. We also compared random with activity-stratified batch composition and tested four stopping policies.
+The evolutionary-strategy campaign used a fixed CYP3A4 damped-symplectic Graph-CA with 16 channels and 32 recurrent generations. Its atom inputs comprised the baseline descriptors supplemented by the Periodic and Electronic feature groups in Table 2. We compared 32 evolutionary configurations that varied the number and size of the candidate weight perturbations, the evolutionary learning rate, training-batch size and composition, and the stopping criteria. Appendix B defines these settings and reports their tested values.
 
-Each evolutionary configuration was screened on two scaffold folds, producing 64 runs. The five strongest settings advanced to five-fold confirmation with two independent seeds, producing 50 more runs. Five CUDA workers executed the resulting 114 runs. The corresponding backpropagation-trained model's original two-fold result supplied the matched reference; confirmation measured the reproducibility of evolutionary performance. This comparator remained confined to internal validation.
+Each evolutionary configuration was screened using two scaffold folds, producing 64 runs. The five strongest configurations then underwent confirmation across five scaffold folds and two independent seeds, producing 50 additional runs. Performance of the backpropagation-trained model on the same two screening folds provided a matched reference, while the confirmation stage tested whether the evolutionary results were reproducible. ES-Graph-CA remained an internal comparison and was not evaluated on the sealed holdout or blind challenge set.
 
 #### 2.4.4. Hybrid genetic Graph-CA structure search
 
-We next used a genetic algorithm to search the discrete architecture of the CYP3A4 specialist while retaining backpropagation for its continuous numerical parameters (Figure 3C). *Discrete architecture* refers to design choices selected from a defined list rather than numerical weights that vary continuously. Each candidate design was represented by a *genome*: a list containing its transition-rule family, trajectory depth, state width, atom-feature profile, trajectory-pooling design, degree normalisation, chemical-feature gating, initial-state anchoring, channel-specific timescales and optional trajectory summaries.
+We next used a genetic algorithm to search the design of the CYP3A4 specialist while retaining backpropagation to train its numerical weights (Figure 3C). Each candidate design specified the transition-rule family, number of generations and channels, atom features, trajectory pooling and optional model components. Four genetic generations of 24 candidates were screened using two scaffold folds, after which the four strongest designs and the fixed reference advanced to five-fold, two-seed confirmation. Development MA-ST-RAE guided selection, with RMSE as a secondary measure. Appendix C defines the design choices, genetic operations and training budget.
 
-Trajectory depth and state width were defined in Section 2.3. The atom-feature profile selected descriptors from Section 2.2, while the pooling and temporal-observable choices selected which trajectory summaries entered ridge regression. The available transition rules were damped symplectic, FitzHugh-Nagumo and delayed memory. The search tested 16, 32, 64 or 128 recurrent generations and 8, 16 or 24 hidden channels. Atom encodings ranged from the periodic-electronic set to the comprehensive chemical profile. Numerical optimiser settings remained fixed at the previously established values for each rule.
-
-We evolved four populations, called genetic generations, each containing 24 unique model structures. Tournament selection compared groups of three candidates when choosing parents. Uniform crossover formed a child by selecting individual design choices from either parent. Mutation independently changed each design choice with probability 0.25. Backpropagation trained every candidate using two internal cross-validation folds, with molecular scaffolds kept separate between training and validation, for at most 35 epochs, producing 192 screening runs. The four strongest Graph-CA structures from the hybrid genetic search and the canonical reference advanced to confirmation using five scaffold folds, two training seeds and at most 80 epochs. These 50 additional runs brought the total to 242. Development MA-ST-RAE supplied the genetic fitness used for model selection, while RMSE was the secondary diagnostic. Five CUDA workers evaluated independent candidates at the same time.
-
-The selected configuration used a FitzHugh-Nagumo rule, 128 generations, 24 channels, comprehensive atom features, multiscale trajectory pooling, unit degree normalisation, dynamic observables and multiscale transition-energy summaries. Chemical-feature gating, initial-state anchoring, channel-specific timescales, recurrence at multiple generation lags, temporal extrema and directional-flux summaries were disabled.
+The selected design used a FitzHugh-Nagumo rule with 128 generations, 24 channels and comprehensive atom features. Appendix C reports its complete configuration, including the trajectory summaries that were enabled or disabled.
 
 #### 2.4.5. Genetic programming of the cellular automaton transition rule
 
 GP-Graph-CA evolved executable mathematical expressions for the CYP3A4 transition rule (Figure 3D), retaining the selected configuration in Section 2.4.4 for the other model components. This isolated changes to the rule from changes in graph encoding, channel count and training procedure.
 
-Each candidate program could combine four inputs, called *terminals*: the vector rᵢ⁽ᵗ⁾ calculated from the atom's state, neighbour information, chemical descriptors and CYP context, current state hᵢ⁽ᵗ⁾, difference between the bonded-neighbour mean and current state h̄ᵢ⁽ᵗ⁾−hᵢ⁽ᵗ⁾, and difference between a delayed state and current state hᵢ⁽ᵗ⁻ᵈ⁾−hᵢ⁽ᵗ⁾. The permitted mathematical operations, called *primitives*, were addition, subtraction, multiplication, averaging, negation, hyperbolic tangent, sine and multiplication by a fixed scale. These operations were bounded and differentiable where required for training.
-
-Candidate programs were expression trees, in which operations form branches and inputs form terminal leaves. We limited trees to depth four. Tournament selection chose parents. Subtree crossover exchanged complete parts of two parent expressions; subtree mutation replaced one part with a newly generated expression; and point mutation changed an individual operation or input. A small penalty for expression size discouraged additional complexity unless it improved prediction error. We screened four genetic generations of 24 programs on two scaffold folds. Five finalists then underwent five-fold confirmation with two seeds, producing 242 CUDA training runs. Each candidate rule remained fixed throughout its training and validation trajectories. Backpropagation trained the weights for bond messages, local-input combinations and numerical transformations through the ridge fit described in Section 2.4.2. Scaffold-validation MA-ST-RAE supplied candidate fitness, with RMSE as a secondary diagnostic.
+Each candidate transition rule was an expression tree that combined the atom's local-input vector, current state, bonded-neighbour difference and delayed-state difference using permitted mathematical operations. We screened four genetic generations of 24 programs using two scaffold folds, then confirmed five finalists using five folds and two seeds. Backpropagation trained the numerical weights within each candidate, while scaffold-validation MA-ST-RAE guided selection and RMSE provided a secondary measure. Appendix D defines the candidate inputs, permitted operations, genetic-programming procedure and training budget.
 
 The cellular automaton transition rule selected by genetic programming used the depth-one expression
 
@@ -199,9 +193,9 @@ The expression averages two H-channel vectors: rᵢ⁽ᵗ⁾, which combines the
 
 #### 2.4.6. Final validation and blinded inference
 
-Model development used five scaffold-grouped folds drawn from the fitting pool. Structurally related molecular frameworks were therefore kept within the same fold. We opened the previously defined sealed holdout only once, after selecting the individual Graph-CA models and the sparse endpoint-specific ridge combinations. The hybrid genetic CYP3A4 structure and genetic-programming rule were fixed after five-fold development confirmation with two seeds. Each was then evaluated once on the sealed holdout. We used the primary and complementary metrics defined in Section 2.1 and estimated final uncertainty with 1,000 bootstrap resamples.
+Model development used five scaffold-grouped folds drawn from the fitting pool. Structurally related molecular frameworks were therefore kept within the same fold. We opened the previously defined sealed holdout only once, after selecting the individual Graph-CA models and the endpoint-specific stacked ensembles. The hybrid genetic CYP3A4 structure and genetic-programming rule were fixed after five-fold development confirmation with two seeds. Each was then evaluated once on the sealed holdout. We used the primary and complementary metrics defined in Section 2.1 and estimated final uncertainty with 1,000 bootstrap resamples. ES-Graph-CA served only as an internal comparison, while BP-Graph-CA, GA-Graph-CA and GP-Graph-CA were submitted for blinded evaluation.
 
-After all model parameters had been fixed, checkpoints trained across five scaffold folds and two seeds generated predictions for every blinded molecule-CYP pair under each selected rule. We first averaged the predictions from checkpoints using the same rule. The saved endpoint-specific ridge combination then produced the final pIC50 prediction. GA-Graph-CA retained the frozen fixed-rule predictions for CYP1A2, CYP2C9 and CYP2D6, but replaced CYP3A4 with the ten-checkpoint specialist selected by the hybrid genetic search. GP-Graph-CA used the same three frozen fixed-rule endpoint ensembles and replaced CYP3A4 with the ten-checkpoint genetic-programming ensemble. Concealed challenge labels were never loaded during development or local validation.
+After all model parameters had been fixed, checkpoints trained across five scaffold folds and two seeds generated predictions for every blinded molecule-CYP pair under each selected rule. We first averaged the predictions from checkpoints using the same rule. The saved endpoint-specific ridge-regression stacking model then produced the final pIC50 prediction. GA-Graph-CA retained the frozen fixed-rule predictions for CYP1A2, CYP2C9 and CYP2D6, but replaced CYP3A4 with the ten-checkpoint specialist selected by the hybrid genetic search. GP-Graph-CA used the same three frozen fixed-rule endpoint ensembles and replaced CYP3A4 with the ten-checkpoint genetic-programming ensemble. Concealed challenge labels were never loaded during development or local validation.
 
 ### 2.5. Long-Horizon Dynamical Analysis
 
@@ -221,7 +215,7 @@ S = \frac{v_{\mathrm{late}}\left(1 + H_{\mathrm{spectral}}\right)}{R_{\mathrm{re
 
 Here, v[late] is late-time motion, H[spectral] is normalised spectral entropy, and R[recurrence] is the recurrence ratio. The score ranked trajectories for detailed testing. The population screen covered all ten families; detailed analyses included gated residual, delayed memory, inertial reaction–diffusion, Kuramoto–Sakaguchi and FitzHugh–Nagumo, together with the coupled-map oscillator example.
 
-We propagated 20 complete molecular states for 5,000 generations using frozen Graph-CA parameters. Every channel of every atom was retained at every generation. The first 1,000 generations were treated as *burn-in* and excluded from late-time measurements, allowing initial transient behaviour to pass before analysis. We examined ten representative cases in greater detail using principal-component projections, recurrence plots, frequency spectra, estimates of correlation dimension and curves describing the separation of neighbouring trajectories. Principal-component analysis provides lower-dimensional coordinates that capture major patterns of variation. We used these coordinates only to display the trajectories. All perturbation and Lyapunov calculations used the complete atom-by-channel state, so dimensional reduction did not remove information from the quantitative dynamical tests.
+We propagated 20 complete molecular states for 5,000 generations using frozen Graph-CA parameters. Every channel of every atom was retained at every generation. The first 1,000 generations were treated as *burn-in* and excluded from late-time measurements, allowing initial transient behaviour to pass before analysis. We examined ten representative cases in greater detail using principal-component projections, which provide lower-dimensional coordinates that capture major patterns of variation, together with recurrence plots, frequency spectra, estimates of correlation dimension and curves describing the separation of neighbouring trajectories. We used these coordinates only to display the trajectories. All perturbation and Lyapunov calculations used the complete atom-by-channel state, so dimensional reduction did not remove information from the quantitative dynamical tests.
 
 #### 2.5.2. Direct perturbation screen
 
@@ -288,7 +282,7 @@ We also generated reproducible three-dimensional conformations using the ETKDG p
 
 For each descriptor separately, we measured association with the largest Lyapunov exponent using Spearman rank correlation. The Benjamini-Hochberg procedure corrected for testing many descriptors within the same analysis. We obtained confidence intervals from 2,000 bootstrap resamples in which complete Bemis-Murcko scaffold groups, rather than individual molecules, were resampled together. This preserved dependence among molecules sharing the same central ring-and-linker framework.
 
-We then tested whether combinations of descriptors gave reproducible predictions using Elastic Net and Extra Trees regression with five-fold scaffold-grouped cross-validation. Elastic Net is a penalised linear model, whereas Extra Trees combines many randomly varied decision trees. For each descriptor, we shuffled its held-out values and measured the resulting change in predictive performance. A larger decrease indicated a larger contribution. Scaffold separation was preserved between every training and evaluation fold.
+We then tested whether combinations of descriptors gave reproducible predictions using Elastic Net, a penalised linear model, and Extra Trees, which combines many randomly varied decision trees, with five-fold scaffold-grouped cross-validation. For each descriptor, we shuffled its held-out values and measured the resulting change in predictive performance. A larger decrease indicated a larger contribution. Scaffold separation was preserved between every training and evaluation fold.
 
 #### 2.5.9. Frozen-model structural interventions
 
@@ -608,6 +602,123 @@ The basic fingerprint contained five types of summary. The final atom-state mean
 The model predicted four different CYP isoforms. The one-hot CYP context vector therefore selected the copy of the fingerprint belonging to the target isoform: the relevant block was active and the other three blocks were zero. This produced CYP-specific readout features and allowed ridge regression to associate the same types of trajectory measurement with different isoforms.
 
 The genetic search also tested optional summaries of trajectory change. The *dynamic observables* option added the difference between the initial and final molecular mean states and a normalised correlation between the molecular mean states at successive generations. The correlation measured how strongly one generation resembled the next. *Multiscale transition-energy summaries* added the squared changes between the molecular mean states at consecutive sampling points listed above. The search also tested correlations separated by several generation lags, smooth approximations to the largest and smallest molecular mean states, and separate summaries of increases and decreases in state values. Together, these options allowed the readout to use persistence, variation, direction and scale of change rather than relying only on the final state.
+
+
+## Appendix B. Evolutionary-Strategy Configuration
+
+The evolutionary-strategy experiment changed the procedure used to optimise numerical weights while holding the CYP3A4 Graph-CA design fixed. This allowed a direct comparison with backpropagation. Table B1 lists the fixed model settings that were removed from the main-text summary.
+
+**Table B1. Fixed Graph-CA settings used throughout the evolutionary-strategy experiment.**
+
+| Fixed setting | Value and meaning |
+|---|---|
+| Transition rule and prediction target | A damped-symplectic Graph-CA predicted CYP3A4 pIC50. Section 2.3 describes this transition rule. |
+| State width and trajectory depth | Each atom carried 16 numerical channels, and the transition rule was repeated for 32 generations. |
+| Atom features | The baseline atom descriptors were supplemented by the Periodic and Electronic feature groups in Table 2. |
+| Bond messages | Information passed between bonded atoms was conditioned on the recorded bond descriptors, including whether a bond was single, double, triple or aromatic. |
+| Trajectory pooling | Multiscale pooling summarised the trajectory at several generations, allowing the fingerprint to retain early, intermediate and final behaviour as described in Appendix A. |
+| Update scale | A value of 0.25 controlled the magnitude of the change applied to the atomic states at each generation. |
+| Support fraction | A value of 0.6 assigned 60% of the eligible molecules in each training batch to the support subset used to fit the ridge readout. The remaining molecules formed the query subset. |
+| Ridge penalty | A value of 0.1 discouraged excessively large fingerprint coefficients in the ridge-regression readout. |
+
+An evolutionary configuration was one combination of the settings in Table B2. We evaluated 32 such combinations. For each evolutionary update, random changes were generated in opposite pairs around the current weights, as described in Section 2.4.3.
+
+**Table B2. Evolutionary-strategy settings and tested values.**
+
+| Evolutionary setting | Meaning | Values tested |
+|---|---|---|
+| Population size | The total number of candidate weight sets evaluated during one update, including both members of every opposite pair. | 32, 64, 96 or 128 candidates. |
+| Perturbation standard deviation | The typical size of the random changes applied to the current weights. The changes were drawn from a Gaussian, or bell-shaped, distribution. | 0.005, 0.01, 0.02, 0.04 or 0.08. |
+| Evolutionary learning rate | The scale of the adjustment made to the current weights after the candidate pairs had been compared. | 0.0005, 0.001, 0.003, 0.006 or 0.01. |
+| Training-batch size | The number of molecules selected for one evolutionary update. | 256, 512, 1,024 or 1,600 molecules. |
+| Batch composition | Random composition selected molecules without using their measured activity to arrange the support and query subsets. Activity-stratified composition distributed query molecules across the observed pIC50 range, with the remaining molecules assigned to the support subset. | Random or activity-stratified. |
+| Stopping policy | The rule specifying the maximum number of training epochs and how long training continued without sufficient improvement in validation MA-ST-RAE. | Responsive, balanced, patient or fine, as defined in Table B3. |
+
+Each epoch comprised one evolutionary update. Training stopped at the maximum number of epochs or when validation MA-ST-RAE failed to improve by at least the minimum improvement for the stated number of consecutive epochs, called the patience period.
+
+**Table B3. Stopping policies tested during evolutionary-strategy optimisation.**
+
+| Stopping policy | Maximum epochs | Patience period | Minimum improvement in MA-ST-RAE |
+|---|---:|---:|---:|
+| Responsive | 40 | 8 | 0.003 |
+| Balanced | 60 | 14 | 0.002 |
+| Patient | 80 | 20 | 0.002 |
+| Fine | 100 | 25 | 0.001 |
+
+
+## Appendix C. Hybrid Genetic Graph-CA Structure Search
+
+The hybrid genetic search changed discrete choices in the CYP3A4 Graph-CA design while backpropagation trained the numerical weights of every candidate. A candidate's complete list of design choices formed its genome. The numerical optimiser settings associated with each transition-rule family remained fixed, allowing the genetic algorithm to compare model structures without simultaneously searching a second set of continuous training parameters.
+
+**Table C1. Design choices represented in the hybrid genetic genome.**
+
+| Design choice | Meaning | Options tested |
+|---|---|---|
+| Transition-rule family | The mathematical rule used to update every atomic cell. | Damped symplectic, FitzHugh-Nagumo or delayed memory. |
+| Recurrent generations | The number of times the transition rule was applied. | 16, 32, 64 or 128. |
+| State width | The number of numerical channels carried by each atom. | 8, 16 or 24. |
+| Atom-feature profile | The baseline descriptors supplemented by selected feature groups from Table 2. | Periodic and Electronic; Electronic and Local environment; Periodic and Valence; or all five additional groups. |
+| Trajectory pooling | The method used to convert the variable-length trajectory into a fixed-length fingerprint. Basic pooling used the five core summaries in Appendix A; multiscale pooling also retained five intermediate states; temporal-attention pooling learned how strongly to weight those five states. | Basic, multiscale or temporal attention. |
+| Degree normalisation | The strength with which the number of bonded neighbours reduced the combined incoming message. | Exponent 0.5 or 1.0. |
+| Chemical-feature gating | Whether a learned gate adjusted the contribution of each chemical descriptor. | Disabled or enabled. |
+| Initial-state anchoring | Whether the initial molecular mean and variance were retained in the final fingerprint. | Disabled or enabled. |
+| Dynamic observables | Whether the fingerprint included change from the initial to final molecular mean and correlation between successive generations. | Disabled or enabled. |
+| Multiscale transition energy | Whether the fingerprint included squared changes between the five multiscale sampling points. | Disabled or enabled. |
+| Channel-specific timescales | Whether each channel learned its own rate of movement towards the proposed next state. | Disabled or enabled. |
+| Multilag recurrence | Whether the fingerprint included correlations between states separated by several generation intervals. | Disabled or enabled. |
+| Temporal extrema | Whether the fingerprint included smooth estimates of the largest and smallest molecular mean states reached during the trajectory. | Disabled or enabled. |
+| Directional flux | Whether increases and decreases in state values were summarised separately. | Disabled or enabled. |
+
+The search used four genetic generations containing 24 unique candidate structures each. Tournament selection chose a parent by comparing three candidates. Uniform crossover constructed a child by choosing each design setting from either parent, and mutation independently changed each setting with probability 0.25.
+
+Every candidate was trained by backpropagation on two scaffold-separated folds for at most 35 epochs. The 96 candidates therefore produced 192 screening runs. The four strongest candidates and the fixed damped-symplectic reference then underwent confirmation using five scaffold folds, two seeds and at most 80 epochs, producing another 50 runs and 242 runs in total. Development MA-ST-RAE supplied the genetic fitness, while RMSE was the secondary measure. The sealed holdout and blind labels were excluded from screening, selection and confirmation.
+
+**Table C2. Configuration selected by the hybrid genetic search.**
+
+| Component | Selected setting |
+|---|---|
+| Transition rule | FitzHugh-Nagumo. |
+| Recurrent generations | 128. |
+| State width | 24 channels. |
+| Atom-feature profile | Comprehensive, comprising the baseline descriptors and all five additional feature groups in Table 2. |
+| Trajectory pooling | Multiscale. |
+| Degree normalisation | Exponent 1.0. |
+| Dynamic observables | Enabled. |
+| Multiscale transition energy | Enabled. |
+| Chemical-feature gating | Disabled. |
+| Initial-state anchoring | Disabled. |
+| Channel-specific timescales | Disabled. |
+| Multilag recurrence | Disabled. |
+| Temporal extrema | Disabled. |
+| Directional flux | Disabled. |
+
+
+## Appendix D. Genetic Programming of the Transition Rule
+
+The genetic-programming experiment retained the hybrid search's selected CYP3A4 configuration and changed only the mathematical transition rule. Each candidate rule was represented as an expression tree. Mathematical operations formed the branches, while the available input vectors formed the terminal leaves. A candidate rule remained fixed throughout its training and validation trajectories, although backpropagation continued to train its numerical weights.
+
+**Table D1. Input vectors available to each candidate transition rule.**
+
+| Candidate input | Meaning |
+|---|---|
+| Local input, rᵢ⁽ᵗ⁾ | The vector calculated from the atom's current state, bonded-neighbour information, chemical descriptors and CYP context. |
+| Current state, hᵢ⁽ᵗ⁾ | The atom's H-channel state at the current generation. |
+| Neighbour difference, h̄ᵢ⁽ᵗ⁾−hᵢ⁽ᵗ⁾ | The mean state of the atom's bonded neighbours minus the atom's own state. |
+| Delayed-state difference, hᵢ⁽ᵗ⁻ᵈ⁾−hᵢ⁽ᵗ⁾ | A retained earlier state of the atom minus its current state. |
+
+**Table D2. Mathematical operations available to genetic programming.**
+
+| Operation group | Permitted operations |
+|---|---|
+| Two-input operations | Addition, subtraction, multiplication and the mean of two inputs. |
+| One-input operations | Negation, hyperbolic tangent, sine and multiplication by a fixed scale. |
+| Fixed scales | −1.0, −0.5, 0.25, 0.5 or 1.0. |
+
+Expression trees were limited to a maximum depth of four. Four genetic generations each contained 24 unique programs. Tournament selection compared groups of three candidates when choosing parents. Subtree crossover exchanged a complete part of one parent expression with a part of another. With probability 0.35, mutation replaced a randomly selected part of the resulting expression with a newly generated subtree. A penalty of 0.0005 per expression-tree node discouraged additional complexity unless it improved predictive performance.
+
+Each program was trained using two scaffold folds and a maximum of 35 epochs. Five finalists then underwent five-fold confirmation with two independent seeds and a maximum of 80 epochs. This produced 242 training runs. Backpropagation trained the weights used for bond messages, local-input construction and numerical transformations through the ridge fit in Section 2.4.2. Scaffold-validation MA-ST-RAE supplied candidate fitness, while RMSE was the secondary measure. The sealed holdout and blind labels were excluded throughout the search and confirmation stages.
+
+The selected program was a three-node expression tree of depth one that averaged the local-input vector and bonded-neighbour difference, giving the transition drive reported in Section 2.4.5.
 
 
 ## References
