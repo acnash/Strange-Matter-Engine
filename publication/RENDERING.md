@@ -1,8 +1,8 @@
 # Publication editing and rendering
 
-Edit `publication/publication.md` on the `Complex-Systems` branch. Its image links are repository-relative. Figure 2 uses `figures/02_five_rule_1d_cellular_evolution_all_text_plus2pt.png`; its original plot pixels are retained with larger typography.
+Edit `publication/publication.md` on the `Complex-Systems` branch. Its image links are repository-relative. Figure 2 uses `figures/02_ten_rule_1d_cellular_evolution.png`, a 600-dpi image designed for 174 mm by 200 mm printing on a dedicated A4 page, with 10-point headings and 8.5–9-point labels. The first five panels preserve the original channel-1 data for generations 0–256.
 
-The current print-quality PDF is `output/pdf/molecule_space_time_publication.pdf`. The same rendering is also saved as `output/pdf/molecular_space_time_latest_high_quality.pdf`.
+The previous complete-manuscript PDFs are `output/pdf/molecule_space_time_publication.pdf` and `output/pdf/molecular_space_time_latest_high_quality.pdf`. Regenerate them after the current manuscript edits. The new Figure 2 print proof is `output/pdf/figure2_ten_rules_A4.pdf`.
 
 ## Portable high-quality renderer
 
@@ -17,4 +17,10 @@ node scripts/print_current_manuscript.cjs
 
 The renderer verifies that all figures loaded and creates `output/pdf/molecular_space_time_latest_high_quality.pdf`. Display equations are converted to MathML, and text remains selectable. Review the PDF visually after any changes.
 
-The PowerShell scripts `scripts/resize_figure2_labels.ps1` and `scripts/figure2_all_text_larger.ps1` preserve the Figure 2 heatmap pixels while changing the surrounding typography. They require Windows, System.Drawing and Arial. Their source image is retained in `publication/figures/02_five_rule_1d_cellular_evolution_before_label_edit.png`.
+## Ten-rule Figure 2
+
+`scripts/render_ten_rule_figure.py --data-root PATH` reads the original archived trajectories, generates the conservative graph-flux trajectory using a frozen checkpoint if required, saves the plotted full-channel arrays in `publication/figure_data/figure2_ten_rules`, and renders the PNG. It requires NumPy, Matplotlib, PyTorch and pandas in the existing scientific environment. On Windows, activate the Conda environment so its DLL directories are available. The data root must contain the original checkpoints, graph cache and long-horizon trajectory archive. The manifest records source paths, hashes, molecule identifiers, channel counts and colour ranges. No training is performed. The conservative graph-flux panel uses its own colour limits because its values exceed the other state panels' range.
+
+`python scripts/print_figure2_a4.py` uses ReportLab to place the PNG and the current manuscript legend on one A4 page. The full-manuscript renderer also gives Figure 2 a dedicated page.
+
+The PowerShell scripts `scripts/resize_figure2_labels.ps1` and `scripts/figure2_all_text_larger.ps1` reproduce the superseded five-panel version. Its source images remain available for comparison.
