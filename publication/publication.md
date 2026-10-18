@@ -34,8 +34,6 @@ Genetic programming modestly improved blind prediction. The dynamical analyses i
 
 The study used the primary direct-inhibition dataset released for the 2026 OpenADMET CYP Inhibition Blind Challenge (https://openadmet.org/blindchallenges/). It comprised 4,905 unique compounds represented by a molecule identifier and a Simplified Molecular Input Line Entry System (SMILES) string. The dataset provided experimental direct-inhibition pIC50 values for four drug-metabolising cytochrome P450 enzyme isoforms: CYP1A2, CYP2C9, CYP2D6, and CYP3A4. Each value described inhibition of one specific isoform by one compound. Here, pIC50 denotes the negative base-10 logarithm of the half-maximal inhibitory concentration expressed in molar units. Each reported measurement included lower and upper uncertainty bounds and an estimated standard deviation from the fitted concentration–response experiment. The experiments did not necessarily measure each compound against every CYP isoform. The dataset contained 6,525 observed compound–CYP pairs, distributed as summarised in Table 1.
 
-**Table 1. Number of observed direct-inhibition pIC50 measurements for each CYP isoform.**
-
 | CYP isoform | Compounds with an observed direct-inhibition pIC50 |
 |---|---:|
 | CYP1A2 | 1,412 |
@@ -43,6 +41,8 @@ The study used the primary direct-inhibition dataset released for the 2026 OpenA
 | CYP2D6 | 1,493 |
 | CYP3A4 | 2,335 |
 | **Total** | **6,525** |
+
+**Table 1. Number of observed direct-inhibition pIC50 measurements for each CYP isoform.**
 
 Each observed compound–CYP pair formed a training case, with molecular structure and isoform identity as inputs and experimental pIC50 as the target. An *endpoint* denotes the direct-inhibition prediction task for one isoform. The CYP-specific systems used observations for their assigned endpoint throughout fitting and selection (Section 2.4). Unmeasured compound–CYP pairs remained missing and contributed neither targets nor loss terms.
 
@@ -58,8 +58,6 @@ We used RDKit to standardise SMILES structures, including common groups of bonde
 
 The standard set of atomic descriptors contained one-hot element identity for H, C, N, O, F, P, S, Cl, Br, I, and other elements; for example, with this ordering the encoding represented carbon as (0,1,0,0,0,0,0,0,0,0,0) and oxygen as (0,0,0,1,0,0,0,0,0,0,0). Further descriptors comprised formal charge; aromaticity; sp, sp2, sp3 (types of atomic orbital hybridisation), and other hybridisation states; degree; total attached hydrogens; ring membership; hydrogen-bond donor and acceptor status; and tetrahedral chirality. We also tested additional atomic descriptors, organised into the five groups in Table 2. To choose which groups to include, we compared their predictive performance using training and validation subsets drawn entirely from the fitting data. The sealed holdout and blinded challenge set played no part in that selection.
 
-**Table 2. Chemically organised atom-feature groups considered during training-only model selection.** A feature group is a named collection of related atom-level descriptors that we added to the baseline encoding as one candidate block.
-
 | Feature group | Atom-level quantities |
 |---|---|
 | Periodic | Atomic number, atomic mass, covalent radius, van der Waals radius, outer electrons, period, group, and approximate atomic volume. |
@@ -67,6 +65,8 @@ The standard set of atomic descriptors contained one-hot element identity for H,
 | Electronic | Pauling electronegativity, approximate polarizability, heteroatom and halogen indicators, conjugated-bond fraction, first ionization energy, electron affinity, and missing-property indicator. |
 | Ring geometry | Number of rings containing the atom and indicators for ring sizes 3, 4, 5, 6, 7, and 8 or greater. |
 | Local environment | Mean neighbouring electronegativity, electronegativity difference from the neighbourhood, mean neighbouring atomic number, and mean neighbouring formal charge. |
+
+**Table 2. Chemically organised atom-feature groups considered during training-only model selection.** A feature group is a named collection of related atom-level descriptors that we added to the baseline encoding as one candidate block.
 
 The *feature profile* specifies which chemical descriptors form each atom's input vector: the baseline encoding together with the selected additional feature groups in Table 2. We stored the selected feature profile with every frozen checkpoint, meaning the saved model whose parameters we held fixed for evaluation. This preserved the exact feature names and order required to predict new molecules. We scaled continuous quantities by fixed chemically meaningful constants during graph construction. The bond vector 𝑒ⱼᵢ contained one-hot indicators for single, double, triple, or aromatic bonds, together with indicators for conjugation, ring membership, and three stereochemical properties. We attached the same bond vector to both directed representations of an undirected bond.
 
@@ -80,7 +80,7 @@ Each atom carries H numerical state values, called channels, which change over g
 
 ### 2.3. Nonlinear Graph Cellular Automaton
 
-The Graph Cellular Automaton (Graph-CA) advances the initial atom states defined in Section 2.2 through repeated local interactions. Each state's role depends on its effects on neighbours, subsequent generations and prediction. We screened ten Graph-CA transition-rule families: gated residual, inertial reaction–diffusion, FitzHugh–Nagumo, Kuramoto–Sakaguchi, delayed memory, Gray–Scott, coupled map, activator–inhibitor, damped symplectic and conservative graph flux. A rule family specifies how an atom calculates its next numerical state. All ten use atomic cells connected by chemical bonds, with one local rule shared across atoms and repeated at every generation. They differ in how they use the atom states, bonded-neighbour information and any retained earlier states. Chemical descriptors set the initial states; most rules also use chemical descriptors and CYP context during subsequent updates. The conservative graph flux rule subsequently exchanges state values directly along bonds. Repeated updates allow information to spread through the molecular graph. Appendix A describes the shared calculations and the implementation of all ten rules. Figure 2 illustrates all ten rules; Section 2.4.1 identifies those selected for prediction, and Table 5 reports their dynamical screening results.
+The Graph Cellular Automaton (Graph-CA) advances the initial atom states defined in Section 2.2 through repeated local interactions. Each state's role depends on its effects on neighbours, subsequent generations and prediction. We screened ten Graph-CA transition-rule families: gated residual, inertial reaction–diffusion, FitzHugh–Nagumo, Kuramoto–Sakaguchi, delayed memory, Gray–Scott, coupled map, activator–inhibitor, damped symplectic and conservative graph flux. A rule family specifies how an atom calculates its next numerical state. All ten use atomic cells connected by chemical bonds, with one local rule shared across atoms and repeated at every generation. They differ in how they use the atom states, bonded-neighbour information and any retained earlier states. Chemical descriptors set the initial states; most rules also use chemical descriptors and CYP context during subsequent updates. The conservative graph flux rule subsequently exchanges state values directly along bonds. Repeated updates allow information to spread through the molecular graph. Appendix A describes the shared calculations and the implementation of all ten rules. Figure 2 illustrates all ten rules; Section 2.4.1 identifies those selected for prediction, and Table 6 reports their dynamical screening results.
 
 **Gated residual.** This rule forms a bounded mixture of the current state and a proposed value calculated from local inputs [17] (Figure 2A). A learned gate controls the mixture separately for each atom, channel and generation, providing adaptive memory through selective retention or change. The approach relates to gated recurrent neural networks [18] and neural cellular automata [19].
 
@@ -215,19 +215,19 @@ We calculated spectral entropy to measure how widely the trajectory’s changes 
 S = \frac{v_{\mathrm{late}}\left(1 + H_{\mathrm{spectral}}\right)}{R_{\mathrm{recurrence}}},
 ```
 
-Here, v[late] is late-time motion, H[spectral] is normalised spectral entropy, and R[recurrence] is the recurrence ratio. We combined these measurements to prioritise trajectories that continued to change, varied across several timescales and returned close to earlier states. Continued change and greater spectral entropy increased the score, while a smaller recurrence ratio increased it by indicating closer returns. Adding one to spectral entropy retained a contribution from trajectories dominated by a few frequencies. We used this study-specific score to select candidates for further dynamical tests. The population screen covered all ten families; detailed analyses included gated residual, delayed memory, inertial reaction–diffusion, Kuramoto–Sakaguchi and FitzHugh–Nagumo, together with the coupled-map oscillator example.
+Here, v[late] is late-time motion, H[spectral] is normalised spectral entropy, and R[recurrence] is the recurrence ratio. We combined these measurements to prioritise trajectories that continued to change, varied across several timescales and returned close to earlier states. Continued change and greater spectral entropy increased the score, while a smaller recurrence ratio increased it by indicating closer returns. The +1 prevented low spectral entropy from reducing the complete score towards zero. Trajectories dominated by a few frequencies could therefore still receive a high score through continued motion and recurrence, while greater frequency diversity increased the score further. We used this study-specific score to select candidates for further dynamical tests. The population screen covered all ten families; detailed analyses included gated residual, delayed memory, inertial reaction–diffusion, Kuramoto–Sakaguchi and FitzHugh–Nagumo, together with the coupled-map oscillator example.
 
 We propagated 20 complete molecular states for 5,000 generations using frozen Graph-CA parameters. Every channel of every atom was retained at every generation. The first 1,000 generations were treated as *burn-in* and excluded from late-time measurements, allowing initial transient behaviour to pass before analysis. We examined ten representative cases in greater detail using principal-component projections, which provide lower-dimensional coordinates that capture major patterns of variation, together with recurrence plots, frequency spectra, estimates of correlation dimension and curves describing the separation of neighbouring trajectories. We used these coordinates only to display the trajectories. All perturbation and Lyapunov calculations used the complete atom-by-channel state, so dimensional reduction did not remove information from the quantitative dynamical tests.
 
 #### 2.5.2. Direct perturbation screen
 
-For each detailed case, we created eight companion states by making small changes in eight independently chosen directions through the complete state space. Every change had Euclidean magnitude 10⁻⁵. We then advanced the unchanged reference state and each perturbed companion under exactly the same frozen transition rule, molecular graph, bond features, atom features and CYP context. At every generation, we recorded the distance between the reference and companion states.
+For each selected reference trajectory, we generated eight independent random perturbation vectors across all atom-by-channel state values. Each vector specified a different pattern of small increases and decreases and was scaled to a total Euclidean magnitude of 10⁻⁵. We applied each perturbation to the initial complete molecular state to create a companion trajectory, then advanced it alongside the unchanged reference under exactly the same frozen transition rule, molecular graph, bond features, atom features and CYP context. At every generation, we recorded the distance between the reference and companion states.
 
-Candidates were prioritised when companions repeatedly moved away from the reference across several perturbation directions. We then tested whether this separation continued after repeatedly returning the companion to a small distance from the reference. Trajectories 7 and 8 showed the clearest reproducible expansion and advanced to the confirmatory tests. These trajectories represented `OCNT-0494110` with CYP2C9 context and `OCNT-2328784` with CYP1A2 context, respectively.
+Candidates were prioritised when their companion trajectories repeatedly moved away from the reference across several perturbation vectors. The selected candidates then underwent the confirmatory tests described in Sections 2.5.5–2.5.7.
 
 #### 2.5.3. Circular state-space distance
 
-The Kuramoto-Sakaguchi rule represents a phase within the interval [−1,1]. The two ends of this interval correspond to the same point in the repeating cycle, just as −π and π represent the same direction on a circle. An ordinary numerical subtraction would incorrectly treat states close to opposite ends as far apart. We therefore measured their shortest separation around the circle. For reference state h and companion state h', the circular difference in each channel was
+In the Kuramoto–Sakaguchi rule, each state channel records a position around a repeating cycle rather than a position on a straight line. The phase angle is rescaled so that 0 represents zero radians, −1 represents −π and +1 represents +π. Because −π and +π meet at the same point on the cycle, values near opposite ends of the numerical range are close in phase, and crossing one end wraps the state to the other. An ordinary numerical subtraction would incorrectly treat states close to opposite ends as far apart. We therefore measured their shortest separation around the circle. For reference state h and companion state h', the circular difference in each channel was
 
 ```math
 \Delta(h',h) = \frac{1}{\pi}\mathrm{atan2}\!\left[
@@ -236,11 +236,11 @@ The Kuramoto-Sakaguchi rule represents a phase within the interval [−1,1]. The
 \right],
 ```
 
-The sine and cosine convert the numerical difference into a circular direction, and atan2 returns its signed shortest angle. Dividing by π returns the result to the model's state scale. The full-state separation d=‖Δ(h',h)‖₂ is the Euclidean length of all these elementwise circular differences. It treats states near opposite ends of the interval as nearby phases and avoids an artificial distance caused only by the wrapped numerical representation. The extended analysis below separately tested whether the learned update itself remained continuous across this boundary.
+The sine and cosine convert the numerical difference into a circular direction, and atan2 returns its signed shortest angle. Dividing by π returns the result to the model's state scale. The full-state separation d=‖Δ(h',h)‖₂ is the Euclidean length of all these elementwise circular differences. It treats states near opposite ends of the interval as nearby phases and avoids an artificial distance caused only by the wrapped numerical representation. We also tested whether the learned update changed smoothly when a phase crossed between +1 and −1, the point at which the numerical representation wraps around the cycle.
 
 #### 2.5.4. Confirmatory protocols
 
-The table below summarises the numerical settings for the confirmatory and population experiments. A *repeat* used either an independently oriented initial perturbation or an independently constructed orthogonal perturbation basis, depending on the calculation.
+The numerical settings for the confirmatory and population experiments are summarised in Table 3. A *repeat* used either an independently oriented initial perturbation or an independently constructed orthogonal perturbation basis, depending on the calculation.
 
 | Analysis | Burn-in generations | Measured generations | Renormalization or sampling interval | Perturbation scale | Repeats |
 |---|---:|---:|---|---|---:|
@@ -249,9 +249,11 @@ The table below summarises the numerical settings for the confirmatory and popul
 | Attraction basin | 1,000 | 6,000 | Sampled every 10 | Displacement radii 0.1, 0.5, 1.0, and 2.0 | 8 per radius and molecule |
 | Population and structural interventions | 1,000 | 2,000 | 10 | 10⁻⁷ | 2 per system |
 
+**Table 3. Numerical settings for the confirmatory and population analyses of Graph-CA dynamics.**
+
 #### 2.5.5. Renormalized largest Lyapunov exponent
 
-The direct perturbation screen could show that two nearby states separated once, but sustained chaos requires repeated local expansion. We therefore used a Benettin-style renormalisation calculation. After burn-in, we placed a companion state at a small distance ε from the reference state. Both states advanced for τ generations. We then measured their circular separation dₖ and recorded how much it had grown relative to ε. Before the next interval, we moved the companion back to distance ε while preserving the direction in which the separation had grown. Repeating this procedure tested whether local expansion was continually regenerated rather than caused by a single transient event. The largest Lyapunov exponent was estimated as
+The first confirmatory analysis tested whether the separation observed in the direct perturbation screen persisted over time. A single separation event may be transient, whereas a positive Lyapunov exponent indicates that nearby states separate exponentially on average over sustained evolution [27]. We therefore estimated the largest Lyapunov exponent using the repeated renormalisation method of Benettin et al. [30]. After burn-in, we placed a companion state at a small distance ε from the reference state. Both states advanced for τ generations. We then measured their circular separation dₖ and recorded how much it had grown relative to ε. Before the next interval, we moved the companion back to distance ε while preserving the direction in which the separation had grown. Repeating this procedure tested whether local expansion was continually regenerated rather than caused by a single transient event. The largest Lyapunov exponent was estimated as
 
 ```math
 \lambda_1 = \frac{1}{K\tau}
@@ -264,13 +266,13 @@ Here, K is the number of measured intervals, τ is the number of generations in 
 
 A single largest Lyapunov exponent measures the fastest average expansion. A *Lyapunov spectrum* extends this idea by measuring growth or contraction along several independent directions through state space. We calculated the eight leading exponents using double-precision float64 arithmetic and eight simultaneous perturbation vectors that began mutually perpendicular.
 
-After each propagation block, the perturbations were no longer guaranteed to remain perpendicular. We assembled their full-state circular differences into a matrix and applied reduced QR decomposition. This standard matrix factorisation separates the matrix into an orthonormal basis Q and an upper-triangular matrix R. Q supplied a renewed set of perpendicular perturbation directions. The logarithms of the absolute diagonal elements of R measured local expansion or contraction along those directions. We compared results across the renormalisation intervals and repeats listed above. Stability across these settings helped distinguish persistent expansion in several directions from numerical precision effects or one isolated unstable direction.
+After the reference trajectory and its eight perturbations had evolved for the specified interval of 5, 10 or 20 generations, the perturbation directions were no longer guaranteed to remain mutually perpendicular. We arranged the circular differences between the reference state and its eight perturbed states as columns of a matrix, then applied reduced QR decomposition. This calculation produced Q, a refreshed set of mutually perpendicular perturbation directions, and R, whose diagonal values recorded the stretching or contraction along those directions. The logarithm of each absolute diagonal value contributed the expansion or contraction measured for that interval. We compared results across the renormalisation intervals and repeats listed above. Stability across these settings helped distinguish persistent expansion in several directions from numerical precision effects or one isolated unstable direction.
 
 #### 2.5.7. Boundedness and attraction-basin test
 
-An attracting region should draw in trajectories that start from different nearby states. We tested this property by displacing the complete post-burn-in state by each radius listed above and propagating the resulting float64 trajectories. The full experiment contained 64 displaced trajectories. We checked boundedness from the largest absolute state value reached by each trajectory. Because phases wrap around, we represented every phase by its sine and cosine. This circular embedding removes the artificial boundary between the two ends of the phase interval. We then compared how often the displaced and reference trajectories visited different parts of this embedded state space.
+An attracting region should draw in trajectories that start from different nearby states. We tested this property by displacing the complete post-burn-in state by Euclidean distances of 0.1, 0.5, 1.0 and 2.0, then propagating the resulting float64 trajectories. The full experiment contained 64 displaced trajectories. We checked boundedness from the largest absolute state value reached by each trajectory. In the Kuramoto–Sakaguchi Graph-CA used for this test, every atom carried cyclic state channels called phases. Because each phase wraps between −1 and +1, we represented it by its sine and cosine before comparing the collections of computational states sampled by different trajectories. This circular embedding removes the artificial boundary between the two ends of the phase interval.
 
-Direct comparison in the full high-dimensional space is difficult. We therefore projected the states onto 32 random one-dimensional directions and compared their sampled distributions along each direction. We calculated the distance from the displaced distribution to the reference distribution during both early and late portions of the trajectory. A late-to-early ratio below one indicated that the displaced trajectory had moved closer to the reference distribution. We also measured the distance from each displaced state to its nearest sampled reference state. This supplied a complementary test of whether the displaced trajectory approached the region visited by the reference.
+Direct comparison in the full high-dimensional space is difficult. We therefore projected the states onto 32 random one-dimensional directions and compared their sampled distributions along each direction. For each time window, the reference distribution was formed from the projected states sampled along the unchanged reference trajectory. We calculated the distance from the displaced distribution to this reference distribution during both early and late portions of the trajectory. A late-to-early ratio below one meant that the displaced trajectory sampled states more similar to those of the reference trajectory at late times than at early times. We also measured the distance from each displaced state to its nearest sampled reference state. This supplied a complementary test of whether the displaced trajectory approached the set of computational states sampled by the reference trajectory.
 
 #### 2.5.8. Population-level structure–dynamics analysis
 
@@ -310,15 +312,13 @@ We also examined the phase boundary, where the numerical representation wraps fr
 
 ### 3.1. Internal Predictive Evaluation
 
-Table 3 compares the internal predictive results. For BP-Graph-CA, 1,000 bootstrap resamples of the 1,309 sealed-holdout observations gave a mean MA-ST-RAE of 0.749064 and a 95% interval of 0.710791–0.789424. Individual CYP ST-RAE values were 0.816136 for CYP1A2, 0.713018 for CYP2C9, 0.936774 for CYP2D6 and 0.528032 for CYP3A4.
+The internal predictive results are compared in Table 4. For BP-Graph-CA, 1,000 bootstrap resamples of the 1,309 sealed-holdout observations gave a mean MA-ST-RAE of 0.749064 and a 95% interval of 0.710791–0.789424. Individual CYP ST-RAE values were 0.816136 for CYP1A2, 0.713018 for CYP2C9, 0.936774 for CYP2D6 and 0.528032 for CYP3A4.
 
 The evolutionary-strategy campaign completed 114 training and internal-validation runs. In the matched two-fold screen, its strongest configuration achieved an MA-ST-RAE of 0.638768 and an RMSE of 0.803659 pIC50. The fixed Graph-CA trained by backpropagation achieved a lower MA-ST-RAE of 0.626897 on the same screen. We then confirmed the evolutionary configurations using five folds and two random seeds. This stage selected a population of 128 candidate parameter sets, a perturbation scale of 0.02, an evolutionary learning rate of 0.01, batches of 256 molecules balanced by activity, and a stopping setting allowing up to 80 evolutionary updates, with training ending after 20 consecutive updates without an improvement of at least 0.002 in validation MA-ST-RAE. Its mean confirmation MA-ST-RAE was 0.659505, and its mean RMSE was 0.817985 pIC50. This experiment showed that the recurrent Graph-CA could be trained without derivatives. Its internal-validation score, however, was not strong enough to justify evaluation on the sealed or blind data.
 
-The hybrid genetic search selected the configuration specified in Section 2.4.4. Five-fold, two-seed confirmation gave MA-ST-RAE 0.596981 ± 0.042987 and RMSE 0.781116 ± 0.035890 pIC50. GA-Graph-CA achieved the lowest four-endpoint sealed error in Table 3, with CYP3A4 ST-RAE 0.508964.
+The hybrid genetic search selected the configuration specified in Section 2.4.4. Five-fold, two-seed confirmation gave MA-ST-RAE 0.596981 ± 0.042987 and RMSE 0.781116 ± 0.035890 pIC50. GA-Graph-CA achieved the lowest four-endpoint sealed error in Table 4, with CYP3A4 ST-RAE 0.508964.
 
-Genetic programming selected `mean(reaction, neighbour_delta)`, the rule defined in Section 2.4.5. Five-fold, two-seed confirmation gave MA-ST-RAE 0.598075 and RMSE 0.772706 pIC50, the lowest confirmation RMSE among the genetic searches. Its sealed MA-ST-RAE lay between the fixed-rule and genetic-structure results (Table 3), with CYP3A4 ST-RAE 0.517368. Across 1,000 bootstrap samples, mean MA-ST-RAE was 0.746602, with a 95% interval of 0.708890–0.788464.
-
-**Table 3. Internal comparison of Graph-CA learning strategies.** Internal-validation values describe scaffold-held-out model selection and are not directly interchangeable across all rows because the fixed-rule and evolutionary-strategy figures use the matched CYP3A4 screen, whereas the genetic searches use five-fold, two-seed confirmation. Sealed values describe the four-endpoint ensemble.
+Genetic programming selected `mean(reaction, neighbour_delta)`, the rule defined in Section 2.4.5. Five-fold, two-seed confirmation gave MA-ST-RAE 0.598075 and RMSE 0.772706 pIC50, the lowest confirmation RMSE among the genetic searches. Its sealed MA-ST-RAE lay between the fixed-rule and genetic-structure results (Table 4), with CYP3A4 ST-RAE 0.517368. Across 1,000 bootstrap samples, mean MA-ST-RAE was 0.746602, with a 95% interval of 0.708890–0.788464.
 
 | Method | Local-rule treatment | Internal-validation MA-ST-RAE | Sealed MA-ST-RAE | Sealed RMSE, pIC50 |
 |---|---|---:|---:|---:|
@@ -327,11 +327,11 @@ Genetic programming selected `mean(reaction, neighbour_delta)`, the rule defined
 | GA-Graph-CA | Genetic algorithm evolves discrete structure | **0.596981 ± 0.0430** | **0.743723** | **0.841572** |
 | GP-Graph-CA | Genetic programming evolves the mathematical form of the cellular automaton transition rule | 0.598075 | 0.745824 | 0.848265 |
 
+**Table 4. Internal comparison of Graph-CA learning strategies.** Internal-validation values describe scaffold-held-out model selection and are not directly interchangeable across all rows because the fixed-rule and evolutionary-strategy figures use the matched CYP3A4 screen, whereas the genetic searches use five-fold, two-seed confirmation. Sealed values describe the four-endpoint ensemble.
+
 ### 3.2. Blind Challenge Evaluation
 
-The organisers evaluated the fixed submissions against concealed experimental measurements (Table 4). Each submission supplied four CYP predictions for each of 750 blinded molecules.
-
-**Table 4. Official blind OpenADMET CYP Inhibition Challenge results for the three submitted Graph-CA variants.** Lower values are favourable for MA-ST-RAE and macro MAE; higher values are favourable for macro R-squared, Spearman rho, and Kendall tau.
+The organisers evaluated the fixed submissions against concealed experimental measurements (Table 5). Each submission supplied four CYP predictions for each of 750 blinded molecules.
 
 | Official blind metric | Fixed-rule BP-Graph-CA | Genetic algorithm GA-Graph-CA | Genetic programming GP-Graph-CA |
 |---|---:|---:|---:|
@@ -340,6 +340,8 @@ The organisers evaluated the fixed submissions against concealed experimental me
 | Macro R-squared | -0.0744 | -0.0724 | **-0.0656** |
 | Macro Spearman rho | 0.5345 | 0.5444 | **0.5498** |
 | Macro Kendall tau | 0.3762 | 0.3840 | **0.3878** |
+
+**Table 5. Official blind OpenADMET CYP Inhibition Challenge results for the three submitted Graph-CA variants.** Lower values are favourable for MA-ST-RAE and macro MAE; higher values are favourable for macro R-squared, Spearman rho, and Kendall tau.
 
 Genetic programming produced the strongest blind result for every reported measure. Compared with the fixed-rule reference, its MA-ST-RAE decreased by 0.0146 and its macro mean absolute error (MAE) decreased by 0.0101 pIC50. Its Spearman rank correlation increased by 0.0153, and its Kendall rank correlation increased by 0.0116. The hybrid genetic structure search lay between the other two systems on all five measures. The improvement was modest but occurred consistently in both the error and rank-correlation measures.
 
@@ -361,8 +363,6 @@ Genetic programming produced the strongest blind result for every reported measu
 
 Each of the ten production models retained summaries of 1,309 validation trajectories, yielding 13,090 short-horizon screens. Point-attractor candidates required late motion below 10⁻⁴ and a final state change below 10⁻⁵. Oscillator candidates required a recurrence ratio below 0.25 and spectral concentration above 0.5, indicating close returns and power concentrated at a small number of frequencies. Remaining trajectories entered the persistent or complex category. These mutually exclusive screening classes guided the separate long-horizon tests described in Section 2.5.
 
-**Table 5. Population-level classification screen for frozen Graph-CA trajectories across all ten transition-rule families introduced in Section 2.3.** Analysed hyperchaotic candidates form a tested subset of the persistent or complex screen.
-
 | Cellular automaton transition rule | Screened | Point-attractor candidates | Oscillator candidates | Persistent or complex | Analysed hyperchaotic candidates |
 |---|---:|---:|---:|---:|---:|
 | Gated residual | 1,309 | 0 | 0 | 1,309 | 0 |
@@ -377,13 +377,13 @@ Each of the ten production models retained summaries of 1,309 validation traject
 | Conservative graph flux | 1,309 | 1,309 | 0 | 0 | 0 |
 | **Total** | **13,090** | **1,309** | **1,309** | **10,472** | **2** |
 
+**Table 6. Population-level classification screen for frozen Graph-CA trajectories across all ten transition-rule families introduced in Section 2.3.** Analysed hyperchaotic candidates form a tested subset of the persistent or complex screen.
+
 The two tested Kuramoto–Sakaguchi candidates came from the persistent or complex class and showed sustained expansion of small differences (Section 3.3.2). All 1,309 coupled-map trajectories met the screening criteria for oscillation, with longer periodicity tests required for confirmation. The [dynamical population summary](../results/long_horizon_attractor_campaign_v1/validation_dynamics_population_summary.csv) provides the complete machine-readable table.
 
 #### 3.3.2. Extended strange-attractor analysis
 
 Both Kuramoto–Sakaguchi candidates retained eight positive leading tangent exponents during 20,000 measured generations following 5,000 burn-in generations. Largest-exponent estimates in successive 5,000-generation windows ranged from 0.011870 to 0.012341 per generation for `OCNT-2328784` and from 0.012169 to 0.013314 for `OCNT-0494110`. Finite-separation tests at 10⁻⁷ and 10⁻⁹ gave estimates of 0.012109 and 0.012704 for the respective systems, supporting persistence beyond the original analysis.
-
-**Table 6. Extended float64 analysis of the two Kuramoto–Sakaguchi candidates.** Leading exponents use the 20,000-generation analysis; complete Lyapunov-spectrum quantities use a subsequent 10,000-generation interval. Positive counts and Kaplan–Yorke estimates are finite-time numerical quantities.
 
 | Quantity | OCNT-2328784, CYP1A2 | OCNT-0494110, CYP2C9 |
 |---|---:|---:|
@@ -393,6 +393,8 @@ Both Kuramoto–Sakaguchi candidates retained eight positive leading tangent exp
 | Positive exponents in complete spectrum | 29 | 30 |
 | Sum of complete spectrum, per generation | −3.606412 | −5.144542 |
 | Kaplan–Yorke heuristic | 68.19 | 73.91 |
+
+**Table 7. Extended float64 analysis of the two Kuramoto–Sakaguchi candidates.** Leading exponents use the 20,000-generation analysis; complete Lyapunov-spectrum quantities use a subsequent 10,000-generation interval. Positive counts and Kaplan–Yorke estimates are finite-time numerical quantities.
 
 The sum of each complete spectrum was negative. A small volume formed by nearby states therefore shrank on average as it moved along the sampled trajectory. At the same time, the individual positive exponents show that the states separated along several directions within that shrinking volume. The largest exponents in the complete spectra were 0.012118 and 0.012480, respectively. For the second system, the number of positive exponents changed from 28 to 30 between the two halves of the 10,000-generation measurement. This variation shows that some finite-time estimates remained close to zero and were not fully stable.
 
@@ -406,13 +408,13 @@ Second, the estimated correlation dimension did not settle at a stable value. Th
 
 ### 4.1. Emergence from Local Molecular Interactions
 
-Our operational test of emergence asks whether repeated interactions between bonded atomic cells generate a molecule-wide representation containing useful predictive information [30, 31]. All three submitted systems showed moderate agreement between predicted and experimental rankings on the blind challenge. This supports the usefulness of their trajectory fingerprints; Section 4.4 identifies the controls needed to establish how much predictive information the repeated interactions add to the starting descriptors.
+Our operational test of emergence asks whether repeated interactions between bonded atomic cells generate a molecule-wide representation containing useful predictive information [31, 32]. All three submitted systems showed moderate agreement between predicted and experimental rankings on the blind challenge. This supports the usefulness of their trajectory fingerprints; Section 4.4 identifies the controls needed to establish how much predictive information the repeated interactions add to the starting descriptors.
 
 Blind performance improved from fixed-rule backpropagation to genetic structure search and then genetic programming, with GP-Graph-CA achieving the strongest result on all five official measures. This ordering suggests that the choice of local transition rule influences the information available to the molecular readout. The selected expression averages the combined local-input vector with the bonded-neighbour state difference, linking local processing to exchange across the graph. Its modest gain supports further investigation of this coupling under the present prediction task and training procedure.
 
 ### 4.2. Molecular Space-Time as a Dynamical Object
 
-The numerical atom states provide coordinates for studying the trained model's behaviour. Their meaning comes from their effects on neighbour messages, subsequent states and predictions, rather than a direct correspondence with physical positions or measured chemical quantities. Such learned coordinates can collectively carry measurable information [32].
+The numerical atom states provide coordinates for studying the trained model's behaviour. Their meaning comes from their effects on neighbour messages, subsequent states and predictions, rather than a direct correspondence with physical positions or measured chemical quantities. Such learned coordinates can collectively carry measurable information [33].
 
 The long-horizon experiments identified convergence, candidate period-two oscillation and persistent complex variation. In two frozen Kuramoto–Sakaguchi systems, nearby states separated along several independent directions while small local volumes contracted on average. Displaced trajectories also approached similar sampled distributions. Together, the perturbation, Lyapunov-spectrum and attraction-basin tests support bounded hyperchaotic behaviour over the measured intervals [11–13]. These findings establish molecular space-time as an object of quantitative dynamical analysis. The larger persistent or complex group remains a screening category, whose members require individual testing. Section 3.3.2 reports the evidence for the two detailed candidates, and Section 4.4 addresses the remaining requirements for a fractal strange-attractor classification.
 
@@ -610,8 +612,6 @@ The genetic search also tested optional summaries of trajectory change. The *dyn
 
 The evolutionary-strategy experiment changed the procedure used to optimise numerical weights while holding the CYP3A4 Graph-CA design fixed. This allowed a direct comparison with backpropagation. Table B1 lists the fixed model settings that were removed from the main-text summary.
 
-**Table B1. Fixed Graph-CA settings used throughout the evolutionary-strategy experiment.**
-
 | Fixed setting | Value and meaning |
 |---|---|
 | Transition rule and prediction target | A damped-symplectic Graph-CA predicted CYP3A4 pIC50. Section 2.3 describes this transition rule. |
@@ -623,9 +623,9 @@ The evolutionary-strategy experiment changed the procedure used to optimise nume
 | Support fraction | A value of 0.6 assigned 60% of the eligible molecules in each training batch to the support subset used to fit the ridge readout. The remaining molecules formed the query subset. |
 | Ridge penalty | A value of 0.1 discouraged excessively large fingerprint coefficients in the ridge-regression readout. |
 
-An evolutionary configuration was one combination of the settings in Table B2. We evaluated 32 such combinations. For each evolutionary update, random changes were generated in opposite pairs around the current weights, as described in Section 2.4.3.
+**Table B1. Fixed Graph-CA settings used throughout the evolutionary-strategy experiment.**
 
-**Table B2. Evolutionary-strategy settings and tested values.**
+An evolutionary configuration was one combination of the settings in Table B2. We evaluated 32 such combinations. For each evolutionary update, random changes were generated in opposite pairs around the current weights, as described in Section 2.4.3.
 
 | Evolutionary setting | Meaning | Values tested |
 |---|---|---|
@@ -636,9 +636,9 @@ An evolutionary configuration was one combination of the settings in Table B2. W
 | Batch composition | Random composition selected molecules without using their measured activity to arrange the support and query subsets. Activity-stratified composition distributed query molecules across the observed pIC50 range, with the remaining molecules assigned to the support subset. | Random or activity-stratified. |
 | Stopping policy | The rule specifying the maximum number of training epochs and how long training continued without sufficient improvement in validation MA-ST-RAE. | The four combinations of maximum training length and stopping thresholds defined in Table B3. |
 
-Each epoch comprised one evolutionary update. Training stopped at the maximum number of epochs or when validation MA-ST-RAE failed to improve by at least the minimum improvement for the stated number of consecutive epochs, called the patience period.
+**Table B2. Evolutionary-strategy settings and tested values.**
 
-**Table B3. Stopping policies tested during evolutionary-strategy optimisation.**
+Each epoch comprised one evolutionary update. Training stopped at the maximum number of epochs or when validation MA-ST-RAE failed to improve by at least the minimum improvement for the stated number of consecutive epochs, called the patience period.
 
 | Stopping policy | Maximum epochs | Patience period | Minimum improvement in MA-ST-RAE |
 |---|---:|---:|---:|
@@ -647,12 +647,12 @@ Each epoch comprised one evolutionary update. Training stopped at the maximum nu
 | Up to 80 updates | 80 | 20 | 0.002 |
 | Up to 100 updates | 100 | 25 | 0.001 |
 
+**Table B3. Stopping policies tested during evolutionary-strategy optimisation.**
+
 
 ## Appendix C. Hybrid Genetic Graph-CA Structure Search
 
 The hybrid genetic search changed discrete choices in the CYP3A4 Graph-CA design while backpropagation trained the numerical weights of every candidate. Each candidate was defined by a complete list of model-design choices. The numerical optimiser settings associated with each transition-rule family remained fixed, allowing the genetic algorithm to compare model structures without simultaneously searching a second set of continuous training parameters.
-
-**Table C1. Model-design choices varied by the hybrid genetic search.**
 
 | Design choice | Meaning | Options tested |
 |---|---|---|
@@ -671,11 +671,11 @@ The hybrid genetic search changed discrete choices in the CYP3A4 Graph-CA design
 | Temporal extrema | Whether the fingerprint included smooth estimates of the largest and smallest molecular mean states reached during the trajectory. | Disabled or enabled. |
 | Separate summaries of state increases and decreases | Whether increases and decreases in state values were summarised separately. | Disabled or enabled. |
 
+**Table C1. Model-design choices varied by the hybrid genetic search.**
+
 The search used four genetic generations containing 24 unique candidate structures each. Tournament selection chose a parent by comparing three candidates. Uniform crossover constructed a child by choosing each design setting from either parent, and mutation independently changed each setting with probability 0.25.
 
 Every candidate was trained by backpropagation on two scaffold-separated folds for at most 35 epochs. The 96 candidates therefore produced 192 screening runs. The four strongest candidates and the fixed damped-symplectic reference then underwent confirmation using five scaffold folds, two seeds and at most 80 epochs, producing another 50 runs and 242 runs in total. MA-ST-RAE on the internal validation folds guided selection of candidate model configurations, with lower prediction error favouring selection. RMSE provided a complementary measure of prediction error. The sealed holdout and blind labels were excluded from screening, selection and confirmation.
-
-**Table C2. Configuration selected by the hybrid genetic search.**
 
 | Component | Selected setting |
 |---|---|
@@ -694,12 +694,12 @@ Every candidate was trained by backpropagation on two scaffold-separated folds f
 | Temporal extrema | Disabled. |
 | Separate summaries of state increases and decreases | Disabled. |
 
+**Table C2. Configuration selected by the hybrid genetic search.**
+
 
 ## Appendix D. Genetic Programming of the Transition Rule
 
 The genetic-programming experiment retained the hybrid search's selected CYP3A4 configuration and changed only the mathematical transition rule. Each candidate rule was represented as an expression tree. Mathematical operations formed the branches, while the available input vectors formed the terminal leaves. A candidate rule remained fixed throughout its training and validation trajectories, although backpropagation continued to train its numerical weights.
-
-**Table D1. Input vectors available to each candidate transition rule.**
 
 | Candidate input | Meaning |
 |---|---|
@@ -708,13 +708,15 @@ The genetic-programming experiment retained the hybrid search's selected CYP3A4 
 | Neighbour difference, h̄ᵢ⁽ᵗ⁾−hᵢ⁽ᵗ⁾ | The mean state of the atom's bonded neighbours minus the atom's own state. |
 | Delayed-state difference, hᵢ⁽ᵗ⁻ᵈ⁾−hᵢ⁽ᵗ⁾ | A retained earlier state of the atom minus its current state. |
 
-**Table D2. Mathematical operations available to genetic programming.**
+**Table D1. Input vectors available to each candidate transition rule.**
 
 | Operation group | Permitted operations |
 |---|---|
 | Two-input operations | Addition, subtraction, multiplication and the mean of two inputs. |
 | One-input operations | Negation, hyperbolic tangent, sine and multiplication by a fixed scale. |
 | Fixed scales | −1.0, −0.5, 0.25, 0.5 or 1.0. |
+
+**Table D2. Mathematical operations available to genetic programming.**
 
 Expression trees were limited to a maximum depth of four. The search evaluated four successive populations, each containing 24 distinct candidate cellular automaton transition rules. Tournament selection compared groups of three candidates when choosing parents. Subtree crossover exchanged a complete part of one parent expression with a part of another. With probability 0.35, mutation replaced a randomly selected part of the resulting expression with a newly generated subtree. A penalty of 0.0005 per expression-tree node discouraged additional complexity unless it improved predictive performance.
 
@@ -754,6 +756,7 @@ The selected cellular automaton transition rule averaged the local-input vector 
 27. Wolf A, Swift JB, Swinney HL, Vastano JA. Determining Lyapunov exponents from a time series. *Physica D: Nonlinear Phenomena*. 1985;16(3):285–317. doi: [10.1016/0167-2789(85)90011-9](https://doi.org/10.1016/0167-2789(85)90011-9).
 28. Eckmann J-P, Oliffson Kamphorst S, Ruelle D. Recurrence plots of dynamical systems. *Europhysics Letters*. 1987;4(9):973–977. [Full text](https://www.ihes.fr/~ruelle/PUBLICATIONS/%5B92%5D.pdf).
 29. Miranda RA, Costa SGSP, Alves RA, Ferreira JL. Spectral entropy of plasma oscillations in numerical simulations of a Hall thruster during start-up transients. *Journal of Electric Propulsion*. 2026;5:7. doi: [10.1007/s44205-026-00180-2](https://doi.org/10.1007/s44205-026-00180-2).
-30. Gershenson C. Emergence in Artificial Life. *Artificial Life*. 2023;29(2):153–167. doi: [10.1162/artl_a_00397](https://doi.org/10.1162/artl_a_00397).
-31. Bedau MA. Artificial life: organization, adaptation and complexity from the bottom up. *Trends in Cognitive Sciences*. 2003;7(11):505–512. doi: [10.1016/j.tics.2003.09.012](https://doi.org/10.1016/j.tics.2003.09.012).
-32. Shannon CE. A mathematical theory of communication. *Bell System Technical Journal*. 1948;27:379–423, 623–656. doi: [10.1002/j.1538-7305.1948.tb01338.x](https://doi.org/10.1002/j.1538-7305.1948.tb01338.x); [10.1002/j.1538-7305.1948.tb00917.x](https://doi.org/10.1002/j.1538-7305.1948.tb00917.x).
+30. Benettin G, Galgani L, Giorgilli A, Strelcyn JM. Lyapunov characteristic exponents for smooth dynamical systems and for Hamiltonian systems; a method for computing all of them. Part 2: numerical application. *Meccanica*. 1980;15(1):21–30. doi: [10.1007/BF02128237](https://doi.org/10.1007/BF02128237).
+31. Gershenson C. Emergence in Artificial Life. *Artificial Life*. 2023;29(2):153–167. doi: [10.1162/artl_a_00397](https://doi.org/10.1162/artl_a_00397).
+32. Bedau MA. Artificial life: organization, adaptation and complexity from the bottom up. *Trends in Cognitive Sciences*. 2003;7(11):505–512. doi: [10.1016/j.tics.2003.09.012](https://doi.org/10.1016/j.tics.2003.09.012).
+33. Shannon CE. A mathematical theory of communication. *Bell System Technical Journal*. 1948;27:379–423, 623–656. doi: [10.1002/j.1538-7305.1948.tb01338.x](https://doi.org/10.1002/j.1538-7305.1948.tb01338.x); [10.1002/j.1538-7305.1948.tb00917.x](https://doi.org/10.1002/j.1538-7305.1948.tb00917.x).
