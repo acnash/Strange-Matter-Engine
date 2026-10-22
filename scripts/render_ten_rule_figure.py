@@ -40,15 +40,17 @@ def main():
     parser.add_argument('--data-root', type=Path, required=True)
     parser.add_argument('--output-root', type=Path, default=Path(__file__).resolve().parents[1])
     parser.add_argument('--linkedin', action='store_true', help='Restyle saved figure data without running calculations')
+    parser.add_argument('--saved-data', action='store_true', help='Render the publication figure from its saved arrays only')
     args = parser.parse_args()
+    reuse = args.linkedin or args.saved_data
     root, dest = args.data_root.resolve(), args.output_root.resolve()
     archive = root / 'results/long_horizon_attractor_campaign_v1/base_trajectories'
     run = root / 'results/figure2_ten_rules_20261017'
     run.mkdir(parents=True, exist_ok=True)
     generated = run / 'conservative_graph_flux'
     checkpoint = root / 'results/production_conservative_graph_flux_enhanced_v3/runs/final_model/model.pt'
-    ck_hash = digest(checkpoint) if not args.linkedin else None
-    if not args.linkedin and not (generated / 'trajectory_generation_complete.json').exists():
+    ck_hash = digest(checkpoint) if not reuse else None
+    if not reuse and not (generated / 'trajectory_generation_complete.json').exists():
         env = {k:v for k,v in os.environ.items() if not k.startswith('SME_')}
         env.update({
             'SME_CHECKPOINT': str(checkpoint),
@@ -62,7 +64,7 @@ def main():
         })
         subprocess.run([sys.executable, str(root / 'scripts/run_graph_ca_visual_prototype.py'),
                         'extended-dynamics'], env=env, cwd=root, check=True)
-    if not args.linkedin:
+    if not reuse:
         assert digest(checkpoint) == ck_hash, 'Frozen checkpoint changed'
     states_dir = dest / 'publication/figure_data/figure2_ten_rules'
     figures = dest / 'publication/figures'
@@ -73,7 +75,7 @@ def main():
     for index, (rule, title) in enumerate(RULES):
         folder = generated if rule == 'conservative_graph_flux' else archive / rule
         source = folder / 'node_trajectories/case_001.npz'
-        if args.linkedin:
+        if reuse:
             source = states_dir / f'{index+1:02d}_{rule}.npz'
         with np.load(source, allow_pickle=False) as data:
             states = data['trajectory'][:257].copy()
@@ -89,7 +91,7 @@ def main():
         if rule != 'conservative_graph_flux':
             assert np.min(states[:,:,0]) >= -1.000001 and np.max(states[:,:,0]) <= 1.000001
         saved = states_dir / f'{index+1:02d}_{rule}.npz'
-        if args.linkedin:
+        if reuse:
             panels.append((states, molecule, rule, title))
             continue
         np.savez_compressed(saved, trajectory=states, molecule_id=molecule, cyp_target=cyp,
@@ -113,7 +115,9 @@ def main():
         panels.append((states, molecule, rule, title))
     plt.rcParams.update({'font.family':'Arial', 'font.size':9, 'axes.labelsize':9,
                          'xtick.labelsize':9, 'ytick.labelsize':9, 'pdf.fonttype':42,
-                         'text.color':'#30363e', 'axes.edgecolor':'#68717a'})
+                         'text.color':'#000000', 'axes.edgecolor':'#000000',
+                         'axes.labelcolor':'#000000', 'axes.titlecolor':'#000000',
+                         'xtick.color':'#000000', 'ytick.color':'#000000'})
     if args.linkedin:
         plt.rcParams.update({'figure.facecolor':'#08182D', 'axes.facecolor':'#08182D',
                              'text.color':'#C9DDF0', 'axes.labelcolor':'#80DFFF',
@@ -131,7 +135,7 @@ def main():
         im = ax.imshow(states[:,:,0], cmap='twilight_shifted' if cyclic else 'RdBu_r',
                        vmin=-limit,vmax=limit,origin='upper',aspect='auto',interpolation='nearest',
                        extent=(.5,count+.5,256.5,-.5),rasterized=True)
-        ax.set_title(f'{chr(65+i)}  {title}', loc='left', fontsize=10, fontweight='bold', pad=20)
+        ax.set_title(f'{chr(65+i)})  {title}', loc='left', fontsize=10, fontweight='bold', pad=20)
         ax.text(0,1.055,f'{molecule}  |  CYP1A2', transform=ax.transAxes,fontsize=8.5,va='bottom')
         ax.set_xticks(sorted(set([1,(count+1)//2,count])))
         ax.set_yticks([0,128,256])
@@ -163,7 +167,7 @@ def main():
     print('Saving figure PNG.', flush=True)
     fig.savefig(png,dpi=600,facecolor='#08182D' if args.linkedin else 'white')
     plt.close(fig)
-    if args.linkedin:
+    if reuse:
         print(json.dumps(dict(png=str(png),source='Saved publication arrays; values and colour scales unchanged'),indent=2))
         return
     manifest = dict(generations=[0,256],channel=1,normalisation='none',

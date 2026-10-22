@@ -2,6 +2,7 @@
 """Render the complementary evidence supporting the strange-attractor claim."""
 
 from pathlib import Path
+from textwrap import fill
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -11,7 +12,7 @@ import pandas as pd
 ROOT = Path(__file__).resolve().parents[1]
 CAMPAIGN = ROOT / "results" / "long_horizon_attractor_campaign_v1"
 OUTPUT = CAMPAIGN / "figures"
-BLUE, ORANGE, GREY, BLACK = "#0072B2", "#D55E00", "#6B7280", "#171717"
+BLUE, ORANGE, GREY, BLACK = "#0072B2", "#D55E00", "#6B7280", "#000000"
 MOLECULES = {
     "OCNT-0494110": ("Trajectory 7 · OCNT-0494110 · CYP2C9", BLUE),
     "OCNT-2328784": ("Trajectory 8 · OCNT-2328784 · CYP1A2", ORANGE),
@@ -19,11 +20,11 @@ MOLECULES = {
 
 
 def style_axis(ax, letter, title):
-    ax.set_title(f"{letter}  |  {title}", loc="left", fontsize=12,
+    ax.set_title(f"{letter}) {fill(title, width=32)}", loc="left", fontsize=22,
                  fontweight="bold", pad=10)
     ax.grid(color="#D9D9D9", linewidth=.65, alpha=.75)
     ax.spines[["top", "right"]].set_visible(False)
-    ax.tick_params(labelsize=8)
+    ax.tick_params(labelsize=19, colors=BLACK)
 
 
 def main():
@@ -34,8 +35,10 @@ def main():
     basin = pd.read_csv(CAMPAIGN / "attractor_basin_float64" / "basin_runs.csv")
 
     plt.rcParams.update({"figure.facecolor": "white", "axes.facecolor": "white",
-                         "savefig.facecolor": "white", "font.family": "DejaVu Sans",
-                         "text.color": BLACK, "axes.labelcolor": BLACK})
+                         "savefig.facecolor": "white", "font.family": "Arial",
+                         "text.color": BLACK, "axes.labelcolor": BLACK,
+                         "font.size": 19, "axes.labelsize": 19,
+                         "pdf.fonttype": 42, "ps.fonttype": 42})
     fig, axes = plt.subplots(2, 2, figsize=(15.2, 11.2), facecolor="white")
 
     ax = axes[0, 0]
@@ -47,7 +50,7 @@ def main():
     ax.set_xscale("log"); ax.set_xlabel("Perturbation magnitude, ε")
     ax.set_ylabel("Renormalized largest Lyapunov exponent")
     style_axis(ax, "A", "Continually regenerated divergence")
-    ax.legend(frameon=False, fontsize=8, loc="best")
+    ax.legend(frameon=False, fontsize=16, loc="best")
 
     ax = axes[0, 1]
     chosen = spectrum[spectrum.interval == 10]
@@ -98,15 +101,15 @@ def main():
                           markeredgecolor="none", label=label)
                for label, colour in MOLECULES.values()]
     handles.append(plt.Line2D([0], [0], color=BLACK, ls="--", label="No contraction"))
-    ax.legend(handles=handles, frameon=False, fontsize=8, loc="lower right")
+    ax.legend(handles=handles, frameon=False, fontsize=16, loc="lower right")
 
-    fig.suptitle("Independent Evidence for Graph-CA Strange Attractors",
-                 fontsize=17, fontweight="bold", y=.985)
-    fig.subplots_adjust(left=.08, right=.98, bottom=.065, top=.93, hspace=.30, wspace=.23)
+    fig.subplots_adjust(left=.12, right=.98, bottom=.10, top=.90, hspace=.62, wspace=.48)
     png = OUTPUT / "18_strange_attractor_evidence_plate.png"
     pdf = OUTPUT / "18_strange_attractor_evidence_plate.pdf"
-    fig.savefig(png, dpi=320, bbox_inches="tight", facecolor="white")
+    fig.savefig(png, dpi=600, bbox_inches="tight", facecolor="white")
     fig.savefig(pdf, bbox_inches="tight", facecolor="white")
+    fig.savefig(OUTPUT / "18_strange_attractor_evidence_plate_preview.png",
+                dpi=110, bbox_inches="tight", facecolor="white")
     plt.close(fig)
     print(png); print(pdf)
 
