@@ -102,7 +102,7 @@ def main() -> None:
     panel_font = font(86, True)
     detail_font, tick_font = font(78), font(78)
     column_width = width / 4
-    plot_top, plot_bottom = 260, 1680
+    plot_top, plot_bottom = 370, 1680
 
     for case_index, case in enumerate(CASES):
         state = np.load(case.trajectory)["trajectory"].astype(np.float64)
